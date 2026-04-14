@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>发布任务 - 校园互助任务平台</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助任务平台</div>
+            <nav class="nav-links">
+                <a href="index.html">首页</a>
+                <a href="task-hall.html">任务大厅</a>
+                <a href="publish-task.html" class="active">发布任务</a>
+                <a href="message-center.html">消息中心</a>
+                <span id="navAuthArea"></span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <div class="card form-container">
+                <h1 class="form-title">发布任务</h1>
+
+                <form>
+                    <div class="form-group">
+                        <label for="taskTitle">任务标题</label>
+                        <input type="text" id="taskTitle" class="form-control" placeholder="请输入任务标题" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskCategory">任务分类</label>
+                        <select id="taskCategory" class="form-control placeholder-select" required>
+                            <option value="" selected disabled>请选择任务分类</option>
+                            <option value="跑腿代办">跑腿代办（快递、外卖、代买）</option>
+                            <option value="生活服务">生活服务（搬运、打印、帮忙）</option>
+                            <option value="技能帮助">技能帮助（维修、设计、编程）</option>
+                            <option value="学习互助">学习互助（答疑、辅导、陪学）</option>
+                            <option value="资料共享">资料共享（课件、笔记、资料）</option>
+                            <option value="物品交易">物品交易（二手、闲置、交换）</option>
+                            <option value="组队协作">组队协作（搭子、组队、合作）</option>
+                            <option value="其他">其他（其他类型任务）</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskDesc">任务描述</label>
+                        <textarea id="taskDesc" class="form-control" placeholder="请输入任务描述"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskReward">报酬金额</label>
+                        <input type="text" id="taskReward" class="form-control" placeholder="请输入报酬金额" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskDeadline">截止时间</label>
+                        <input type="datetime-local" id="taskDeadline" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskContact">联系方式（可选）</label>
+                        <input type="text" id="taskContact" class="form-control" placeholder="请输入联系方式" />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="showDemoMessage('发布成功（演示）')">发布</button>
+                        <button type="reset" class="btn btn-secondary">重置</button>
+                        <a href="index.html" class="btn btn-gray">返回</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助任务平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

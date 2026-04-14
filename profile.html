@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>个人中心</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助任务平台</div>
+            <nav class="nav-links">
+                <a href="index.html">首页</a>
+                <a href="task-hall.html">任务大厅</a>
+                <a href="publish-task.html">发布任务</a>
+                <a href="message-center.html">消息中心</a>
+                <span id="navAuthArea"></span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <h1 class="section-title">个人中心</h1>
+
+            <div class="card profile-box">
+                <div class="profile-avatar">用户头像</div>
+
+                <div class="profile-info">
+                    <p>用户名：<span id="profileUsername">张三</span></p>
+                    <p>手机号：<span id="profilePhone">13800000000</span></p>
+                    <p>实名认证状态：已认证</p>
+                    <p>学院：计算机学院</p>
+                    <p>信用评分：4.8 / 5.0</p>
+                    <p>个人简介：乐于助人，常在线，愿意参与校园互助任务。</p>
+
+                    <div class="actions">
+                        <a href="auth.html" class="btn btn-secondary">去实名认证</a>
+                        <a href="my-task.html" class="btn btn-secondary">我的任务</a>
+                        <a href="message-center.html" class="btn btn-secondary">消息中心</a>
+                        <button type="button" class="btn btn-danger" id="logoutBtn">退出登录</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助任务平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

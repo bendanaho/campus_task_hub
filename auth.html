@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>实名认证</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助任务平台</div>
+            <nav class="nav-links">
+                <a href="index.html">首页</a>
+                <span id="navAuthArea"></span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <div class="card form-container">
+                <h1 class="form-title">实名认证</h1>
+
+                <form>
+                    <div class="form-group">
+                        <label for="realName">真实姓名</label>
+                        <input type="text" id="realName" class="form-control" placeholder="请输入真实姓名" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="studentId">学号</label>
+                        <input type="text" id="studentId" class="form-control" placeholder="请输入学号" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="college">学院</label>
+                        <input type="text" id="college" class="form-control" placeholder="请输入学院" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="className">班级</label>
+                        <input type="text" id="className" class="form-control" placeholder="请输入班级" />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="showDemoMessage('认证提交成功（演示）')">提交认证</button>
+                        <a href="profile.html" class="btn btn-secondary">返回个人中心</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助任务平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

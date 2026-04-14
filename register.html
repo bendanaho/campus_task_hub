@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>用户注册</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助任务平台</div>
+            <nav class="nav-links">
+                <a href="index.html">首页</a>
+                <a href="login.html">登录</a>
+                <a href="register.html" class="active">注册</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <div class="card form-container">
+                <h1 class="form-title">用户注册</h1>
+
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerUsername">用户名</label>
+                        <input
+                            type="text"
+                            id="registerUsername"
+                            class="form-control"
+                            placeholder="请输入用户名"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerPhone">手机号</label>
+                        <input
+                            type="text"
+                            id="registerPhone"
+                            class="form-control"
+                            placeholder="请输入手机号"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerPassword">密码</label>
+                        <input
+                            type="password"
+                            id="registerPassword"
+                            class="form-control"
+                            placeholder="请输入密码"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerConfirmPassword">确认密码</label>
+                        <input
+                            type="password"
+                            id="registerConfirmPassword"
+                            class="form-control"
+                            placeholder="请再次输入密码"
+                        />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn">注册</button>
+                        <a href="login.html" class="btn btn-secondary">返回登录</a>
+                    </div>
+                </form>
+
+                <p class="note">说明：注册信息将保存在当前浏览器本地，仅用于静态演示。</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助任务平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>校园互助任务平台 - 首页</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助任务平台</div>
+            <nav class="nav-links">
+                <a href="index.html" class="active">首页</a>
+                <a href="task-hall.html">任务大厅</a>
+                <a href="publish-task.html">发布任务</a>
+                <a href="message-center.html">消息中心</a>
+                <span id="navAuthArea"></span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <section class="hero">
+                <h1>欢迎使用校园互助任务平台</h1>
+                <p>
+                    本平台面向校园用户，提供任务发布、任务接单、站内沟通、评价反馈等功能，
+                    旨在帮助同学们高效完成代取快递、代拿外卖、跑腿帮忙、学习互助等校园服务。
+                </p>
+                <div class="hero-actions">
+                    <a href="task-hall.html" class="btn">进入任务大厅</a>
+                    <a href="publish-task.html" class="btn btn-secondary">立即发布任务</a>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">平台主要功能</h2>
+                <div class="grid-3">
+                    <div class="card feature-card">
+                        <h3>任务发布</h3>
+                        <p>用户可以快速发布校园互助任务，填写标题、描述、赏金与截止时间等信息。</p>
+                    </div>
+                    <div class="card feature-card">
+                        <h3>任务接单</h3>
+                        <p>用户可以在任务大厅浏览可接取任务，查看详情后选择是否接单。</p>
+                    </div>
+                    <div class="card feature-card">
+                        <h3>站内沟通</h3>
+                        <p>发布者与接单者可进入聊天界面查看历史消息并发送文本消息。</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">推荐任务</h2>
+
+                <div class="task-list">
+                    <div class="task-item">
+                        <h3>帮忙取快递</h3>
+                        <p class="meta">发布者：张三 ｜ 报酬：5元 ｜ 状态：待接单</p>
+                        <p>地点：学校菜鸟驿站，今晚 7 点前帮忙取件送到宿舍楼下。</p>
+                        <div class="actions">
+                            <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
+                        </div>
+                    </div>
+
+                    <div class="task-item">
+                        <h3>图书馆占座</h3>
+                        <p class="meta">发布者：李同学 ｜ 报酬：3元 ｜ 状态：待接单</p>
+                        <p>早上 8 点前在图书馆三楼帮忙占一个靠窗位置。</p>
+                        <div class="actions">
+                            <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助任务平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

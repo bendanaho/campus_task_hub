@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>聊天详情</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助任务平台</div>
+            <nav class="nav-links">
+                <a href="index.html">首页</a>
+                <a href="message-center.html">消息中心</a>
+                <a href="my-task.html">我的任务</a>
+                <span id="navAuthArea"></span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <div class="chat-header">
+                <div>
+                    <h1 class="section-title">聊天详情</h1>
+                    <p class="meta">聊天对象：李四</p>
+                    <p class="meta">对应任务：帮忙取快递</p>
+                </div>
+                <a href="message-center.html" class="btn btn-secondary">返回</a>
+            </div>
+
+            <div class="chat-box">
+                <div class="chat-message chat-left">
+                    <div>你好，请问你现在方便帮我去取一下快递吗？</div>
+                    <div class="chat-time">2026-04-07 14:05</div>
+                </div>
+
+                <div class="chat-message chat-right">
+                    <div>可以的，我现在正好在驿站附近。</div>
+                    <div class="chat-time">2026-04-07 14:07</div>
+                </div>
+
+                <div class="chat-message chat-left">
+                    <div>好的，那麻烦你取到后送到 3 号宿舍楼下。</div>
+                    <div class="chat-time">2026-04-07 14:08</div>
+                </div>
+
+                <div class="chat-message chat-right">
+                    <div>好的，我 10 分钟后到宿舍楼下。</div>
+                    <div class="chat-time">2026-04-07 14:30</div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <textarea class="form-control" placeholder="请输入消息内容"></textarea>
+                <button type="button" class="btn" onclick="showDemoMessage('发送成功（演示）')">发送</button>
+                <button type="button" class="btn btn-secondary" onclick="location.reload()">刷新</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助任务平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>
