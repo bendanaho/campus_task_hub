@@ -183,6 +183,7 @@ function protectProfilePage() {
 function initTaskHallFilter() {
     const filterDropdown = document.getElementById("filterDropdown");
     const filterToggle = document.getElementById("filterToggle");
+    const taskTypeFilter = document.getElementById("taskTypeFilter");
     const taskKeyword = document.getElementById("taskKeyword");
     const searchBtn = document.getElementById("searchBtn");
     const categoryInputs = document.querySelectorAll('input[name="taskCategory"]');
@@ -211,6 +212,12 @@ function initTaskHallFilter() {
         });
     });
 
+    if (taskTypeFilter) {
+        taskTypeFilter.addEventListener("change", function () {
+            filterTasks();
+        });
+    }
+
     if (searchBtn) {
         searchBtn.addEventListener("click", function () {
             filterTasks();
@@ -220,6 +227,7 @@ function initTaskHallFilter() {
     if (taskKeyword) {
         taskKeyword.addEventListener("keydown", function (e) {
             if (e.key === "Enter") {
+                e.preventDefault();
                 filterTasks();
             }
         });
@@ -249,12 +257,17 @@ function initTaskHallFilter() {
             return input.value;
         });
 
+        const selectedType = taskTypeFilter ? taskTypeFilter.value : "all";
         const keyword = taskKeyword ? taskKeyword.value.trim().toLowerCase() : "";
         let visibleCount = 0;
 
         taskItems.forEach(function (item) {
             const category = item.getAttribute("data-category") || "";
+            const type = item.getAttribute("data-type") || "";
             const text = item.textContent.toLowerCase();
+
+            const typeMatched =
+                selectedType === "all" || type === selectedType;
 
             const categoryMatched =
                 selectedCategories.length === 0 || selectedCategories.includes(category);
@@ -262,7 +275,7 @@ function initTaskHallFilter() {
             const keywordMatched =
                 keyword === "" || text.includes(keyword);
 
-            if (categoryMatched && keywordMatched) {
+            if (typeMatched && categoryMatched && keywordMatched) {
                 item.style.display = "block";
                 visibleCount++;
             } else {

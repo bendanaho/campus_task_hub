@@ -131,6 +131,22 @@ select {
     background-color: #6c757d;
 }
 
+.btn-publish {
+    background-color: #1f6feb;
+}
+
+.btn-take {
+    background-color: #16a34a;
+}
+
+.btn-demand {
+    background-color: #f59e0b;
+}
+
+.btn-service {
+    background-color: #16a34a;
+}
+
 .section {
     margin-top: 28px;
 }
@@ -173,9 +189,14 @@ select {
 
 .form-title {
     font-size: 28px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     text-align: center;
     color: #1f3b64;
+}
+
+.page-intro {
+    text-align: center;
+    margin-bottom: 20px;
 }
 
 .form-group {
@@ -195,11 +216,30 @@ select {
     border-radius: 8px;
     background-color: #fff;
     font-size: 14px;
+    color: #333;
 }
 
 textarea.form-control {
     resize: vertical;
     min-height: 100px;
+}
+
+/* 输入框 placeholder */
+.form-control::placeholder {
+    color: #999999;
+}
+
+/* select 模拟 placeholder */
+.placeholder-select {
+    color: #999999;
+}
+
+.placeholder-select:valid {
+    color: #333333;
+}
+
+.placeholder-select option {
+    color: #333333;
 }
 
 .form-actions {
@@ -226,11 +266,38 @@ textarea.form-control {
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
+.task-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
 .task-item h3,
 .message-item h3,
 .record-item h3 {
-    margin-bottom: 10px;
     color: #1f3b64;
+}
+
+.task-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+.badge-demand {
+    background-color: #fff3cd;
+    color: #b45309;
+}
+
+.badge-service {
+    background-color: #dcfce7;
+    color: #15803d;
 }
 
 .meta {
@@ -256,7 +323,15 @@ textarea.form-control {
 
 .search-bar .form-control {
     flex: 1;
-    min-width: 240px;
+    min-width: 220px;
+}
+
+.single-filter {
+    min-width: 160px;
+}
+
+.single-filter .form-control {
+    min-width: 160px;
 }
 
 .detail-box p {
@@ -533,6 +608,14 @@ textarea.form-control {
 
     .hero h1 {
         font-size: 28px;
+    }
+
+    .single-filter {
+        width: 100%;
+    }
+
+    .single-filter .form-control {
+        width: 100%;
     }
 
     .filter-dropdown {

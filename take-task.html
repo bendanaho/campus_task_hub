@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>发布任务 - 校园互助任务平台</title>
+    <title>我要接单 - 校园互助任务平台</title>
     <link rel="stylesheet" href="css/style.css" />
     <script src="js/main.js" defer></script>
 </head>
@@ -14,8 +14,8 @@
             <nav class="nav-links">
                 <a href="index.html">首页</a>
                 <a href="task-hall.html">任务大厅</a>
-                <a href="publish-task.html" class="active">发布任务</a>
-                <a href="take-task.html">我要接单</a>
+                <a href="publish-task.html">发布任务</a>
+                <a href="take-task.html" class="active">我要接单</a>
                 <a href="message-center.html">消息中心</a>
                 <span id="navAuthArea"></span>
             </nav>
@@ -25,23 +25,23 @@
     <main class="page">
         <div class="container">
             <div class="card form-container">
-                <h1 class="form-title">发布任务</h1>
-                <p class="note page-intro">发布你的需求，等待其他同学接单并完成任务。</p>
+                <h1 class="form-title">我要接单</h1>
+                <p class="note page-intro">发布你的服务能力，让有需求的同学主动联系你。</p>
 
                 <form>
                     <div class="form-group">
-                        <label for="taskTitle">任务标题</label>
+                        <label for="serviceTitle">服务标题</label>
                         <input
                             type="text"
-                            id="taskTitle"
+                            id="serviceTitle"
                             class="form-control"
-                            placeholder="请输入任务标题"
+                            placeholder="请输入服务标题"
                         />
                     </div>
 
                     <div class="form-group">
-                        <label for="taskCategory">任务分类</label>
-                        <select id="taskCategory" class="form-control placeholder-select" required>
+                        <label for="serviceCategory">服务分类</label>
+                        <select id="serviceCategory" class="form-control placeholder-select" required>
                             <option value="" selected disabled>请选择任务分类</option>
                             <option value="跑腿代办">跑腿代办（快递、外卖、代买）</option>
                             <option value="生活服务">生活服务（搬运、打印、帮忙）</option>
@@ -55,47 +55,48 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="taskDesc">任务描述</label>
+                        <label for="serviceDesc">服务描述</label>
                         <textarea
-                            id="taskDesc"
+                            id="serviceDesc"
                             class="form-control"
-                            placeholder="请输入任务描述"
+                            placeholder="请输入服务内容、优势或可服务范围"
                         ></textarea>
                     </div>
 
                     <div class="form-group">
-                        <label for="taskReward">报酬金额</label>
+                        <label for="serviceReward">期望报酬</label>
                         <input
                             type="text"
-                            id="taskReward"
+                            id="serviceReward"
                             class="form-control"
-                            placeholder="请输入报酬金额"
+                            placeholder="请输入期望报酬，如 20元/次、15元起"
                         />
                     </div>
 
                     <div class="form-group">
-                        <label for="taskDeadline">截止时间</label>
+                        <label for="serviceTime">可服务时间</label>
                         <input
-                            type="datetime-local"
-                            id="taskDeadline"
+                            type="text"
+                            id="serviceTime"
                             class="form-control"
+                            placeholder="请输入可服务时间，如 工作日晚间、周末全天"
                         />
                     </div>
 
                     <div class="form-group">
-                        <label for="taskContact">联系方式（可选）</label>
+                        <label for="serviceContact">联系方式（可选）</label>
                         <input
                             type="text"
-                            id="taskContact"
+                            id="serviceContact"
                             class="form-control"
                             placeholder="请输入联系方式"
                         />
                     </div>
 
                     <div class="form-actions">
-                        <button type="button" class="btn btn-publish" onclick="showDemoMessage('任务发布成功（演示）')">发布任务</button>
+                        <button type="button" class="btn btn-take" onclick="showDemoMessage('接单信息发布成功（演示）')">发布接单信息</button>
                         <button type="reset" class="btn btn-secondary">重置</button>
-                        <a href="index.html" class="btn btn-gray">返回</a>
+                        <a href="task-hall.html" class="btn btn-gray">返回大厅</a>
                     </div>
                 </form>
             </div>
