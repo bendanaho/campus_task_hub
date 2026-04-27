@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>实名认证</title>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
     <script src="js/main.js" defer></script>
 </head>
 <body>
@@ -12,8 +15,7 @@
         <div class="container">
             <div class="logo">校园互助任务平台</div>
             <nav class="nav-links">
-                <a href="index.html">首页</a>
-                <span id="navAuthArea"></span>
+
             </nav>
         </div>
     </header>
@@ -45,7 +47,7 @@
                     </div>
 
                     <div class="form-actions">
-                        <button type="button" class="btn" onclick="showDemoMessage('认证提交成功（演示）')">提交认证</button>
+                        <button type="button" class="btn" id="authSubmitBtn">提交认证</button>
                         <a href="profile.html" class="btn btn-secondary">返回个人中心</a>
                     </div>
                 </form>

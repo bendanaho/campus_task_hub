@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>校园互助任务平台 - 首页</title>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
     <script src="js/main.js" defer></script>
 </head>
 <body>
@@ -12,11 +15,7 @@
         <div class="container">
             <div class="logo">校园互助任务平台</div>
             <nav class="nav-links">
-                <a href="index.html" class="active">首页</a>
-                <a href="task-hall.html">任务大厅</a>
-                <a href="publish-task.html">发布任务</a>
-                <a href="message-center.html">消息中心</a>
-                <span id="navAuthArea"></span>
+
             </nav>
         </div>
     </header>
@@ -56,24 +55,8 @@
             <section class="section">
                 <h2 class="section-title">推荐任务</h2>
 
-                <div class="task-list">
-                    <div class="task-item">
-                        <h3>帮忙取快递</h3>
-                        <p class="meta">发布者：张三 ｜ 报酬：5元 ｜ 状态：待接单</p>
-                        <p>地点：学校菜鸟驿站，今晚 7 点前帮忙取件送到宿舍楼下。</p>
-                        <div class="actions">
-                            <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        </div>
-                    </div>
-
-                    <div class="task-item">
-                        <h3>图书馆占座</h3>
-                        <p class="meta">发布者：李同学 ｜ 报酬：3元 ｜ 状态：待接单</p>
-                        <p>早上 8 点前在图书馆三楼帮忙占一个靠窗位置。</p>
-                        <div class="actions">
-                            <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        </div>
-                    </div>
+                <div class="task-list" id="taskList">
+                    <!-- 推荐任务由 JS 动态渲染 -->
                 </div>
             </section>
         </div>

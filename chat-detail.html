@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>聊天详情</title>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
     <script src="js/main.js" defer></script>
 </head>
 <body>
@@ -12,10 +15,7 @@
         <div class="container">
             <div class="logo">校园互助任务平台</div>
             <nav class="nav-links">
-                <a href="index.html">首页</a>
-                <a href="message-center.html">消息中心</a>
-                <a href="my-task.html">我的任务</a>
-                <span id="navAuthArea"></span>
+
             </nav>
         </div>
     </header>
@@ -54,8 +54,8 @@
             </div>
 
             <div class="chat-input-area">
-                <textarea class="form-control" placeholder="请输入消息内容"></textarea>
-                <button type="button" class="btn" onclick="showDemoMessage('发送成功（演示）')">发送</button>
+                <textarea id="chatInput" class="form-control" placeholder="请输入消息内容"></textarea>
+                <button type="button" class="btn" id="sendBtn">发送</button>
                 <button type="button" class="btn btn-secondary" onclick="location.reload()">刷新</button>
             </div>
         </div>

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>发布任务 - 校园互助任务平台</title>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
     <script src="js/main.js" defer></script>
 </head>
 <body>
@@ -12,12 +15,7 @@
         <div class="container">
             <div class="logo">校园互助任务平台</div>
             <nav class="nav-links">
-                <a href="index.html">首页</a>
-                <a href="task-hall.html">任务大厅</a>
-                <a href="publish-task.html" class="active">发布任务</a>
-                <a href="take-task.html">我要接单</a>
-                <a href="message-center.html">消息中心</a>
-                <span id="navAuthArea"></span>
+
             </nav>
         </div>
     </header>
@@ -43,14 +41,14 @@
                         <label for="taskCategory">任务分类</label>
                         <select id="taskCategory" class="form-control placeholder-select" required>
                             <option value="" selected disabled>请选择任务分类</option>
-                            <option value="跑腿代办">跑腿代办（快递、外卖、代买）</option>
-                            <option value="生活服务">生活服务（搬运、打印、帮忙）</option>
-                            <option value="技能帮助">技能帮助（维修、设计、编程）</option>
-                            <option value="学习互助">学习互助（答疑、辅导、陪学）</option>
-                            <option value="资料共享">资料共享（课件、笔记、资料）</option>
-                            <option value="物品交易">物品交易（二手、闲置、交换）</option>
-                            <option value="组队协作">组队协作（搭子、组队、合作）</option>
-                            <option value="其他">其他（其他类型任务）</option>
+                            <option value="errand">跑腿代办（快递、外卖、代买）</option>
+                            <option value="life-service">生活服务（搬运、打印、帮忙）</option>
+                            <option value="skill-help">技能帮助（维修、设计、编程）</option>
+                            <option value="study-help">学习互助（答疑、辅导、陪学）</option>
+                            <option value="material-share">资料共享（课件、笔记、资料）</option>
+                            <option value="item-trade">物品交易（二手、闲置、交换）</option>
+                            <option value="teamwork">组队协作（搭子、组队、合作）</option>
+                            <option value="other">其他（其他类型任务）</option>
                         </select>
                     </div>
 
@@ -93,7 +91,7 @@
                     </div>
 
                     <div class="form-actions">
-                        <button type="button" class="btn btn-publish" onclick="showDemoMessage('任务发布成功（演示）')">发布任务</button>
+                        <button type="button" class="btn btn-publish">发布任务</button>
                         <button type="reset" class="btn btn-secondary">重置</button>
                         <a href="index.html" class="btn btn-gray">返回</a>
                     </div>

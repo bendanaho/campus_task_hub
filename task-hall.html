@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>任务大厅 - 校园互助任务平台</title>
     <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
     <script src="js/main.js" defer></script>
 </head>
 <body>
@@ -12,12 +15,7 @@
         <div class="container">
             <div class="logo">校园互助任务平台</div>
             <nav class="nav-links">
-                <a href="index.html">首页</a>
-                <a href="task-hall.html" class="active">任务大厅</a>
-                <a href="publish-task.html">发布任务</a>
-                <a href="take-task.html">我要接单</a>
-                <a href="message-center.html">消息中心</a>
-                <span id="navAuthArea"></span>
+
             </nav>
         </div>
     </header>
@@ -123,6 +121,17 @@
                         placeholder="请输入任务关键词，如：快递、外卖、占座、辅导、设计"
                     />
 
+                    <div class="single-filter">
+                        <select id="sortSelect" class="form-control placeholder-select">
+                            <option value="" selected>默认排序</option>
+                            <option value="time_asc">发布时间：从早到晚</option>
+                            <option value="time_desc">发布时间：从晚到早</option>
+                            <option value="reward_asc">报酬金额：从低到高</option>
+                            <option value="reward_desc">报酬金额：从高到低</option>
+                            <option value="credit_asc">信用分数：从低到高</option>
+                            <option value="credit_desc">信用分数：从高到低</option>
+                        </select>
+                    </div>
                     <button type="button" class="btn" id="searchBtn">搜索</button>
                 </div>
 
@@ -134,332 +143,7 @@
             </div>
 
             <div class="task-list" id="taskList">
-                <!-- 需求单 -->
-                <div class="task-item" data-type="demand" data-category="errand">
-                    <div class="task-item-top">
-                        <h3>帮忙取快递</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：跑腿代办 ｜ 发布者：张三 ｜ 报酬：5元 ｜ 发布时间：2026-04-07 10:30 ｜ 状态：待接单</p>
-                    <p>从学校菜鸟驿站取一个中等大小快递，送到 3 号宿舍楼下即可。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="errand">
-                    <div class="task-item-top">
-                        <h3>代拿外卖</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：跑腿代办 ｜ 发布者：李四 ｜ 报酬：4元 ｜ 发布时间：2026-04-07 11:10 ｜ 状态：待接单</p>
-                    <p>帮忙从东门外卖柜取餐，送到教学楼 A 区门口。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="errand">
-                    <div class="task-item-top">
-                        <h3>代买文具</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：跑腿代办 ｜ 发布者：陈同学 ｜ 报酬：6元 ｜ 发布时间：2026-04-07 09:20 ｜ 状态：待接单</p>
-                    <p>帮忙去校内超市买 2 支黑色中性笔和 1 本 A4 草稿本，送到 5 号教学楼门口。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="life-service">
-                    <div class="task-item-top">
-                        <h3>帮忙打印课程论文</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：生活服务 ｜ 发布者：周同学 ｜ 报酬：3元 ｜ 发布时间：2026-04-07 08:50 ｜ 状态：待接单</p>
-                    <p>需要打印一份 12 页的课程论文，双面黑白，下午上课前送到教学楼 B 区。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="life-service">
-                    <div class="task-item-top">
-                        <h3>宿舍搬运行李</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：生活服务 ｜ 发布者：吴同学 ｜ 报酬：15元 ｜ 发布时间：2026-04-06 17:30 ｜ 状态：待接单</p>
-                    <p>需要帮忙把两个行李箱从 1 号宿舍楼搬到 8 号宿舍楼，有电梯。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="skill-help">
-                    <div class="task-item-top">
-                        <h3>帮修电脑无法联网问题</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：技能帮助 ｜ 发布者：孙同学 ｜ 报酬：20元 ｜ 发布时间：2026-04-07 12:00 ｜ 状态：待接单</p>
-                    <p>笔记本电脑连不上校园网，想请懂电脑的同学帮忙排查一下问题。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="skill-help">
-                    <div class="task-item-top">
-                        <h3>社团海报设计</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：技能帮助 ｜ 发布者：学生会宣传部 ｜ 报酬：30元 ｜ 发布时间：2026-04-06 19:40 ｜ 状态：待接单</p>
-                    <p>需要一张活动宣传海报，风格活泼简洁，今晚可先出草稿更好。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="study-help">
-                    <div class="task-item-top">
-                        <h3>图书馆占座</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：学习互助 ｜ 发布者：王同学 ｜ 报酬：3元 ｜ 发布时间：2026-04-06 20:20 ｜ 状态：待接单</p>
-                    <p>明天早上 8 点前在图书馆三楼帮忙占一个座位，靠窗优先。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="study-help">
-                    <div class="task-item-top">
-                        <h3>高数题目答疑</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：学习互助 ｜ 发布者：刘同学 ｜ 报酬：10元 ｜ 发布时间：2026-04-07 13:15 ｜ 状态：待接单</p>
-                    <p>想请一位同学帮忙讲解几道高等数学极限题，线下 30 分钟左右。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="material-share">
-                    <div class="task-item-top">
-                        <h3>借实验课报告模板</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：资料共享 ｜ 发布者：赵同学 ｜ 报酬：2元 ｜ 发布时间：2026-04-06 18:00 ｜ 状态：待接单</p>
-                    <p>想找一份上学期实验课报告模板作参考，有偿求助。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="material-share">
-                    <div class="task-item-top">
-                        <h3>求数据库课程笔记</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：资料共享 ｜ 发布者：何同学 ｜ 报酬：5元 ｜ 发布时间：2026-04-07 10:05 ｜ 状态：待接单</p>
-                    <p>想购买一份数据库原理的期中复习笔记，最好是本学期老师上课版本。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="item-trade">
-                    <div class="task-item-top">
-                        <h3>转让二手台灯</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：物品交易 ｜ 发布者：郑同学 ｜ 报酬：25元 ｜ 发布时间：2026-04-07 09:40 ｜ 状态：待接单</p>
-                    <p>毕业清理闲置，转让一盏九成新护眼台灯，可在宿舍区当面交易。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('联系对方功能演示中')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="item-trade">
-                    <div class="task-item-top">
-                        <h3>求购二手自行车</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：物品交易 ｜ 发布者：冯同学 ｜ 报酬：面议 ｜ 发布时间：2026-04-06 16:45 ｜ 状态：待接单</p>
-                    <p>想收一辆能正常骑行的二手自行车，预算 150 元以内，校内面交。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('联系对方功能演示中')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="teamwork">
-                    <div class="task-item-top">
-                        <h3>羽毛球搭子招募</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：组队协作 ｜ 发布者：许同学 ｜ 报酬：无 ｜ 发布时间：2026-04-07 15:10 ｜ 状态：待接单</p>
-                    <p>想找一位每周二、周四晚上一起打羽毛球的搭子，水平不限。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('报名成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="teamwork">
-                    <div class="task-item-top">
-                        <h3>数学建模比赛组队</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：组队协作 ｜ 发布者：邓同学 ｜ 报酬：无 ｜ 发布时间：2026-04-07 14:00 ｜ 状态：待接单</p>
-                    <p>准备参加校级数学建模比赛，想找会写论文或会编程的同学组队。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('报名成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="demand" data-category="other">
-                    <div class="task-item-top">
-                        <h3>失物招领信息代发布</h3>
-                        <span class="task-badge badge-demand">需求单</span>
-                    </div>
-                    <p class="meta">分类：其他 ｜ 发布者：校学生服务站 ｜ 报酬：1元 ｜ 发布时间：2026-04-07 09:00 ｜ 状态：待接单</p>
-                    <p>帮忙把一则失物招领信息转发到年级群，完成后截图即可。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-demand" onclick="showDemoMessage('接单成功（演示）')">接单</button>
-                    </div>
-                </div>
-
-                <!-- 服务单 -->
-                <div class="task-item" data-type="service" data-category="errand">
-                    <div class="task-item-top">
-                        <h3>可长期代取快递</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：跑腿代办 ｜ 发布者：林同学 ｜ 报酬：3-5元/单 ｜ 发布时间：2026-04-07 16:10 ｜ 状态：可接服务</p>
-                    <p>工作日傍晚可帮忙代取快递，覆盖西区宿舍，响应较快，支持提前联系。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="errand">
-                    <div class="task-item-top">
-                        <h3>可代买早餐和日用品</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：跑腿代办 ｜ 发布者：黄同学 ｜ 报酬：2-6元/次 ｜ 发布时间：2026-04-07 07:20 ｜ 状态：可接服务</p>
-                    <p>早上可顺路代买早餐、矿泉水、纸巾等日用品，南区宿舍优先。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="skill-help">
-                    <div class="task-item-top">
-                        <h3>提供 PPT 美化与排版服务</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：技能帮助 ｜ 发布者：设计社成员 ｜ 报酬：20元起 ｜ 发布时间：2026-04-06 21:30 ｜ 状态：可接服务</p>
-                    <p>可帮忙优化课程汇报 PPT、社团展示 PPT，支持简约风、学术风、活泼风。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="skill-help">
-                    <div class="task-item-top">
-                        <h3>提供基础电脑故障排查</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：技能帮助 ｜ 发布者：计算机专业同学 ｜ 报酬：15元起 ｜ 发布时间：2026-04-07 13:40 ｜ 状态：可接服务</p>
-                    <p>可协助处理系统卡顿、软件安装、打印机连接、校园网基础问题等。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="study-help">
-                    <div class="task-item-top">
-                        <h3>高数一对一答疑辅导</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：学习互助 ｜ 发布者：数学学院同学 ｜ 报酬：25元/小时 ｜ 发布时间：2026-04-07 18:00 ｜ 状态：可接服务</p>
-                    <p>可辅导极限、导数、积分等基础内容，适合期中前突击复习。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="study-help">
-                    <div class="task-item-top">
-                        <h3>英语口语陪练</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：学习互助 ｜ 发布者：外语系同学 ｜ 报酬：18元/30分钟 ｜ 发布时间：2026-04-07 17:25 ｜ 状态：可接服务</p>
-                    <p>可陪练四六级口语、自我介绍、日常对话，适合基础薄弱同学。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="material-share">
-                    <div class="task-item-top">
-                        <h3>出售整理版期中复习资料</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：资料共享 ｜ 发布者：郭同学 ｜ 报酬：8元/份 ｜ 发布时间：2026-04-07 16:35 ｜ 状态：可接服务</p>
-                    <p>提供数据库、数据结构、大学物理等课程的重点整理资料，可发电子版。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="life-service">
-                    <div class="task-item-top">
-                        <h3>帮忙打印装订资料</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：生活服务 ｜ 发布者：校内打印店兼职同学 ｜ 报酬：按页计费 ｜ 发布时间：2026-04-07 11:45 ｜ 状态：可接服务</p>
-                    <p>可代打印课程作业、论文、简历等，支持黑白和彩印，晚间也可联系。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
-
-                <div class="task-item" data-type="service" data-category="other">
-                    <div class="task-item-top">
-                        <h3>可代写活动推文初稿</h3>
-                        <span class="task-badge badge-service">服务单</span>
-                    </div>
-                    <p class="meta">分类：其他 ｜ 发布者：新媒体中心成员 ｜ 报酬：15元起 ｜ 发布时间：2026-04-06 22:10 ｜ 状态：可接服务</p>
-                    <p>可帮忙撰写活动预告、总结推文初稿，适合社团、班级、学生组织使用。</p>
-                    <div class="actions">
-                        <a href="task-detail.html" class="btn btn-secondary">查看详情</a>
-                        <button type="button" class="btn btn-service" onclick="showDemoMessage('联系服务者成功（演示）')">联系服务者</button>
-                    </div>
-                </div>
+                <!-- 任务列表由 JS 动态渲染 -->
             </div>
         </div>
     </main>
