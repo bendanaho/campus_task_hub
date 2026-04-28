@@ -10,10 +10,11 @@ function showDemoMessage(message) {
 
 var NAV_ITEMS = [
     { label: '首页', href: 'index.html' },
-    { label: '任务大厅', href: 'task-hall.html' },
+    { label: '互助大厅', href: 'task-hall.html' },
     { label: '发布任务', href: 'publish-task.html' },
     { label: '发布服务', href: 'take-task.html' },
-    { label: '消息中心', href: 'message-center.html' }
+    { label: '消息中心', href: 'message-center.html' },
+    { label: '我的订单', href: 'order-center.html' }
 ];
 
 function renderNav() {
@@ -32,7 +33,8 @@ function renderNav() {
     if (isLoggedIn()) {
         html += '<a href="profile.html">' + getCurrentUser().username + '</a>';
     } else {
-        html += '<a href="login.html">登录/注册</a>';
+        var redirectUrl = encodeURIComponent(currentPage);
+        html += '<a href="login.html?redirect=' + redirectUrl + '">登录/注册</a>';
     }
 
     navLinks.innerHTML = html;
@@ -44,7 +46,8 @@ function protectPage(pages) {
     var currentPage = window.location.pathname.split('/').pop();
     if (pages.indexOf(currentPage) >= 0 && !isLoggedIn()) {
         alert('请先登录。');
-        window.location.href = 'login.html';
+        var redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = 'login.html?redirect=' + redirectUrl;
         return false;
     }
     return true;
@@ -55,6 +58,12 @@ function protectPage(pages) {
 function handleRegisterForm() {
     var form = document.getElementById('registerForm');
     if (!form) return;
+
+    var redirect = getUrlParam('redirect') || '';
+    var loginLink = document.querySelector('a[href="login.html"]');
+    if (loginLink && redirect) {
+        loginLink.href = 'login.html?redirect=' + encodeURIComponent(redirect);
+    }
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -83,7 +92,9 @@ function handleRegisterForm() {
         register({ username: username, phone: phone, email: email, password: password })
             .then(function() {
                 alert('注册成功，请登录。');
-                window.location.href = 'login.html';
+                var redirect = getUrlParam('redirect') || '';
+                var target = redirect ? 'login.html?redirect=' + encodeURIComponent(redirect) : 'login.html';
+                window.location.href = target;
             })
             .catch(function(err) {
                 alert(err.message || '注册失败');
@@ -94,6 +105,12 @@ function handleRegisterForm() {
 function handleLoginForm() {
     var form = document.getElementById('loginForm');
     if (!form) return;
+
+    var redirect = getUrlParam('redirect') || '';
+    var registerLink = document.querySelector('a[href="register.html"]');
+    if (registerLink && redirect) {
+        registerLink.href = 'register.html?redirect=' + encodeURIComponent(redirect);
+    }
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -107,7 +124,8 @@ function handleLoginForm() {
         login(account, password)
             .then(function() {
                 alert('登录成功。');
-                window.location.href = 'index.html';
+                var redirect = getUrlParam('redirect') || 'index.html';
+                window.location.href = redirect;
             })
             .catch(function(err) {
                 alert(err.message || '登录失败');
@@ -293,7 +311,7 @@ function initHomePage() {
                     '<div class="task-item-top">' +
                         '<h3>' + task.title + '</h3>' +
                     '</div>' +
-                    '<p class="meta">分类：' + catName + ' ｜ 发布者：' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + task.reward + '</p>' +
+                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + task.reward + '</p>' +
                     '<div class="task-item-body">' +
                         '<p class="task-desc">' + task.description + '</p>' +
                         bodyImages +
@@ -307,7 +325,7 @@ function initHomePage() {
     });
 }
 
-// ==================== 任务大厅 ====================
+// ==================== 互助大厅 ====================
 
 function initTaskHall() {
     if (!window.location.pathname.includes('task-hall.html')) return;
@@ -354,7 +372,7 @@ function initTaskHall() {
                 if (task.type === 'demand') {
                     actionBtn = '<button type="button" class="btn btn-demand" onclick="handleTakeTask(\'' + task.id + '\')">接单</button>';
                 } else {
-                    actionBtn = '<button type="button" class="btn btn-service" onclick="handleTakeTask(\'' + task.id + '\')">联系服务者</button>';
+                    actionBtn = '<a href="chat-detail.html?chatId=c-' + task.publisherId + '&partner=' + task.publisherId + '&task=' + task.id + '" class="btn btn-service">联系服务者</a>';
                 }
 
                 var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
@@ -366,7 +384,7 @@ function initTaskHall() {
                             '<h3>' + task.title + '</h3>' +
                             '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                         '</div>' +
-                        '<p class="meta">分类：' + catName + ' ｜ 发布者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + task.reward + ' ｜ ' + timeStr + '</p>' +
+                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + task.reward + ' ｜ ' + timeStr + '</p>' +
                         '<div class="task-item-body">' +
                             '<p class="task-desc">' + task.description + '</p>' +
                             bodyImages +
@@ -443,7 +461,8 @@ function initTaskHall() {
 function handleTakeTask(taskId) {
     if (!isLoggedIn()) {
         alert('请先登录。');
-        window.location.href = 'login.html';
+        var redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = 'login.html?redirect=' + redirectUrl;
         return;
     }
     takeTask(taskId).then(function() {
@@ -575,11 +594,12 @@ function initTaskDetail() {
 
         var box = document.querySelector('.detail-box');
         if (box) {
+            var contactChatLink = 'chat-detail.html?chatId=c-' + task.publisherId + '&partner=' + task.publisherId + '&task=' + task.id;
             box.innerHTML = '<p><strong>任务标题：</strong>' + task.title + '</p>' +
                 '<p><strong>任务类型：</strong>' + typeLabel + '</p>' +
                 '<p><strong>任务分类：</strong>' + catName + '</p>' +
                 '<p><strong>任务描述：</strong>' + task.description + '</p>' +
-                '<p><strong>发布者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
+                '<p><strong>任务发起者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
                 '<p><strong>报酬金额：</strong>' + task.reward + '</p>' +
                 '<p><strong>发布时间：</strong>' + formatDateTime(task.publishTime) + '</p>' +
@@ -587,15 +607,79 @@ function initTaskDetail() {
                 '<p><strong>任务状态：</strong>' + statusText + '</p>' +
                 imagesHtml +
                 '<div class="actions">' +
-                    (task.type === 'demand' ? '<button type="button" class="btn" onclick="handleTakeTask(\'' + task.id + '\')">接单</button>' : '<button type="button" class="btn" onclick="handleTakeTask(\'' + task.id + '\')">联系服务者</button>') +
-                    '<a href="chat-detail.html?chatId=c-' + task.publisherId + '&partner=' + task.publisherId + '&task=' + task.id + '" class="btn btn-secondary">联系对方</a>' +
-                    '<a href="task-hall.html" class="btn btn-gray">返回任务大厅</a>' +
+                    (task.type === 'demand' ? '<button type="button" class="btn" onclick="handleTakeTask(\'' + task.id + '\')">接单</button>' : '<a href="' + contactChatLink + '" class="btn">联系服务者</a>') +
+                    (task.type === 'demand' ? '<a href="' + contactChatLink + '" class="btn btn-secondary">联系对方</a>' : '') +
+                    '<a href="task-hall.html" class="btn btn-gray">返回互助大厅</a>' +
                 '</div>';
         }
     });
 }
 
 // ==================== 消息中心 ====================
+
+function getConversationStatusText(task, chatId, currentUserId) {
+    if (!task || !currentUserId) return { text: '', className: '' };
+    if (task.type === 'demand') {
+        if (task.status === 'pending') {
+            return { text: '待接单', className: 'status-pending' };
+        }
+        if (task.status === 'in_progress') {
+            var isPub = currentUserId === task.publisherId;
+            var isTak = currentUserId === task.takerId;
+            var pConf = task.publisherConfirmed;
+            var tConf = task.takerConfirmed;
+            if (!pConf && !tConf) return { text: '进行中', className: 'status-in_progress' };
+            if (pConf && !tConf) {
+                if (isPub) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                if (isTak) return { text: '待我确认', className: 'status-pending' };
+            }
+            if (!pConf && tConf) {
+                if (isPub) return { text: '待我确认', className: 'status-pending' };
+                if (isTak) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
+            }
+            return { text: '进行中', className: 'status-in_progress' };
+        }
+        if (task.status === 'completed') {
+            return { text: '已完成', className: 'status-completed' };
+        }
+    } else {
+        var db = getDB();
+        var orders = db.serviceOrders || [];
+        for (var i = 0; i < orders.length; i++) {
+            if (orders[i].chatId === chatId) {
+                var order = orders[i];
+                var isCon = currentUserId === order.consumerId;
+                var isPro = currentUserId === order.providerId;
+                if (order.status === 'pending') {
+                    if (!order.providerConfirmed) {
+                        if (isPro) return { text: '待我确认', className: 'status-pending' };
+                        if (isCon) return { text: '待对方确认', className: 'status-pending' };
+                    }
+                    return { text: '待确认', className: 'status-pending' };
+                }
+                if (order.status === 'in_progress') {
+                    var cConf = order.consumerConfirmed;
+                    var pConf = order.providerConfirmed;
+                    if (!cConf && !pConf) return { text: '进行中', className: 'status-in_progress' };
+                    if (cConf && !pConf) {
+                        if (isCon) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                        if (isPro) return { text: '待我确认', className: 'status-pending' };
+                    }
+                    if (!cConf && pConf) {
+                        if (isCon) return { text: '待我确认', className: 'status-pending' };
+                        if (isPro) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                    }
+                    return { text: '进行中', className: 'status-in_progress' };
+                }
+                if (order.status === 'completed') {
+                    return { text: '已完成', className: 'status-completed' };
+                }
+            }
+        }
+        if (task.status === 'available') return { text: '可预约', className: 'status-available' };
+    }
+    return { text: '', className: '' };
+}
 
 function initMessageCenter() {
     if (!window.location.pathname.includes('message-center.html')) return;
@@ -611,12 +695,53 @@ function initMessageCenter() {
         }
 
         list.innerHTML = conversations.map(function(c) {
-            var nameInitial = c.partnerName ? c.partnerName.charAt(0) : '?';
+            var currentUser = getCurrentUser();
+            var roleText = '';
+            var task = c.taskId ? getTaskById(c.taskId) : null;
+            var statusInfo = getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
+
+            if (task && currentUser) {
+                if (task.type === 'demand') {
+                    if (currentUser.id === task.publisherId) {
+                        roleText = '我是任务发起者';
+                    } else if (currentUser.id === task.takerId) {
+                        roleText = '我是任务接单者';
+                    }
+                } else {
+                    if (currentUser.id === task.publisherId) {
+                        roleText = '我是服务提供者';
+                    } else {
+                        roleText = '我是服务申请者';
+                    }
+                }
+            }
+
+            // 最后一条消息前缀
+            var msgPreview = '';
+            if (c.lastMessage) {
+                if (c.lastMessageSenderId === 'system') {
+                    msgPreview = '[系统] ' + c.lastMessage;
+                } else if (c.lastMessageSenderId === (currentUser ? currentUser.id : '')) {
+                    msgPreview = '我：' + c.lastMessage;
+                } else if (c.lastMessageSenderId) {
+                    var sender = getUserById(c.lastMessageSenderId);
+                    msgPreview = (sender ? sender.username : '对方') + '：' + c.lastMessage;
+                } else {
+                    msgPreview = c.lastMessage;
+                }
+            }
+
+            var statusBadge = statusInfo.text
+                ? '<span class="status-badge ' + statusInfo.className + '">' + statusInfo.text + '</span>'
+                : '';
+
             return '<div class="message-item">' +
-                '<h3>聊天对象：' + c.partnerName + '</h3>' +
-                '<p class="meta">对应任务：' + c.taskTitle + '</p>' +
-                '<p>' + (c.lastMessage || '') + '</p>' +
-                '<p class="meta">' + timeAgo(c.lastTime) + '</p>' +
+                '<div class="msg-header">' +
+                    '<h3>' + c.taskTitle + (roleText ? ' ｜ ' + roleText : '') + '</h3>' +
+                    '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
+                '</div>' +
+                '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
+                '<p class="msg-preview">' + msgPreview + '</p>' +
                 '<div class="actions">' +
                     '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + c.taskId + '" class="btn">进入聊天</a>' +
                 '</div>' +
@@ -649,6 +774,38 @@ function initChatDetail() {
         chatBox.appendChild(messageList);
     }
 
+    // 动态更新聊天页头部信息
+    function updateChatHeader() {
+        if (!taskId) return;
+        var partnerIdParam = getUrlParam('partner');
+        var metaEls = document.querySelectorAll('.chat-header .meta');
+        if (metaEls.length >= 2) {
+            // 优先使用 URL 参数中准确的 partnerId 查询用户信息
+            var partnerName = '未知用户';
+            if (partnerIdParam) {
+                var partner = getUserById(partnerIdParam);
+                if (partner) partnerName = partner.username;
+            }
+            metaEls[0].textContent = '聊天对象：' + partnerName;
+            getTaskDetail(taskId).then(function(result) {
+                var task = result && result.task;
+                var roleText = '';
+                var currentUser = getCurrentUser();
+                if (task && currentUser) {
+                    if (task.type === 'demand') {
+                        if (currentUser.id === task.publisherId) roleText = '我是任务发起者';
+                        else if (currentUser.id === task.takerId) roleText = '我是任务接单者';
+                    } else {
+                        if (currentUser.id === task.publisherId) roleText = '我是服务提供者';
+                        else roleText = '我是服务申请者';
+                    }
+                }
+                metaEls[1].textContent = '对应任务：' + (task ? task.title : '') + (roleText ? ' ｜ ' + roleText : '');
+            });
+        }
+    }
+    updateChatHeader();
+
     function renderMessages() {
         getMessages(chatId).then(function(messages) {
             var currentUser = getCurrentUser();
@@ -663,6 +820,9 @@ function initChatDetail() {
                     return '<div class="chat-message withdrawn" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
                         withdrawText +
                     '</div>';
+                }
+                if (m.senderId === 'system') {
+                    return '<div class="chat-message system">' + m.content + '</div>';
                 }
                 var cls = isSelf ? 'chat-right' : 'chat-left';
                 return '<div class="chat-message ' + cls + '" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
@@ -720,7 +880,144 @@ function initChatDetail() {
         });
     }
 
+    // 顶部状态栏
+    var taskBar = document.getElementById('chatTaskBar');
+    if (!taskBar) {
+        taskBar = document.createElement('div');
+        taskBar.id = 'chatTaskBar';
+        taskBar.className = 'chat-task-bar';
+        chatBox.parentNode.insertBefore(taskBar, chatBox);
+    }
+
+    function renderTaskBar() {
+        if (!taskId) { taskBar.style.display = 'none'; return; }
+        getTaskDetail(taskId).then(function(result) {
+            var task = result && result.task;
+            if (!task) { taskBar.style.display = 'none'; return; }
+            var currentUser = getCurrentUser();
+            var isPublisher = currentUser && currentUser.id === task.publisherId;
+            if (task.type === 'demand') {
+                renderTaskBarForDemand(task, isPublisher, currentUser);
+            } else {
+                renderTaskBarForService(task, chatId, currentUser, isPublisher);
+            }
+        });
+    }
+
+    function renderTaskBarForDemand(task, isPublisher, currentUser) {
+        var html = '<div class="task-bar-info">' +
+            '<span class="task-bar-title">' + task.title + '</span>' +
+            '<span class="task-bar-reward">' + task.reward + '</span>' +
+            '<span class="task-bar-status">' + getTaskStatusText(task.status) + '</span>' +
+            '</div><div class="task-bar-actions">';
+        if (task.status === 'pending' && !isPublisher) {
+            html += '<button type="button" class="btn btn-small" onclick="handleChatTakeTask(\'' + task.id + '\')">接单</button>';
+        } else if (task.status === 'in_progress') {
+            var myRole = isPublisher ? 'publisher' : 'taker';
+            var myConfirmed = isPublisher ? task.publisherConfirmed : task.takerConfirmed;
+            if (!myConfirmed) {
+                html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmTask(\'' + task.id + '\', \'' + myRole + '\')">标记完成</button>';
+            } else {
+                html += '<span class="task-bar-waiting">等待对方确认...</span>';
+            }
+        } else if (task.status === 'completed') {
+            var db = getDB();
+            var toUserId = isPublisher ? task.takerId : task.publisherId;
+            var hasReview = false;
+            for (var i = 0; i < (db.reviews || []).length; i++) {
+                if (db.reviews[i].taskId === task.id && db.reviews[i].fromUserId === currentUser.id) {
+                    hasReview = true; break;
+                }
+            }
+            if (!hasReview) {
+                html += '<a href="review.html?task=' + task.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+            } else {
+                html += '<span class="task-bar-waiting">已完成</span>';
+            }
+        }
+        html += '</div>';
+        taskBar.innerHTML = html;
+        taskBar.style.display = 'flex';
+    }
+
+    function renderTaskBarForService(task, chatId, currentUser, isPublisher) {
+        getActiveOrder(chatId).then(function(order) {
+            var html = '<div class="task-bar-info">' +
+                '<span class="task-bar-title">' + task.title + '</span>' +
+                '<span class="task-bar-reward">' + task.reward + '</span>' +
+                '</div><div class="task-bar-actions">';
+            if (!order) {
+                if (!isPublisher) {
+                    html += '<button type="button" class="btn btn-small" onclick="handleChatCreateOrder(\'' + task.id + '\', \'' + chatId + '\')">申请服务</button>';
+                }
+            } else {
+                html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
+                var isConsumer = currentUser && currentUser.id === order.consumerId;
+                var isProvider = currentUser && currentUser.id === order.providerId;
+                if (order.status === 'pending') {
+                    if (isProvider) {
+                        html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'provider\')">同意接单</button>';
+                    } else if (isConsumer) {
+                        html += '<span class="task-bar-waiting">等待对方同意...</span>';
+                    }
+                } else if (order.status === 'in_progress') {
+                    var myRole = isConsumer ? 'consumer' : 'provider';
+                    var myConfirmed = isConsumer ? order.consumerConfirmed : order.providerConfirmed;
+                    if (!myConfirmed) {
+                        html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'' + myRole + '\')">标记完成</button>';
+                    } else {
+                        html += '<span class="task-bar-waiting">等待对方确认...</span>';
+                    }
+                } else if (order.status === 'completed') {
+                    var db = getDB();
+                    var toUserId = isProvider ? order.consumerId : order.providerId;
+                    var hasReview = false;
+                    for (var i = 0; i < (db.reviews || []).length; i++) {
+                        if (db.reviews[i].taskId === order.serviceId && db.reviews[i].fromUserId === currentUser.id) {
+                            hasReview = true; break;
+                        }
+                    }
+                    if (!hasReview) {
+                        html += '<a href="review.html?task=' + order.serviceId + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+                    } else {
+                        html += '<span class="task-bar-waiting">已完成</span>';
+                    }
+                }
+            }
+            html += '</div>';
+            taskBar.innerHTML = html;
+            taskBar.style.display = 'flex';
+        });
+    }
+
     renderMessages();
+    renderTaskBar();
+
+    // 确保 conversation 存在，使消息中心能显示该会话
+    if (partnerId && taskId) {
+        getTaskDetail(taskId).then(function(result) {
+            var partnerName = '';
+            var taskTitle = '';
+            if (result && result.task) {
+                taskTitle = result.task.title;
+                var currentUser = getCurrentUser();
+                if (result.publisher && currentUser) {
+                    partnerName = result.publisher.id === currentUser.id
+                        ? (result.task.takerName || '接单人')
+                        : result.publisher.username;
+                } else if (result.publisher) {
+                    partnerName = result.publisher.username;
+                }
+            }
+            ensureConversation({
+                chatId: chatId,
+                partnerId: partnerId,
+                partnerName: partnerName,
+                taskId: taskId,
+                taskTitle: taskTitle
+            });
+        });
+    }
 
     var sendBtn = document.getElementById('sendBtn');
     var chatInput = document.getElementById('chatInput');
@@ -737,6 +1034,66 @@ function initChatDetail() {
         });
     }
 }
+
+// ==================== 聊天全局函数 ====================
+
+function getTaskStatusText(status) {
+    var map = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
+    return map[status] || status;
+}
+
+function getOrderStatusText(status) {
+    var map = { pending: '待确认', in_progress: '进行中', completed: '已完成', cancelled: '已取消', refunded: '已退款' };
+    return map[status] || status;
+}
+
+window.handleChatTakeTask = function(taskId) {
+    takeTask(taskId).then(function() {
+        alert('接单成功！');
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '接单失败');
+    });
+};
+
+window.handleChatConfirmTask = function(taskId, role) {
+    confirmTaskComplete(taskId, role).then(function(res) {
+        if (res.task && res.task.status === 'completed') {
+            alert('任务已完成，款项已结算！');
+        } else {
+            alert('已标记完成，等待对方确认。');
+        }
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '操作失败');
+    });
+};
+
+window.handleChatCreateOrder = function(serviceId, chatId) {
+    createServiceOrder(serviceId, chatId).then(function() {
+        alert('申请成功，等待提供者确认！');
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '申请失败');
+    });
+};
+
+window.handleChatConfirmOrder = function(orderId, role) {
+    confirmServiceOrder(orderId, role).then(function(res) {
+        var order = res.order;
+        if (order.status === 'in_progress' && role === 'provider') {
+            alert('已同意接单，服务开始执行！');
+        } else if (order.status === 'completed') {
+            alert('服务已完成，款项已结算！');
+        } else {
+            alert('已标记完成，等待对方确认。');
+        }
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '操作失败');
+    });
+};
+
 
 // ==================== 我的任务 ====================
 
@@ -761,34 +1118,69 @@ function initMyTasks() {
     if (tabs[1]) tabs[1].textContent = isServiceView ? '我接取的服务' : '我接取的任务';
 
     function render(type) {
-        var apiCall = type === 'published' ? getMyPublishedTasks() : getMyTasks();
-        apiCall.then(function(tasks) {
-            if (isServiceView) {
-                tasks = tasks.filter(function(t) { return t.type === 'service'; });
-            }
-            if (!tasks || tasks.length === 0) {
-                var emptyText = isServiceView ? '暂无服务' : '暂无任务';
-                list.innerHTML = '<div class="card empty-state"><p>' + emptyText + '</p></div>';
-                return;
-            }
-            list.innerHTML = tasks.map(function(task) {
-                var role = type === 'published' ? '发布者' : '接单者';
-                var otherName = type === 'published' ? (task.takerName || '暂无') : task.publisherName;
-                var statusMap = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
-                var partnerId = type === 'published' ? (task.takerId || task.publisherId) : task.publisherId;
-                var typeLabel = task.type === 'demand' ? '需求' : '服务';
-                return '<div class="record-item">' +
-                    '<h3>' + task.title + '</h3>' +
-                    '<p class="meta">类型：' + typeLabel + ' ｜ 身份：' + role + ' ｜ 状态：' + (statusMap[task.status] || task.status) + ' ｜ 发布时间：' + formatDateTime(task.publishTime) + '</p>' +
-                    '<p>' + (type === 'published' ? '接单人：' : '发布者：') + otherName + '</p>' +
-                    '<div class="actions">' +
-                        '<a href="task-detail.html?id=' + task.id + '" class="btn btn-secondary">查看详情</a>' +
-                        '<a href="chat-detail.html?chatId=c-' + partnerId + '&partner=' + partnerId + '&task=' + task.id + '" class="btn btn-secondary">联系对方</a>' +
-                        '<a href="review.html?task=' + task.id + '&to=' + partnerId + '" class="btn btn-secondary">去评价</a>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-        });
+        if (isServiceView && type === 'taken') {
+            getMyServiceOrders().then(function(orders) {
+                if (!orders || orders.length === 0) {
+                    list.innerHTML = '<div class="card empty-state"><p>暂无服务</p></div>';
+                    return;
+                }
+                list.innerHTML = orders.map(function(order) {
+                    var service = getTaskById(order.serviceId);
+                    var statusMap = { pending: '待确认', in_progress: '进行中', completed: '已完成', cancelled: '已取消', refunded: '已退款' };
+                    var provider = getUserById(order.providerId);
+                    return '<div class="record-item">' +
+                        '<h3>' + (service ? service.title : '未知服务') + '</h3>' +
+                        '<p class="meta">类型：服务 ｜ 身份：服务申请者 ｜ 状态：' + (statusMap[order.status] || order.status) + ' ｜ 申请时间：' + formatDateTime(order.createdAt) + '</p>' +
+                        '<p>服务提供者：' + (provider ? provider.username : '未知') + '</p>' +
+                        '<div class="actions">' +
+                            '<a href="task-detail.html?id=' + order.serviceId + '" class="btn btn-secondary">查看服务</a>' +
+                            '<a href="chat-detail.html?chatId=' + order.chatId + '&partner=' + order.providerId + '&task=' + order.serviceId + '" class="btn btn-secondary">进入聊天</a>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+            });
+        } else {
+            var apiCall = type === 'published' ? getMyPublishedTasks() : getMyTasks();
+            apiCall.then(function(tasks) {
+                if (isServiceView) {
+                    tasks = tasks.filter(function(t) { return t.type === 'service'; });
+                } else {
+                    tasks = tasks.filter(function(t) { return t.type === 'demand'; });
+                }
+                if (!tasks || tasks.length === 0) {
+                    var emptyText = isServiceView ? '暂无服务' : '暂无任务';
+                    list.innerHTML = '<div class="card empty-state"><p>' + emptyText + '</p></div>';
+                    return;
+                }
+                list.innerHTML = tasks.map(function(task) {
+                    var role = type === 'published' ? '任务发起者' : '任务接单者';
+                    var otherName = type === 'published' ? (task.takerName || '暂无') : task.publisherName;
+                    var statusMap = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
+                    var partnerId = type === 'published' ? (task.takerId || task.publisherId) : task.publisherId;
+                    var typeLabel = task.type === 'demand' ? '需求' : '服务';
+                    var actionsHtml = '<a href="task-detail.html?id=' + task.id + '" class="btn btn-secondary">查看详情</a>';
+                    if (task.status === 'in_progress' || task.status === 'pending') {
+                        actionsHtml += '<a href="chat-detail.html?chatId=c-' + partnerId + '&partner=' + partnerId + '&task=' + task.id + '" class="btn btn-secondary">联系对方</a>';
+                    }
+                    if (task.status === 'completed') {
+                        var db = getDB();
+                        var hasReview = false;
+                        for (var r = 0; r < (db.reviews || []).length; r++) {
+                            if (db.reviews[r].taskId === task.id) { hasReview = true; break; }
+                        }
+                        if (!hasReview) {
+                            actionsHtml += '<a href="review.html?task=' + task.id + '&to=' + partnerId + '" class="btn btn-secondary">去评价</a>';
+                        }
+                    }
+                    return '<div class="record-item">' +
+                        '<h3>' + task.title + '</h3>' +
+                        '<p class="meta">类型：' + typeLabel + ' ｜ 身份：' + role + ' ｜ 状态：' + (statusMap[task.status] || task.status) + ' ｜ 发布时间：' + formatDateTime(task.publishTime) + '</p>' +
+                        '<p>' + (type === 'published' ? '任务接单者：' : '任务发起者：') + otherName + '</p>' +
+                        '<div class="actions">' + actionsHtml + '</div>' +
+                    '</div>';
+                }).join('');
+            });
+        }
     }
 
     tabs.forEach(function(tab, index) {
@@ -801,6 +1193,205 @@ function initMyTasks() {
 
     if (tabs[0]) tabs[0].classList.add('active');
     render('published');
+}
+
+// ==================== 我的订单 ====================
+
+function initOrderCenter() {
+    if (!window.location.pathname.includes('order-center.html')) return;
+    if (!protectPage(['order-center.html'])) return;
+
+    var list = document.querySelector('.record-list');
+    var filterSelect = document.getElementById('orderFilter');
+    if (!list) return;
+
+    function renderAll() {
+        var currentUser = getCurrentUser();
+        if (!currentUser) {
+            list.innerHTML = '<div class="card empty-state"><p>请先登录</p></div>';
+            return;
+        }
+        var db = getDB();
+        var records = [];
+
+        (db.tasks || []).forEach(function(task) {
+            if (task.type === 'demand' && task.publisherId === currentUser.id) {
+                var statusInfo = getConversationStatusText(task, '', currentUser.id);
+                records.push({
+                    id: task.id,
+                    title: task.title,
+                    filterType: 'demand-published',
+                    typeLabel: '需求',
+                    roleLabel: '任务发起者',
+                    partnerName: task.takerName || '暂无',
+                    status: statusInfo.text || (task.status === 'pending' ? '待接单' : '进行中'),
+                    statusClass: statusInfo.className || 'status-pending',
+                    time: task.publishTime,
+                    timeStr: formatDateTime(task.publishTime),
+                    task: task
+                });
+            }
+        });
+
+        (db.tasks || []).forEach(function(task) {
+            if (task.type === 'demand' && task.takerId === currentUser.id) {
+                var statusInfo = getConversationStatusText(task, '', currentUser.id);
+                records.push({
+                    id: task.id,
+                    title: task.title,
+                    filterType: 'demand-taken',
+                    typeLabel: '需求',
+                    roleLabel: '任务接单者',
+                    partnerName: task.publisherName,
+                    status: statusInfo.text || '进行中',
+                    statusClass: statusInfo.className || 'status-in_progress',
+                    time: task.publishTime,
+                    timeStr: formatDateTime(task.publishTime),
+                    task: task
+                });
+            }
+        });
+
+        var serviceIdsWithOrder = {};
+        (db.serviceOrders || []).forEach(function(order) {
+            if (order.providerId === currentUser.id) {
+                serviceIdsWithOrder[order.serviceId] = true;
+            }
+        });
+        (db.tasks || []).forEach(function(task) {
+            if (task.type === 'service' && task.publisherId === currentUser.id && !serviceIdsWithOrder[task.id]) {
+                records.push({
+                    id: task.id,
+                    title: task.title,
+                    filterType: 'service-published',
+                    typeLabel: '服务',
+                    roleLabel: '服务提供者',
+                    partnerName: '-',
+                    status: '可预约',
+                    statusClass: 'status-available',
+                    time: task.publishTime,
+                    timeStr: formatDateTime(task.publishTime),
+                    task: task
+                });
+            }
+        });
+
+        (db.serviceOrders || []).forEach(function(order) {
+            if (order.providerId === currentUser.id) {
+                var service = getTaskById(order.serviceId);
+                var consumer = getUserById(order.consumerId);
+                var statusInfo = getConversationStatusText(service, order.chatId, currentUser.id);
+                records.push({
+                    id: order.id,
+                    title: service ? service.title : '未知服务',
+                    filterType: 'service-published',
+                    typeLabel: '服务',
+                    roleLabel: '服务提供者',
+                    partnerName: consumer ? consumer.username : '未知',
+                    status: statusInfo.text || getOrderStatusText(order.status),
+                    statusClass: statusInfo.className || 'status-pending',
+                    time: order.createdAt,
+                    timeStr: formatDateTime(order.createdAt),
+                    task: service,
+                    order: order
+                });
+            }
+        });
+
+        (db.serviceOrders || []).forEach(function(order) {
+            if (order.consumerId === currentUser.id) {
+                var service = getTaskById(order.serviceId);
+                var provider = getUserById(order.providerId);
+                var statusInfo = getConversationStatusText(service, order.chatId, currentUser.id);
+                records.push({
+                    id: order.id,
+                    title: service ? service.title : '未知服务',
+                    filterType: 'service-taken',
+                    typeLabel: '服务',
+                    roleLabel: '服务申请者',
+                    partnerName: provider ? provider.username : '未知',
+                    status: statusInfo.text || getOrderStatusText(order.status),
+                    statusClass: statusInfo.className || 'status-pending',
+                    time: order.createdAt,
+                    timeStr: formatDateTime(order.createdAt),
+                    task: service,
+                    order: order
+                });
+            }
+        });
+
+        records.sort(function(a, b) {
+            return new Date(b.time) - new Date(a.time);
+        });
+
+        var filterValue = filterSelect ? filterSelect.value : 'all';
+        if (filterValue !== 'all') {
+            records = records.filter(function(r) {
+                return r.filterType === filterValue;
+            });
+        }
+
+        if (records.length === 0) {
+            list.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
+            return;
+        }
+
+        list.innerHTML = records.map(function(r) {
+            var statusBadge = r.statusClass
+                ? '<span class="status-badge ' + r.statusClass + '">' + r.status + '</span>'
+                : '<span class="status-badge">' + r.status + '</span>';
+
+            var actionsHtml = '<a href="task-detail.html?id=' + (r.task ? r.task.id : '') + '" class="btn btn-secondary">查看详情</a>';
+
+            if (r.task) {
+                var chatPartnerId = '';
+                var chatTaskId = r.task.id;
+                if (r.task.type === 'demand') {
+                    if (r.roleLabel === '任务发起者' && r.task.takerId) chatPartnerId = r.task.takerId;
+                    else if (r.roleLabel === '任务接单者') chatPartnerId = r.task.publisherId;
+                } else if (r.order) {
+                    chatPartnerId = r.roleLabel === '服务提供者' ? r.order.consumerId : r.order.providerId;
+                }
+                if (chatPartnerId) {
+                    actionsHtml += '<a href="chat-detail.html?chatId=c-' + chatPartnerId + '&partner=' + chatPartnerId + '&task=' + chatTaskId + '" class="btn btn-secondary">联系对方</a>';
+                }
+            }
+
+            if (r.status === '已完成') {
+                var db2 = getDB();
+                var hasReview = false;
+                var taskIdForReview = r.task ? r.task.id : '';
+                for (var rev = 0; rev < (db2.reviews || []).length; rev++) {
+                    if (db2.reviews[rev].taskId === taskIdForReview && db2.reviews[rev].fromUserId === currentUser.id) {
+                        hasReview = true; break;
+                    }
+                }
+                if (!hasReview) {
+                    var toUserId = '';
+                    if (r.task && r.task.type === 'demand') {
+                        toUserId = r.roleLabel === '任务发起者' ? r.task.takerId : r.task.publisherId;
+                    } else if (r.order) {
+                        toUserId = r.roleLabel === '服务提供者' ? r.order.consumerId : r.order.providerId;
+                    }
+                    if (toUserId) {
+                        actionsHtml += '<a href="review.html?task=' + taskIdForReview + '&to=' + toUserId + '" class="btn btn-secondary">去评价</a>';
+                    }
+                }
+            }
+
+            return '<div class="record-item">' +
+                '<h3>' + r.title + '</h3>' +
+                '<p class="meta">' + statusBadge + '类型：' + r.typeLabel + ' ｜ 身份：' + r.roleLabel + ' ｜ 时间：' + r.timeStr + '</p>' +
+                '<p>对方：' + r.partnerName + '</p>' +
+                '<div class="actions">' + actionsHtml + '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    renderAll();
+    if (filterSelect) {
+        filterSelect.addEventListener('change', renderAll);
+    }
 }
 
 // ==================== 评价 ====================
@@ -832,7 +1423,30 @@ function initReview() {
         });
     });
 
-    var submitBtn = form.querySelector('button[type="button"]');
+    var imageInput = document.getElementById('reviewImages');
+    var previewArea = document.getElementById('imagePreview');
+    var uploadedImages = [];
+
+    if (imageInput) {
+        imageInput.addEventListener('change', function(e) {
+            var files = Array.from(e.target.files).slice(0, 3);
+            uploadedImages = [];
+            previewArea.innerHTML = '';
+            files.forEach(function(file) {
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    uploadedImages.push(ev.target.result);
+                    var img = document.createElement('img');
+                    img.src = ev.target.result;
+                    img.className = 'preview-thumb';
+                    previewArea.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+    }
+
+    var submitBtn = form.querySelector('.form-actions button[type="button"]');
     if (submitBtn) {
         submitBtn.addEventListener('click', function() {
             var content = document.getElementById('reviewContent').value.trim();
@@ -842,13 +1456,61 @@ function initReview() {
 
             submitReview({
                 taskId: taskId, toUserId: toUserId,
-                rating: selectedRating, content: content
+                rating: selectedRating, content: content,
+                images: uploadedImages
             }).then(function() {
                 alert('评价提交成功！');
-                window.location.href = 'my-task.html';
+                window.location.href = 'order-center.html';
             }).catch(function(err) {
                 alert(err.message || '评价失败');
             });
+        });
+    }
+}
+
+// ==================== 图片放大 ====================
+
+function initLightbox() {
+    var overlay = document.getElementById('lightboxOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'lightboxOverlay';
+        overlay.className = 'lightbox-overlay';
+        overlay.innerHTML = '<img src="" alt="大图">';
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', function() {
+            overlay.classList.remove('active');
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                overlay.classList.remove('active');
+            }
+        });
+    }
+
+    var taskList = document.getElementById('taskList');
+    if (taskList) {
+        taskList.addEventListener('click', function(e) {
+            if (e.target.classList.contains('task-image-thumb')) {
+                e.stopPropagation();
+                var bigImg = overlay.querySelector('img');
+                bigImg.src = e.target.src;
+                overlay.classList.add('active');
+            }
+        });
+    }
+
+    var detailBox = document.querySelector('.detail-box');
+    if (detailBox) {
+        detailBox.addEventListener('click', function(e) {
+            if (e.target.classList.contains('detail-image')) {
+                e.stopPropagation();
+                var bigImg = overlay.querySelector('img');
+                bigImg.src = e.target.src;
+                overlay.classList.add('active');
+            }
         });
     }
 }
@@ -869,5 +1531,28 @@ document.addEventListener('DOMContentLoaded', function() {
     initMessageCenter();
     initChatDetail();
     initMyTasks();
+    initOrderCenter();
     initReview();
+    initLightbox();
+
+    var scrollKey = 'scroll_' + location.pathname;
+    var savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+        window.scrollTo(0, parseInt(savedScroll));
+        sessionStorage.removeItem(scrollKey);
+    }
+
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('a');
+        if (link) {
+            var href = link.getAttribute('href');
+            if (href && href.indexOf('http') !== 0 && href.indexOf('#') !== 0 && href.indexOf('javascript') !== 0) {
+                var currentPath = location.pathname.split('/').pop();
+                var targetPath = href.split('?')[0].split('/').pop();
+                if (targetPath !== currentPath) {
+                    sessionStorage.setItem(scrollKey, window.scrollY);
+                }
+            }
+        }
+    });
 });

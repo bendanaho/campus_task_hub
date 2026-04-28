@@ -179,6 +179,16 @@ async function getMyPublishedTasks() {
     return res.json();
 }
 
+async function getMyServiceOrders() {
+    if (USE_MOCK) {
+        return mockGetMyServiceOrders();
+    }
+    var res = await fetch(API_BASE + '/service-orders/my', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
 // ==================== 消息 ====================
 
 async function getConversations() {
@@ -223,6 +233,21 @@ async function withdrawMessage(messageId) {
     var res = await fetch(API_BASE + '/messages/' + messageId + '/withdraw', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+async function ensureConversation(data) {
+    if (USE_MOCK) {
+        return mockEnsureConversation(data);
+    }
+    var res = await fetch(API_BASE + '/conversations/ensure', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify(data)
     });
     return res.json();
 }
@@ -482,6 +507,13 @@ function mockPublishTask(data) {
                 return;
             }
             var db = getDB();
+            var amount = parseRewardValue(data.reward);
+            var user = getUserById(currentUser.id);
+            if (!user || (user.balance || 0) < amount) {
+                reject(new Error('余额不足，无法发布任务（需要预付报酬 ' + amount + ' 元）'));
+                return;
+            }
+            user.balance -= amount;
             var newTask = {
                 id: 't' + (db.tasks.length + 1) + '-' + Date.now(),
                 title: data.title,
@@ -492,12 +524,15 @@ function mockPublishTask(data) {
                 publisherName: currentUser.username,
                 publisherCredit: currentUser.creditScore || 5.0,
                 reward: data.reward,
-                rewardValue: parseRewardValue(data.reward),
+                rewardValue: amount,
                 deadline: data.deadline,
                 publishTime: new Date().toISOString(),
                 status: 'pending',
                 contact: data.contact || '站内联系',
-                images: data.images || []
+                images: data.images || [],
+                paymentStatus: 'frozen',
+                publisherConfirmed: false,
+                takerConfirmed: false
             };
             db.tasks.unshift(newTask);
             saveDB(db);
@@ -559,6 +594,10 @@ function mockTakeTask(id) {
                 reject(new Error('任务不存在'));
                 return;
             }
+            if (task.paymentStatus !== 'frozen') {
+                reject(new Error('任务尚未预付报酬，无法接单'));
+                return;
+            }
             task.status = 'in_progress';
             task.takerId = currentUser.id;
             task.takerName = currentUser.username;
@@ -598,11 +637,106 @@ function mockGetMyPublishedTasks() {
     });
 }
 
+function mockGetMyServiceOrders() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) {
+                reject(new Error('请先登录'));
+                return;
+            }
+            var db = getDB();
+            var result = (db.serviceOrders || []).filter(function(o) {
+                return o.consumerId === currentUser.id;
+            });
+            resolve(result);
+        }, 150);
+    });
+}
+
 function mockGetConversations() {
     return new Promise(function(resolve) {
         setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) {
+                resolve([]);
+                return;
+            }
             var db = getDB();
-            resolve(db.conversations || []);
+            var result = [];
+
+            (db.conversations || []).forEach(function(c) {
+                var partnerId = null;
+                var isParticipant = false;
+                var task = c.taskId ? getTaskById(c.taskId) : null;
+
+                // 方法1：通过消息记录确定参与者（支持"发了消息但尚未建立交易"的场景）
+                var msgParticipants = {};
+                (db.messages || []).forEach(function(m) {
+                    if (m.chatId === c.id) {
+                        if (m.senderId && m.senderId !== 'system') msgParticipants[m.senderId] = true;
+                        if (m.receiverId) msgParticipants[m.receiverId] = true;
+                    }
+                });
+                if (msgParticipants[currentUser.id]) {
+                    isParticipant = true;
+                    for (var pid in msgParticipants) {
+                        if (pid !== currentUser.id) {
+                            partnerId = pid;
+                            break;
+                        }
+                    }
+                }
+
+                // 方法2：通过交易关系确定参与者（支持"已建立交易但尚未发消息"的场景）
+                if (!partnerId && task) {
+                    if (task.type === 'demand') {
+                        if (task.takerId && currentUser.id === task.publisherId) {
+                            partnerId = task.takerId;
+                            isParticipant = true;
+                        } else if (currentUser.id === task.takerId) {
+                            partnerId = task.publisherId;
+                            isParticipant = true;
+                        }
+                    } else if (task.type === 'service') {
+                        var orders = db.serviceOrders || [];
+                        for (var i = 0; i < orders.length; i++) {
+                            if (orders[i].chatId === c.id) {
+                                if (currentUser.id === orders[i].consumerId) {
+                                    partnerId = orders[i].providerId;
+                                    isParticipant = true;
+                                } else if (currentUser.id === orders[i].providerId) {
+                                    partnerId = orders[i].consumerId;
+                                    isParticipant = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (isParticipant && partnerId) {
+                    var partner = getUserById(partnerId);
+                    result.push({
+                        id: c.id,
+                        partnerId: partnerId,
+                        partnerName: partner ? partner.username : '未知用户',
+                        partnerAvatar: partner ? partner.avatar : '',
+                        taskId: c.taskId,
+                        taskTitle: c.taskTitle,
+                        lastMessage: c.lastMessage,
+                        lastTime: c.lastTime,
+                        lastMessageSenderId: c.lastMessageSenderId || ''
+                    });
+                }
+            });
+
+            // 按最后消息时间倒序排列
+            result.sort(function(a, b) {
+                return new Date(b.lastTime) - new Date(a.lastTime);
+            });
+
+            resolve(result);
         }, 100);
     });
 }
@@ -645,6 +779,7 @@ function mockSendMessage(chatId, content) {
                 if (db.conversations[i].id === chatId) {
                     db.conversations[i].lastMessage = content;
                     db.conversations[i].lastTime = newMsg.time;
+                    db.conversations[i].lastMessageSenderId = currentUser.id;
                     break;
                 }
             }
@@ -672,6 +807,7 @@ function mockSubmitReview(data) {
                 toUserName: data.toUserName,
                 rating: data.rating,
                 content: data.content,
+                images: data.images || [],
                 time: new Date().toISOString()
             };
             if (!db.reviews) db.reviews = [];
@@ -689,6 +825,284 @@ function mockGetReviews(userId) {
             var result = (db.reviews || []).filter(function(r) { return r.toUserId === userId; });
             resolve(result);
         }, 100);
+    });
+}
+
+// ==================== 余额 ====================
+
+async function getBalance() {
+    if (USE_MOCK) {
+        return mockGetBalance();
+    }
+    var res = await fetch(API_BASE + '/user/balance', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+function mockGetBalance() {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) {
+                resolve({ balance: 0 });
+                return;
+            }
+            var user = getUserById(currentUser.id);
+            resolve({ balance: user ? (user.balance || 0) : 0 });
+        }, 100);
+    });
+}
+
+// ==================== 服务订单 ====================
+
+async function createServiceOrder(serviceId, chatId) {
+    if (USE_MOCK) {
+        return mockCreateServiceOrder(serviceId, chatId);
+    }
+    var res = await fetch(API_BASE + '/service-orders', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ serviceId: serviceId, chatId: chatId })
+    });
+    return res.json();
+}
+
+async function confirmServiceOrder(orderId, role) {
+    if (USE_MOCK) {
+        return mockConfirmServiceOrder(orderId, role);
+    }
+    var res = await fetch(API_BASE + '/service-orders/' + orderId + '/confirm', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ role: role })
+    });
+    return res.json();
+}
+
+async function getActiveOrder(chatId) {
+    if (USE_MOCK) {
+        return mockGetActiveOrder(chatId);
+    }
+    var res = await fetch(API_BASE + '/service-orders/active?chatId=' + chatId, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+async function getOrderHistory(chatId) {
+    if (USE_MOCK) {
+        return mockGetOrderHistory(chatId);
+    }
+    var res = await fetch(API_BASE + '/service-orders?chatId=' + chatId, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+// ==================== 任务完成确认 ====================
+
+async function confirmTaskComplete(taskId, role) {
+    if (USE_MOCK) {
+        return mockConfirmTaskComplete(taskId, role);
+    }
+    var res = await fetch(API_BASE + '/tasks/' + taskId + '/complete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ role: role })
+    });
+    return res.json();
+}
+
+// ==================== Mock 实现 ====================
+
+function mockCreateServiceOrder(serviceId, chatId) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) {
+                reject(new Error('请先登录'));
+                return;
+            }
+            var db = getDB();
+            var service = getTaskById(serviceId);
+            if (!service) {
+                reject(new Error('服务不存在'));
+                return;
+            }
+            var activeOrder = null;
+            for (var i = 0; i < (db.serviceOrders || []).length; i++) {
+                var o = db.serviceOrders[i];
+                if (o.chatId === chatId && (o.status === 'pending' || o.status === 'in_progress')) {
+                    activeOrder = o; break;
+                }
+            }
+            if (activeOrder) {
+                reject(new Error('已有进行中的订单，请先完成'));
+                return;
+            }
+            var amount = service.rewardValue || parseRewardValue(service.reward);
+            var user = getUserById(currentUser.id);
+            if (!user || (user.balance || 0) < amount) {
+                reject(new Error('余额不足，需要 ' + amount + ' 元'));
+                return;
+            }
+            user.balance -= amount;
+            var order = {
+                id: 'so' + ((db.serviceOrders || []).length + 1) + '-' + Date.now(),
+                serviceId: serviceId,
+                chatId: chatId,
+                consumerId: currentUser.id,
+                providerId: service.publisherId,
+                amount: amount,
+                status: 'pending',
+                consumerConfirmed: false,
+                providerConfirmed: false,
+                createdAt: new Date().toISOString(),
+                confirmedAt: null,
+                autoConfirmAt: null
+            };
+            if (!db.serviceOrders) db.serviceOrders = [];
+            db.serviceOrders.push(order);
+
+            var convExists = false;
+            for (var j = 0; j < (db.conversations || []).length; j++) {
+                if (db.conversations[j].id === chatId) {
+                    convExists = true; break;
+                }
+            }
+            if (!convExists) {
+                var partnerId = service.publisherId;
+                var partner = getUserById(partnerId);
+                db.conversations.push({
+                    id: chatId,
+                    partnerId: partnerId,
+                    partnerName: partner ? partner.username : '未知用户',
+                    partnerAvatar: partner ? partner.avatar : '',
+                    taskId: serviceId,
+                    taskTitle: service.title,
+                    lastMessage: '服务申请者已申请服务，等待服务提供者确认',
+                    lastTime: new Date().toISOString()
+                });
+            }
+
+            saveDB(db);
+            resolve({ success: true, order: order });
+        }, 200);
+    });
+}
+
+function mockConfirmServiceOrder(orderId, role) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) {
+                reject(new Error('请先登录'));
+                return;
+            }
+            var db = getDB();
+            var order = null;
+            for (var i = 0; i < (db.serviceOrders || []).length; i++) {
+                if (db.serviceOrders[i].id === orderId) {
+                    order = db.serviceOrders[i]; break;
+                }
+            }
+            if (!order) {
+                reject(new Error('订单不存在'));
+                return;
+            }
+            if (role === 'consumer') {
+                order.consumerConfirmed = true;
+            } else {
+                order.providerConfirmed = true;
+            }
+            if (order.status === 'pending' && order.providerConfirmed) {
+                order.status = 'in_progress';
+            }
+            if (order.status === 'in_progress' && order.consumerConfirmed && order.providerConfirmed) {
+                order.status = 'completed';
+                order.confirmedAt = new Date().toISOString();
+                var provider = getUserById(order.providerId);
+                if (provider) {
+                    provider.balance = (provider.balance || 0) + order.amount;
+                }
+            }
+            saveDB(db);
+            resolve({ success: true, order: order });
+        }, 200);
+    });
+}
+
+function mockGetActiveOrder(chatId) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var db = getDB();
+            var orders = db.serviceOrders || [];
+            var active = null;
+            for (var i = orders.length - 1; i >= 0; i--) {
+                if (orders[i].chatId === chatId && (orders[i].status === 'pending' || orders[i].status === 'in_progress')) {
+                    active = orders[i]; break;
+                }
+            }
+            resolve(active);
+        }, 100);
+    });
+}
+
+function mockGetOrderHistory(chatId) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var db = getDB();
+            var orders = db.serviceOrders || [];
+            var result = [];
+            for (var i = 0; i < orders.length; i++) {
+                if (orders[i].chatId === chatId) result.push(orders[i]);
+            }
+            resolve(result);
+        }, 100);
+    });
+}
+
+function mockConfirmTaskComplete(taskId, role) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) {
+                reject(new Error('请先登录'));
+                return;
+            }
+            var db = getDB();
+            var task = getTaskById(taskId);
+            if (!task) {
+                reject(new Error('任务不存在'));
+                return;
+            }
+            if (role === 'publisher') {
+                task.publisherConfirmed = true;
+            } else {
+                task.takerConfirmed = true;
+            }
+            if (task.publisherConfirmed && task.takerConfirmed) {
+                task.status = 'completed';
+                task.paymentStatus = 'released';
+                task.confirmedAt = new Date().toISOString();
+                var taker = getUserById(task.takerId);
+                if (taker) {
+                    taker.balance = (taker.balance || 0) + (task.rewardValue || 0);
+                }
+            }
+            saveDB(db);
+            resolve({ success: true, task: task });
+        }, 200);
     });
 }
 
@@ -741,6 +1155,33 @@ function mockWithdrawMessage(messageId) {
     });
 }
 
+function mockEnsureConversation(data) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var db = getDB();
+            var exists = false;
+            for (var i = 0; i < db.conversations.length; i++) {
+                if (db.conversations[i].id === data.chatId) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                db.conversations.push({
+                    id: data.chatId,
+                    partnerId: data.partnerId || '',
+                    partnerName: data.partnerName || '未知用户',
+                    taskId: data.taskId || '',
+                    taskTitle: data.taskTitle || '未知任务',
+                    lastMessage: '',
+                    lastTime: new Date().toISOString()
+                });
+                saveDB(db);
+            }
+            resolve({ success: true });
+        }, 100);
+    });
+}
 
 function mockUpdatePhone(phone) {
     return new Promise(function(resolve, reject) {

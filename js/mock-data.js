@@ -29,7 +29,7 @@ function createInitialData() {
         {
             id: 'u1', username: '张三', phone: '13800138001', email: 'zhangsan@example.com', password: '123456',
             avatar: 'https://picsum.photos/seed/avatar1/200/200',
-            creditScore: 4.8, authStatus: 'verified',
+            creditScore: 4.8, authStatus: 'verified', balance: 85,
             realName: '张小明', studentId: '2021010001',
             college: '计算机学院', className: '软件工程2101',
             bio: '乐于助人，常在线，愿意参与校园互助任务。'
@@ -37,21 +37,21 @@ function createInitialData() {
         {
             id: 'u2', username: '李四', phone: '13800138002', email: 'lisi@example.com', password: '123456',
             avatar: 'https://picsum.photos/seed/avatar2/200/200',
-            creditScore: 4.2, authStatus: 'verified',
+            creditScore: 4.2, authStatus: 'verified', balance: 85,
             realName: '李华', studentId: '2021020002',
             college: '经济管理学院', className: '金融学2102',
             bio: '喜欢帮助别人，课余时间比较多。'
         },
         {
             id: 'u3', username: '王同学', phone: '13800138003', email: 'wang@example.com', password: '123456',
-            avatar: '', creditScore: 3.5, authStatus: 'unverified',
+            avatar: '', creditScore: 3.5, authStatus: 'unverified', balance: 80,
             realName: '', studentId: '', college: '', className: '',
             bio: '新用户，正在探索平台功能。'
         },
         {
             id: 'u4', username: '陈同学', phone: '13800138004', email: 'chen@example.com', password: '123456',
             avatar: 'https://picsum.photos/seed/avatar4/200/200',
-            creditScore: 2.8, authStatus: 'verified',
+            creditScore: 2.8, authStatus: 'verified', balance: 100,
             realName: '陈志强', studentId: '2021030004',
             college: '机械工程学院', className: '机械设计2101',
             bio: '做事认真负责，但有时回复较慢。'
@@ -59,28 +59,28 @@ function createInitialData() {
         {
             id: 'u5', username: '赵同学', phone: '13800138005', email: 'zhao@example.com', password: '123456',
             avatar: 'https://picsum.photos/seed/avatar5/200/200',
-            creditScore: 4.9, authStatus: 'verified',
+            creditScore: 4.9, authStatus: 'verified', balance: 100,
             realName: '赵雨薇', studentId: '2021040005',
             college: '设计学院', className: '视觉传达2103',
             bio: '设计专业学生，擅长海报和PPT制作。'
         },
         {
             id: 'u6', username: '刘同学', phone: '13800138006', email: 'liu@example.com', password: '123456',
-            avatar: '', creditScore: 3.9, authStatus: 'unverified',
+            avatar: '', creditScore: 3.9, authStatus: 'unverified', balance: 100,
             realName: '', studentId: '', college: '', className: '',
             bio: '数学系学生，乐于助人。'
         },
         {
             id: 'u7', username: '孙同学', phone: '13800138007', email: 'sun@example.com', password: '123456',
             avatar: 'https://picsum.photos/seed/avatar7/200/200',
-            creditScore: 4.6, authStatus: 'verified',
+            creditScore: 4.6, authStatus: 'verified', balance: 105,
             realName: '孙文博', studentId: '2021050007',
             college: '外国语学院', className: '英语2101',
             bio: '英语口语流利，喜欢交朋友。'
         },
         {
             id: 'u8', username: '周同学', phone: '13800138008', email: 'zhou@example.com', password: '123456',
-            avatar: '', creditScore: 2.5, authStatus: 'unverified',
+            avatar: '', creditScore: 2.5, authStatus: 'unverified', balance: 100,
             realName: '', studentId: '', college: '', className: '',
             bio: '校内打印店兼职，可以帮忙打印资料。'
         }
@@ -93,8 +93,10 @@ function createInitialData() {
             publisherId: 'u1', publisherName: '张三', publisherCredit: 4.8,
             reward: '5元', rewardValue: 5,
             deadline: dayAgo(-1), publishTime: hourAgo(26),
-            status: 'pending', contact: '站内联系',
-            images: ['https://picsum.photos/seed/task1a/300/200']
+            status: 'in_progress', contact: '站内联系',
+            images: ['https://picsum.photos/seed/task1a/300/200'],
+            takerId: 'u2', takerName: '李四',
+            paymentStatus: 'frozen', publisherConfirmed: false, takerConfirmed: false
         },
         {
             id: 't2', title: '代拿外卖', type: 'demand', category: 'errand',
@@ -102,7 +104,9 @@ function createInitialData() {
             publisherId: 'u2', publisherName: '李四', publisherCredit: 4.2,
             reward: '4元', rewardValue: 4,
             deadline: dayAgo(-1), publishTime: hourAgo(30),
-            status: 'pending', contact: '站内联系', images: []
+            status: 'completed', contact: '站内联系', images: [],
+            takerId: 'u1', takerName: '张三',
+            paymentStatus: 'released', publisherConfirmed: true, takerConfirmed: true
         },
         {
             id: 't3', title: '宿舍搬运行李', type: 'demand', category: 'life-service',
@@ -290,9 +294,93 @@ function createInitialData() {
             withdrawn: false
         },
         {
-            id: 'm3', chatId: 'c2', senderId: 'u1', senderName: '张三',
-            receiverId: 'u3', content: '辛苦了，到了给我发消息就行。',
-            time: hourAgo(5), taskId: 't2', taskTitle: '代拿外卖',
+            id: 'm3', chatId: 'c2', senderId: 'u2', senderName: '李四',
+            receiverId: 'u1', content: '辛苦了，到了给我发消息就行。',
+            time: hourAgo(8.5), taskId: 't2', taskTitle: '代拿外卖',
+            withdrawn: false
+        },
+        {
+            id: 'm4', chatId: 'c1', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '李四已接单',
+            time: hourAgo(3), taskId: 't1', taskTitle: '帮忙取快递',
+            withdrawn: false
+        },
+        {
+            id: 'm5', chatId: 'c1', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '张三已预付报酬 5 元，任务开始执行',
+            time: hourAgo(2.5), taskId: 't1', taskTitle: '帮忙取快递',
+            withdrawn: false
+        },
+        {
+            id: 'm6', chatId: 'c2', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '张三已接单',
+            time: hourAgo(10), taskId: 't2', taskTitle: '代拿外卖',
+            withdrawn: false
+        },
+        {
+            id: 'm7', chatId: 'c2', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '李四已预付报酬 4 元，任务开始执行',
+            time: hourAgo(9), taskId: 't2', taskTitle: '代拿外卖',
+            withdrawn: false
+        },
+        {
+            id: 'm8', chatId: 'c2', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '双方已确认任务完成，款项已结算',
+            time: hourAgo(8), taskId: 't2', taskTitle: '代拿外卖',
+            withdrawn: false
+        },
+        {
+            id: 'm9', chatId: 'c3', senderId: 'u1', senderName: '张三',
+            receiverId: 'u7', content: '帮我取个快递，菜鸟驿站的',
+            time: hourAgo(50), taskId: 't15', taskTitle: '可长期代取快递',
+            withdrawn: false
+        },
+        {
+            id: 'm10', chatId: 'c3', senderId: 'u7', senderName: '孙同学',
+            receiverId: 'u1', content: '好的，晚上 7 点送到你宿舍',
+            time: hourAgo(49), taskId: 't15', taskTitle: '可长期代取快递',
+            withdrawn: false
+        },
+        {
+            id: 'm11', chatId: 'c3', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '服务已完成，款项已结算',
+            time: hourAgo(24), taskId: 't15', taskTitle: '可长期代取快递',
+            withdrawn: false
+        },
+        {
+            id: 'm12', chatId: 'c4', senderId: 'u1', senderName: '张三',
+            receiverId: 'u8', content: '明天早上帮我带一份豆浆',
+            time: hourAgo(12), taskId: 't16', taskTitle: '可代买早餐和日用品',
+            withdrawn: false
+        },
+        {
+            id: 'm13', chatId: 'c4', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '周同学已同意接单，服务开始执行',
+            time: hourAgo(11), taskId: 't16', taskTitle: '可代买早餐和日用品',
+            withdrawn: false
+        },
+        {
+            id: 'm14', chatId: 'c5', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '服务申请者已申请服务，等待服务提供者确认',
+            time: hourAgo(2), taskId: 't17', taskTitle: '提供 PPT 美化与排版服务',
+            withdrawn: false
+        },
+        {
+            id: 'm15', chatId: 'c6', senderId: 'u2', senderName: '李四',
+            receiverId: 'u5', content: '高数答疑可以今晚开始吗？',
+            time: hourAgo(20), taskId: 't19', taskTitle: '高数一对一答疑辅导',
+            withdrawn: false
+        },
+        {
+            id: 'm16', chatId: 'c6', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '赵同学已同意接单，服务开始执行',
+            time: hourAgo(19), taskId: 't19', taskTitle: '高数一对一答疑辅导',
+            withdrawn: false
+        },
+        {
+            id: 'm17', chatId: 'c6', senderId: 'system', senderName: '系统',
+            receiverId: '', content: '李四已确认服务完成，等待提供者确认（2天后自动确认）',
+            time: hourAgo(10), taskId: 't19', taskTitle: '高数一对一答疑辅导',
             withdrawn: false
         }
     ];
@@ -302,13 +390,43 @@ function createInitialData() {
             id: 'c1', partnerId: 'u2', partnerName: '李四',
             partnerAvatar: users[1].avatar,
             taskId: 't1', taskTitle: '帮忙取快递',
-            lastMessage: '好的，我 10 分钟后到宿舍楼下。', lastTime: hourAgo(2)
+            lastMessage: '好的，我 10 分钟后到宿舍楼下。', lastTime: hourAgo(2),
+            lastMessageSenderId: 'u2'
         },
         {
-            id: 'c2', partnerId: 'u3', partnerName: '王同学',
-            partnerAvatar: users[2].avatar,
+            id: 'c2', partnerId: 'u2', partnerName: '李四',
+            partnerAvatar: users[1].avatar,
             taskId: 't2', taskTitle: '代拿外卖',
-            lastMessage: '辛苦了，到了给我发消息就行。', lastTime: hourAgo(5)
+            lastMessage: '双方已确认任务完成，款项已结算', lastTime: hourAgo(8),
+            lastMessageSenderId: 'system'
+        },
+        {
+            id: 'c3', partnerId: 'u7', partnerName: '孙同学',
+            partnerAvatar: users[6].avatar,
+            taskId: 't15', taskTitle: '可长期代取快递',
+            lastMessage: '服务已完成，款项已结算', lastTime: hourAgo(24),
+            lastMessageSenderId: 'system'
+        },
+        {
+            id: 'c4', partnerId: 'u8', partnerName: '周同学',
+            partnerAvatar: users[7].avatar,
+            taskId: 't16', taskTitle: '可代买早餐和日用品',
+            lastMessage: '周同学已同意接单，服务开始执行', lastTime: hourAgo(11),
+            lastMessageSenderId: 'system'
+        },
+        {
+            id: 'c5', partnerId: 'u1', partnerName: '张三',
+            partnerAvatar: users[0].avatar,
+            taskId: 't17', taskTitle: '提供 PPT 美化与排版服务',
+            lastMessage: '消费者已申请服务，等待服务提供者确认', lastTime: hourAgo(2),
+            lastMessageSenderId: 'system'
+        },
+        {
+            id: 'c6', partnerId: 'u5', partnerName: '赵同学',
+            partnerAvatar: users[4].avatar,
+            taskId: 't19', taskTitle: '高数一对一答疑辅导',
+            lastMessage: '李四已确认服务完成，等待提供者确认（2天后自动确认）', lastTime: hourAgo(10),
+            lastMessageSenderId: 'system'
         }
     ];
 
@@ -317,10 +435,46 @@ function createInitialData() {
             id: 'r1', taskId: 't1', fromUserId: 'u1', fromUserName: '张三',
             toUserId: 'u2', toUserName: '李四', rating: 5,
             content: '非常准时，服务态度很好！', time: hourAgo(24)
+        },
+        {
+            id: 'r2', taskId: 't15', fromUserId: 'u1', fromUserName: '张三',
+            toUserId: 'u7', toUserName: '孙同学', rating: 5,
+            content: '取快递很及时，下次还会找他！', time: hourAgo(23)
         }
     ];
 
-    return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews };
+    var serviceOrders = [
+        {
+            id: 'so1', serviceId: 't15', chatId: 'c3',
+            consumerId: 'u1', providerId: 'u7',
+            amount: 5, status: 'completed',
+            consumerConfirmed: true, providerConfirmed: true,
+            createdAt: hourAgo(50), confirmedAt: hourAgo(24), autoConfirmAt: null
+        },
+        {
+            id: 'so2', serviceId: 't16', chatId: 'c4',
+            consumerId: 'u1', providerId: 'u8',
+            amount: 10, status: 'in_progress',
+            consumerConfirmed: false, providerConfirmed: false,
+            createdAt: hourAgo(12), confirmedAt: null, autoConfirmAt: null
+        },
+        {
+            id: 'so3', serviceId: 't17', chatId: 'c5',
+            consumerId: 'u3', providerId: 'u1',
+            amount: 20, status: 'pending',
+            consumerConfirmed: false, providerConfirmed: false,
+            createdAt: hourAgo(2), confirmedAt: null, autoConfirmAt: null
+        },
+        {
+            id: 'so4', serviceId: 't19', chatId: 'c6',
+            consumerId: 'u2', providerId: 'u5',
+            amount: 15, status: 'in_progress',
+            consumerConfirmed: true, providerConfirmed: false,
+            createdAt: hourAgo(36), confirmedAt: null, autoConfirmAt: dayAgo(-2)
+        }
+    ];
+
+    return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews, serviceOrders: serviceOrders };
 }
 
 const DB_KEY = 'campus_mock_db';

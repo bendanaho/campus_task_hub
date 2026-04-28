@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>消息中心</title>
+    <title>我的订单 - 校园互助平台</title>
     <link rel="stylesheet" href="css/style.css" />
     <script src="js/utils.js" defer></script>
     <script src="js/mock-data.js" defer></script>
@@ -14,19 +14,25 @@
     <header class="navbar">
         <div class="container">
             <div class="logo">校园互助平台</div>
-            <nav class="nav-links">
-
-            </nav>
+            <nav class="nav-links"></nav>
         </div>
     </header>
 
     <main class="page">
         <div class="container">
-            <h1 class="section-title">消息中心</h1>
+            <h1 class="section-title">我的订单</h1>
 
-            <div class="message-list" id="messageList">
-                <!-- 消息列表由 JS 动态渲染 -->
+            <div class="filter-bar">
+                <select id="orderFilter" class="form-control">
+                    <option value="all">全部订单</option>
+                    <option value="demand-published">我发起的任务</option>
+                    <option value="demand-taken">我接单的任务</option>
+                    <option value="service-published">我提供的服务</option>
+                    <option value="service-taken">我申请的服务</option>
+                </select>
             </div>
+
+            <div class="record-list"></div>
         </div>
     </main>
 
