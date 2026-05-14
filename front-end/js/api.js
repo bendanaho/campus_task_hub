@@ -1,6 +1,15 @@
 const USE_MOCK = true;
 const API_BASE = 'http://localhost:8080/api';
 
+// 保存 mock-data.js 原始同步函数的引用（供 API Mock 分支内部使用，避免与异步包装函数同名冲突）
+var _mockGetDB = getDB;
+var _mockSaveDB = saveDB;
+var _mockGetTaskById = getTaskById;
+var _mockGetUserById = getUserById;
+var _mockGetUserByUsername = getUserByUsername;
+var _mockGetUserByPhone = getUserByPhone;
+var _mockGetUserByEmail = getUserByEmail;
+
 // ==================== 认证 ====================
 
 async function login(account, password) {
@@ -277,12 +286,69 @@ async function getReviews(userId) {
     return res.json();
 }
 
+// ==================== 辅助查询接口（供 main.js 使用，替代直接访问 Mock 数据库） ====================
+
+async function fetchTaskById(id) {
+    if (USE_MOCK) {
+        return new Promise(function(resolve) {
+            setTimeout(function() {
+                resolve(_mockGetTaskById(id));
+            }, 50);
+        });
+    }
+    var res = await fetch(API_BASE + '/tasks/' + id);
+    return res.json();
+}
+
+async function fetchUserById(id) {
+    if (USE_MOCK) {
+        return new Promise(function(resolve) {
+            setTimeout(function() {
+                resolve(_mockGetUserById(id));
+            }, 50);
+        });
+    }
+    var res = await fetch(API_BASE + '/users/' + id);
+    return res.json();
+}
+
+async function getOrderByChatId(chatId) {
+    if (USE_MOCK) {
+        return mockGetOrderByChatId(chatId);
+    }
+    var res = await fetch(API_BASE + '/service-orders/by-chat?chatId=' + chatId, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+async function hasReviewed(taskId) {
+    if (USE_MOCK) {
+        return mockHasReviewed(taskId);
+    }
+    var res = await fetch(API_BASE + '/reviews/has-reviewed?taskId=' + taskId, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+async function getOrderCenterRecords(filterType) {
+    if (USE_MOCK) {
+        return mockGetOrderCenterRecords(filterType);
+    }
+    var query = filterType ? '?filter=' + filterType : '';
+    var res = await fetch(API_BASE + '/order-center/records' + query, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
 // ==================== Mock 实现 ====================
 
 function mockLogin(account, password) {
     return new Promise(function(resolve, reject) {
         setTimeout(function() {
-            var user = getUserByUsername(account) || getUserByPhone(account) || getUserByEmail(account);
+            var user = _mockGetUserByUsername(account) || _mockGetUserByPhone(account) || _mockGetUserByEmail(account);
             if (!user || user.password !== password) {
                 reject(new Error('用户名/手机号/邮箱或密码错误'));
                 return;
@@ -319,7 +385,7 @@ function mockRegister(data) {
                 reject(new Error('请输入正确的邮箱地址'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             for (var i = 0; i < db.users.length; i++) {
                 if (db.users[i].username === data.username) {
                     reject(new Error('该用户名已注册'));
@@ -350,7 +416,7 @@ function mockRegister(data) {
                 bio: ''
             };
             db.users.push(newUser);
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true });
         }, 200);
     });
@@ -359,7 +425,7 @@ function mockRegister(data) {
 function mockGetUserProfile(userId) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var user = getUserById(userId);
+            var user = _mockGetUserById(userId);
             if (!user) {
                 resolve(null);
                 return;
@@ -390,7 +456,7 @@ function mockSubmitAuth(data) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var user = null;
             for (var i = 0; i < db.users.length; i++) {
                 if (db.users[i].id === currentUser.id) {
@@ -407,7 +473,7 @@ function mockSubmitAuth(data) {
             user.studentId = data.studentId || '';
             user.college = data.college || '';
             user.className = data.className || '';
-            saveDB(db);
+            _mockSaveDB(db);
 
             var safeUser = {
                 id: user.id,
@@ -427,7 +493,7 @@ function mockSubmitAuth(data) {
 function mockGetTasks(filters) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var db = getDB();
+            var db = _mockGetDB();
             var result = db.tasks.slice();
 
             if (filters) {
@@ -479,9 +545,9 @@ function mockGetTasks(filters) {
 function mockGetTaskDetail(id) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var task = getTaskById(id);
+            var task = _mockGetTaskById(id);
             if (task) {
-                var publisher = getUserById(task.publisherId);
+                var publisher = _mockGetUserById(task.publisherId);
                 resolve({
                     task: task,
                     publisher: publisher ? {
@@ -506,9 +572,9 @@ function mockPublishTask(data) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var amount = parseRewardValue(data.reward);
-            var user = getUserById(currentUser.id);
+            var user = _mockGetUserById(currentUser.id);
             if (!user || (user.balance || 0) < amount) {
                 reject(new Error('余额不足，无法发布任务（需要预付报酬 ' + amount + ' 元）'));
                 return;
@@ -535,7 +601,7 @@ function mockPublishTask(data) {
                 takerConfirmed: false
             };
             db.tasks.unshift(newTask);
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, task: newTask });
         }, 200);
     });
@@ -549,7 +615,7 @@ function mockPublishService(data) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var newTask = {
                 id: 't' + (db.tasks.length + 1) + '-' + Date.now(),
                 title: data.title,
@@ -568,7 +634,7 @@ function mockPublishService(data) {
                 images: data.images || []
             };
             db.tasks.unshift(newTask);
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, task: newTask });
         }, 200);
     });
@@ -582,7 +648,7 @@ function mockTakeTask(id) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var task = null;
             for (var i = 0; i < db.tasks.length; i++) {
                 if (db.tasks[i].id === id) {
@@ -601,7 +667,7 @@ function mockTakeTask(id) {
             task.status = 'in_progress';
             task.takerId = currentUser.id;
             task.takerName = currentUser.username;
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, task: task });
         }, 200);
     });
@@ -615,7 +681,7 @@ function mockGetMyTasks() {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var result = db.tasks.filter(function(t) { return t.takerId === currentUser.id; });
             resolve(result);
         }, 150);
@@ -630,7 +696,7 @@ function mockGetMyPublishedTasks() {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var result = db.tasks.filter(function(t) { return t.publisherId === currentUser.id; });
             resolve(result);
         }, 150);
@@ -645,7 +711,7 @@ function mockGetMyServiceOrders() {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var result = (db.serviceOrders || []).filter(function(o) {
                 return o.consumerId === currentUser.id;
             });
@@ -662,13 +728,13 @@ function mockGetConversations() {
                 resolve([]);
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var result = [];
 
             (db.conversations || []).forEach(function(c) {
                 var partnerId = null;
                 var isParticipant = false;
-                var task = c.taskId ? getTaskById(c.taskId) : null;
+                var task = c.taskId ? _mockGetTaskById(c.taskId) : null;
 
                 // 方法1：通过消息记录确定参与者（支持"发了消息但尚未建立交易"的场景）
                 var msgParticipants = {};
@@ -716,7 +782,7 @@ function mockGetConversations() {
                 }
 
                 if (isParticipant && partnerId) {
-                    var partner = getUserById(partnerId);
+                    var partner = _mockGetUserById(partnerId);
                     result.push({
                         id: c.id,
                         partnerId: partnerId,
@@ -744,7 +810,7 @@ function mockGetConversations() {
 function mockGetMessages(chatId) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var db = getDB();
+            var db = _mockGetDB();
             var result = (db.messages || []).filter(function(m) { return m.chatId === chatId; });
             result.sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
             resolve(result);
@@ -760,7 +826,7 @@ function mockSendMessage(chatId, content) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var newMsg = {
                 id: 'm' + Date.now(),
                 chatId: chatId,
@@ -783,7 +849,7 @@ function mockSendMessage(chatId, content) {
                     break;
                 }
             }
-            saveDB(db);
+            _mockSaveDB(db);
             resolve(newMsg);
         }, 100);
     });
@@ -797,7 +863,7 @@ function mockSubmitReview(data) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var newReview = {
                 id: 'r' + Date.now(),
                 taskId: data.taskId,
@@ -812,7 +878,7 @@ function mockSubmitReview(data) {
             };
             if (!db.reviews) db.reviews = [];
             db.reviews.push(newReview);
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, review: newReview });
         }, 200);
     });
@@ -821,7 +887,7 @@ function mockSubmitReview(data) {
 function mockGetReviews(userId) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var db = getDB();
+            var db = _mockGetDB();
             var result = (db.reviews || []).filter(function(r) { return r.toUserId === userId; });
             resolve(result);
         }, 100);
@@ -848,7 +914,7 @@ function mockGetBalance() {
                 resolve({ balance: 0 });
                 return;
             }
-            var user = getUserById(currentUser.id);
+            var user = _mockGetUserById(currentUser.id);
             resolve({ balance: user ? (user.balance || 0) : 0 });
         }, 100);
     });
@@ -933,8 +999,8 @@ function mockCreateServiceOrder(serviceId, chatId) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
-            var service = getTaskById(serviceId);
+            var db = _mockGetDB();
+            var service = _mockGetTaskById(serviceId);
             if (!service) {
                 reject(new Error('服务不存在'));
                 return;
@@ -951,7 +1017,7 @@ function mockCreateServiceOrder(serviceId, chatId) {
                 return;
             }
             var amount = service.rewardValue || parseRewardValue(service.reward);
-            var user = getUserById(currentUser.id);
+            var user = _mockGetUserById(currentUser.id);
             if (!user || (user.balance || 0) < amount) {
                 reject(new Error('余额不足，需要 ' + amount + ' 元'));
                 return;
@@ -982,7 +1048,7 @@ function mockCreateServiceOrder(serviceId, chatId) {
             }
             if (!convExists) {
                 var partnerId = service.publisherId;
-                var partner = getUserById(partnerId);
+                var partner = _mockGetUserById(partnerId);
                 db.conversations.push({
                     id: chatId,
                     partnerId: partnerId,
@@ -995,7 +1061,7 @@ function mockCreateServiceOrder(serviceId, chatId) {
                 });
             }
 
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, order: order });
         }, 200);
     });
@@ -1009,7 +1075,7 @@ function mockConfirmServiceOrder(orderId, role) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var order = null;
             for (var i = 0; i < (db.serviceOrders || []).length; i++) {
                 if (db.serviceOrders[i].id === orderId) {
@@ -1031,12 +1097,12 @@ function mockConfirmServiceOrder(orderId, role) {
             if (order.status === 'in_progress' && order.consumerConfirmed && order.providerConfirmed) {
                 order.status = 'completed';
                 order.confirmedAt = new Date().toISOString();
-                var provider = getUserById(order.providerId);
+                var provider = _mockGetUserById(order.providerId);
                 if (provider) {
                     provider.balance = (provider.balance || 0) + order.amount;
                 }
             }
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, order: order });
         }, 200);
     });
@@ -1045,7 +1111,7 @@ function mockConfirmServiceOrder(orderId, role) {
 function mockGetActiveOrder(chatId) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var db = getDB();
+            var db = _mockGetDB();
             var orders = db.serviceOrders || [];
             var active = null;
             for (var i = orders.length - 1; i >= 0; i--) {
@@ -1061,7 +1127,7 @@ function mockGetActiveOrder(chatId) {
 function mockGetOrderHistory(chatId) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var db = getDB();
+            var db = _mockGetDB();
             var orders = db.serviceOrders || [];
             var result = [];
             for (var i = 0; i < orders.length; i++) {
@@ -1080,8 +1146,8 @@ function mockConfirmTaskComplete(taskId, role) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
-            var task = getTaskById(taskId);
+            var db = _mockGetDB();
+            var task = _mockGetTaskById(taskId);
             if (!task) {
                 reject(new Error('任务不存在'));
                 return;
@@ -1095,12 +1161,12 @@ function mockConfirmTaskComplete(taskId, role) {
                 task.status = 'completed';
                 task.paymentStatus = 'released';
                 task.confirmedAt = new Date().toISOString();
-                var taker = getUserById(task.takerId);
+                var taker = _mockGetUserById(task.takerId);
                 if (taker) {
                     taker.balance = (taker.balance || 0) + (task.rewardValue || 0);
                 }
             }
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, task: task });
         }, 200);
     });
@@ -1114,7 +1180,7 @@ function mockWithdrawMessage(messageId) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             var msg = null;
             for (var i = 0; i < db.messages.length; i++) {
                 if (db.messages[i].id === messageId) {
@@ -1149,7 +1215,7 @@ function mockWithdrawMessage(messageId) {
                 }
             }
 
-            saveDB(db);
+            _mockSaveDB(db);
             resolve({ success: true, message: msg });
         }, 100);
     });
@@ -1158,7 +1224,7 @@ function mockWithdrawMessage(messageId) {
 function mockEnsureConversation(data) {
     return new Promise(function(resolve) {
         setTimeout(function() {
-            var db = getDB();
+            var db = _mockGetDB();
             var exists = false;
             for (var i = 0; i < db.conversations.length; i++) {
                 if (db.conversations[i].id === data.chatId) {
@@ -1176,7 +1242,7 @@ function mockEnsureConversation(data) {
                     lastMessage: '',
                     lastTime: new Date().toISOString()
                 });
-                saveDB(db);
+                _mockSaveDB(db);
             }
             resolve({ success: true });
         }, 100);
@@ -1195,7 +1261,7 @@ function mockUpdatePhone(phone) {
                 reject(new Error('请输入正确的 11 位手机号'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             for (var i = 0; i < db.users.length; i++) {
                 if (db.users[i].phone === phone && db.users[i].id !== currentUser.id) {
                     reject(new Error('该手机号已被其他账号使用'));
@@ -1208,8 +1274,8 @@ function mockUpdatePhone(phone) {
                     break;
                 }
             }
-            saveDB(db);
-            var updatedUser = getUserById(currentUser.id);
+            _mockSaveDB(db);
+            var updatedUser = _mockGetUserById(currentUser.id);
             var safeUser = {
                 id: updatedUser.id,
                 username: updatedUser.username,
@@ -1238,7 +1304,7 @@ function mockUpdateEmail(email) {
                 reject(new Error('请输入正确的邮箱地址'));
                 return;
             }
-            var db = getDB();
+            var db = _mockGetDB();
             for (var i = 0; i < db.users.length; i++) {
                 if (db.users[i].email === email && db.users[i].id !== currentUser.id) {
                     reject(new Error('该邮箱已被其他账号使用'));
@@ -1251,8 +1317,8 @@ function mockUpdateEmail(email) {
                     break;
                 }
             }
-            saveDB(db);
-            var updatedUser = getUserById(currentUser.id);
+            _mockSaveDB(db);
+            var updatedUser = _mockGetUserById(currentUser.id);
             var safeUser = {
                 id: updatedUser.id,
                 username: updatedUser.username,
@@ -1266,5 +1332,218 @@ function mockUpdateEmail(email) {
             setCurrentUser(safeUser);
             resolve({ success: true, user: safeUser });
         }, 200);
+    });
+}
+
+
+function mockGetOrderByChatId(chatId) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var db = _mockGetDB();
+            var orders = db.serviceOrders || [];
+            var result = null;
+            for (var i = 0; i < orders.length; i++) {
+                if (orders[i].chatId === chatId) {
+                    result = orders[i]; break;
+                }
+            }
+            resolve(result);
+        }, 50);
+    });
+}
+
+function mockHasReviewed(taskId) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { resolve(false); return; }
+            var db = _mockGetDB();
+            var result = false;
+            for (var i = 0; i < (db.reviews || []).length; i++) {
+                if (db.reviews[i].taskId === taskId && db.reviews[i].fromUserId === currentUser.id) {
+                    result = true; break;
+                }
+            }
+            resolve(result);
+        }, 50);
+    });
+}
+
+function mockGetOrderCenterRecords(filterType) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+
+            var db = _mockGetDB();
+            var records = [];
+
+            // 我发布的需求单
+            (db.tasks || []).forEach(function(task) {
+                if (task.type === 'demand' && task.publisherId === currentUser.id) {
+                    var statusInfo = { text: task.status === 'pending' ? '待接单' : '进行中', className: task.status === 'pending' ? 'status-pending' : 'status-in_progress' };
+                    if (task.status === 'in_progress') {
+                        var isPub = currentUser.id === task.publisherId;
+                        var isTak = currentUser.id === task.takerId;
+                        var pConf = task.publisherConfirmed;
+                        var tConf = task.takerConfirmed;
+                        if (pConf && !tConf) statusInfo = isPub ? { text: '我已确认，待对方确认', className: 'status-in_progress' } : { text: '待我确认', className: 'status-pending' };
+                        else if (!pConf && tConf) statusInfo = isPub ? { text: '待我确认', className: 'status-pending' } : { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                    }
+                    if (task.status === 'completed') statusInfo = { text: '已完成', className: 'status-completed' };
+
+                    records.push({
+                        id: task.id,
+                        title: task.title,
+                        filterType: 'demand-published',
+                        typeLabel: '需求',
+                        roleLabel: '任务发起者',
+                        partnerName: task.takerName || '暂无',
+                        status: statusInfo.text,
+                        statusClass: statusInfo.className,
+                        time: task.publishTime,
+                        timeStr: formatDateTime(task.publishTime),
+                        task: task
+                    });
+                }
+            });
+
+            // 我接取的需求单
+            (db.tasks || []).forEach(function(task) {
+                if (task.type === 'demand' && task.takerId === currentUser.id) {
+                    var statusInfo = { text: '进行中', className: 'status-in_progress' };
+                    var isPub = currentUser.id === task.publisherId;
+                    var isTak = currentUser.id === task.takerId;
+                    var pConf = task.publisherConfirmed;
+                    var tConf = task.takerConfirmed;
+                    if (pConf && !tConf) statusInfo = isPub ? { text: '我已确认，待对方确认', className: 'status-in_progress' } : { text: '待我确认', className: 'status-pending' };
+                    else if (!pConf && tConf) statusInfo = isPub ? { text: '待我确认', className: 'status-pending' } : { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                    if (task.status === 'completed') statusInfo = { text: '已完成', className: 'status-completed' };
+
+                    records.push({
+                        id: task.id,
+                        title: task.title,
+                        filterType: 'demand-taken',
+                        typeLabel: '需求',
+                        roleLabel: '任务接单者',
+                        partnerName: task.publisherName,
+                        status: statusInfo.text,
+                        statusClass: statusInfo.className,
+                        time: task.publishTime,
+                        timeStr: formatDateTime(task.publishTime),
+                        task: task
+                    });
+                }
+            });
+
+            // 我发布的服务单（没有订单的）
+            var serviceIdsWithOrder = {};
+            (db.serviceOrders || []).forEach(function(order) {
+                if (order.providerId === currentUser.id) {
+                    serviceIdsWithOrder[order.serviceId] = true;
+                }
+            });
+            (db.tasks || []).forEach(function(task) {
+                if (task.type === 'service' && task.publisherId === currentUser.id && !serviceIdsWithOrder[task.id]) {
+                    records.push({
+                        id: task.id,
+                        title: task.title,
+                        filterType: 'service-published',
+                        typeLabel: '服务',
+                        roleLabel: '服务提供者',
+                        partnerName: '-',
+                        status: '可预约',
+                        statusClass: 'status-available',
+                        time: task.publishTime,
+                        timeStr: formatDateTime(task.publishTime),
+                        task: task
+                    });
+                }
+            });
+
+            // 我作为提供者接到的服务订单
+            (db.serviceOrders || []).forEach(function(order) {
+                if (order.providerId === currentUser.id) {
+                    var service = _mockGetTaskById(order.serviceId);
+                    var consumer = _mockGetUserById(order.consumerId);
+                    var statusInfo = { text: '待确认', className: 'status-pending' };
+                    if (order.status === 'pending') {
+                        if (!order.providerConfirmed) statusInfo = { text: '待我确认', className: 'status-pending' };
+                        else statusInfo = { text: '待确认', className: 'status-pending' };
+                    } else if (order.status === 'in_progress') {
+                        var cConf = order.consumerConfirmed;
+                        var pConf = order.providerConfirmed;
+                        if (cConf && !pConf) statusInfo = { text: '待我确认', className: 'status-pending' };
+                        else if (!cConf && pConf) statusInfo = { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                        else statusInfo = { text: '进行中', className: 'status-in_progress' };
+                    } else if (order.status === 'completed') {
+                        statusInfo = { text: '已完成', className: 'status-completed' };
+                    }
+
+                    records.push({
+                        id: order.id,
+                        title: service ? service.title : '未知服务',
+                        filterType: 'service-published',
+                        typeLabel: '服务',
+                        roleLabel: '服务提供者',
+                        partnerName: consumer ? consumer.username : '未知',
+                        status: statusInfo.text,
+                        statusClass: statusInfo.className,
+                        time: order.createdAt,
+                        timeStr: formatDateTime(order.createdAt),
+                        task: service,
+                        order: order
+                    });
+                }
+            });
+
+            // 我申请的服务订单
+            (db.serviceOrders || []).forEach(function(order) {
+                if (order.consumerId === currentUser.id) {
+                    var service = _mockGetTaskById(order.serviceId);
+                    var provider = _mockGetUserById(order.providerId);
+                    var statusInfo = { text: '待确认', className: 'status-pending' };
+                    if (order.status === 'pending') {
+                        if (!order.providerConfirmed) statusInfo = { text: '待对方确认', className: 'status-pending' };
+                        else statusInfo = { text: '待确认', className: 'status-pending' };
+                    } else if (order.status === 'in_progress') {
+                        var cConf = order.consumerConfirmed;
+                        var pConf = order.providerConfirmed;
+                        if (cConf && !pConf) statusInfo = { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                        else if (!cConf && pConf) statusInfo = { text: '待我确认', className: 'status-pending' };
+                        else statusInfo = { text: '进行中', className: 'status-in_progress' };
+                    } else if (order.status === 'completed') {
+                        statusInfo = { text: '已完成', className: 'status-completed' };
+                    }
+
+                    records.push({
+                        id: order.id,
+                        title: service ? service.title : '未知服务',
+                        filterType: 'service-taken',
+                        typeLabel: '服务',
+                        roleLabel: '服务申请者',
+                        partnerName: provider ? provider.username : '未知',
+                        status: statusInfo.text,
+                        statusClass: statusInfo.className,
+                        time: order.createdAt,
+                        timeStr: formatDateTime(order.createdAt),
+                        task: service,
+                        order: order
+                    });
+                }
+            });
+
+            records.sort(function(a, b) {
+                return new Date(b.time) - new Date(a.time);
+            });
+
+            if (filterType && filterType !== 'all') {
+                records = records.filter(function(r) {
+                    return r.filterType === filterType;
+                });
+            }
+
+            resolve(records);
+        }, 150);
     });
 }

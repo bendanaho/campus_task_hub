@@ -1,28 +1,29 @@
 const TOKEN_KEY = 'campus_token';
 const CURRENT_USER_KEY = 'campus_current_user';
+// token 为“电子通行证”
 
-function getToken() {
+function getToken() {//
     return localStorage.getItem(TOKEN_KEY);
 }
 
-function setToken(token) {
+function setToken(token) {//
     localStorage.setItem(TOKEN_KEY, token);
 }
 
-function removeToken() {
+function removeToken() {//
     localStorage.removeItem(TOKEN_KEY);
 }
 
-function getCurrentUser() {
+function getCurrentUser() {//
     const user = localStorage.getItem(CURRENT_USER_KEY);
     return user ? JSON.parse(user) : null;
 }
 
-function setCurrentUser(user) {
+function setCurrentUser(user) {//
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
 }
 
-function removeCurrentUser() {
+function removeCurrentUser() {//
     localStorage.removeItem(CURRENT_USER_KEY);
 }
 

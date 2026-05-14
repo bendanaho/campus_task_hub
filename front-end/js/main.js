@@ -617,7 +617,7 @@ function initTaskDetail() {
 
 // ==================== 消息中心 ====================
 
-function getConversationStatusText(task, chatId, currentUserId) {
+async function getConversationStatusText(task, chatId, currentUserId) {
     if (!task || !currentUserId) return { text: '', className: '' };
     if (task.type === 'demand') {
         if (task.status === 'pending') {
@@ -643,37 +643,33 @@ function getConversationStatusText(task, chatId, currentUserId) {
             return { text: '已完成', className: 'status-completed' };
         }
     } else {
-        var db = getDB();
-        var orders = db.serviceOrders || [];
-        for (var i = 0; i < orders.length; i++) {
-            if (orders[i].chatId === chatId) {
-                var order = orders[i];
-                var isCon = currentUserId === order.consumerId;
-                var isPro = currentUserId === order.providerId;
-                if (order.status === 'pending') {
-                    if (!order.providerConfirmed) {
-                        if (isPro) return { text: '待我确认', className: 'status-pending' };
-                        if (isCon) return { text: '待对方确认', className: 'status-pending' };
-                    }
-                    return { text: '待确认', className: 'status-pending' };
+        var order = await getOrderByChatId(chatId);
+        if (order) {
+            var isCon = currentUserId === order.consumerId;
+            var isPro = currentUserId === order.providerId;
+            if (order.status === 'pending') {
+                if (!order.providerConfirmed) {
+                    if (isPro) return { text: '待我确认', className: 'status-pending' };
+                    if (isCon) return { text: '待对方确认', className: 'status-pending' };
                 }
-                if (order.status === 'in_progress') {
-                    var cConf = order.consumerConfirmed;
-                    var pConf = order.providerConfirmed;
-                    if (!cConf && !pConf) return { text: '进行中', className: 'status-in_progress' };
-                    if (cConf && !pConf) {
-                        if (isCon) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
-                        if (isPro) return { text: '待我确认', className: 'status-pending' };
-                    }
-                    if (!cConf && pConf) {
-                        if (isCon) return { text: '待我确认', className: 'status-pending' };
-                        if (isPro) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
-                    }
-                    return { text: '进行中', className: 'status-in_progress' };
+                return { text: '待确认', className: 'status-pending' };
+            }
+            if (order.status === 'in_progress') {
+                var cConf = order.consumerConfirmed;
+                var pConf = order.providerConfirmed;
+                if (!cConf && !pConf) return { text: '进行中', className: 'status-in_progress' };
+                if (cConf && !pConf) {
+                    if (isCon) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
+                    if (isPro) return { text: '待我确认', className: 'status-pending' };
                 }
-                if (order.status === 'completed') {
-                    return { text: '已完成', className: 'status-completed' };
+                if (!cConf && pConf) {
+                    if (isCon) return { text: '待我确认', className: 'status-pending' };
+                    if (isPro) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
                 }
+                return { text: '进行中', className: 'status-in_progress' };
+            }
+            if (order.status === 'completed') {
+                return { text: '已完成', className: 'status-completed' };
             }
         }
         if (task.status === 'available') return { text: '可预约', className: 'status-available' };
@@ -688,17 +684,17 @@ function initMessageCenter() {
     var list = document.querySelector('.message-list');
     if (!list) return;
 
-    getConversations().then(function(conversations) {
+    getConversations().then(async function(conversations) {
         if (!conversations || conversations.length === 0) {
             list.innerHTML = '<div class="card empty-state"><p>暂无消息</p></div>';
             return;
         }
 
-        list.innerHTML = conversations.map(function(c) {
+        var enriched = await Promise.all(conversations.map(async function(c) {
             var currentUser = getCurrentUser();
             var roleText = '';
-            var task = c.taskId ? getTaskById(c.taskId) : null;
-            var statusInfo = getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
+            var task = c.taskId ? await fetchTaskById(c.taskId) : null;
+            var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
 
             if (task && currentUser) {
                 if (task.type === 'demand') {
@@ -724,24 +720,29 @@ function initMessageCenter() {
                 } else if (c.lastMessageSenderId === (currentUser ? currentUser.id : '')) {
                     msgPreview = '我：' + c.lastMessage;
                 } else if (c.lastMessageSenderId) {
-                    var sender = getUserById(c.lastMessageSenderId);
+                    var sender = await fetchUserById(c.lastMessageSenderId);
                     msgPreview = (sender ? sender.username : '对方') + '：' + c.lastMessage;
                 } else {
                     msgPreview = c.lastMessage;
                 }
             }
 
-            var statusBadge = statusInfo.text
-                ? '<span class="status-badge ' + statusInfo.className + '">' + statusInfo.text + '</span>'
+            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview };
+        }));
+
+        list.innerHTML = enriched.map(function(item) {
+            var c = item.c;
+            var statusBadge = item.statusInfo.text
+                ? '<span class="status-badge ' + item.statusInfo.className + '">' + item.statusInfo.text + '</span>'
                 : '';
 
             return '<div class="message-item">' +
                 '<div class="msg-header">' +
-                    '<h3>' + c.taskTitle + (roleText ? ' ｜ ' + roleText : '') + '</h3>' +
+                    '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + '</h3>' +
                     '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
                 '</div>' +
                 '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
-                '<p class="msg-preview">' + msgPreview + '</p>' +
+                '<p class="msg-preview">' + item.msgPreview + '</p>' +
                 '<div class="actions">' +
                     '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + c.taskId + '" class="btn">进入聊天</a>' +
                 '</div>' +
@@ -775,7 +776,7 @@ function initChatDetail() {
     }
 
     // 动态更新聊天页头部信息
-    function updateChatHeader() {
+    async function updateChatHeader() {
         if (!taskId) return;
         var partnerIdParam = getUrlParam('partner');
         var metaEls = document.querySelectorAll('.chat-header .meta');
@@ -783,7 +784,7 @@ function initChatDetail() {
             // 优先使用 URL 参数中准确的 partnerId 查询用户信息
             var partnerName = '未知用户';
             if (partnerIdParam) {
-                var partner = getUserById(partnerIdParam);
+                var partner = await fetchUserById(partnerIdParam);
                 if (partner) partnerName = partner.username;
             }
             metaEls[0].textContent = '聊天对象：' + partnerName;
@@ -889,22 +890,22 @@ function initChatDetail() {
         chatBox.parentNode.insertBefore(taskBar, chatBox);
     }
 
-    function renderTaskBar() {
+    async function renderTaskBar() {
         if (!taskId) { taskBar.style.display = 'none'; return; }
-        getTaskDetail(taskId).then(function(result) {
+        getTaskDetail(taskId).then(async function(result) {
             var task = result && result.task;
             if (!task) { taskBar.style.display = 'none'; return; }
             var currentUser = getCurrentUser();
             var isPublisher = currentUser && currentUser.id === task.publisherId;
             if (task.type === 'demand') {
-                renderTaskBarForDemand(task, isPublisher, currentUser);
+                await renderTaskBarForDemand(task, isPublisher, currentUser);
             } else {
-                renderTaskBarForService(task, chatId, currentUser, isPublisher);
+                await renderTaskBarForService(task, chatId, currentUser, isPublisher);
             }
         });
     }
 
-    function renderTaskBarForDemand(task, isPublisher, currentUser) {
+    async function renderTaskBarForDemand(task, isPublisher, currentUser) {
         var html = '<div class="task-bar-info">' +
             '<span class="task-bar-title">' + task.title + '</span>' +
             '<span class="task-bar-reward">' + task.reward + '</span>' +
@@ -921,14 +922,8 @@ function initChatDetail() {
                 html += '<span class="task-bar-waiting">等待对方确认...</span>';
             }
         } else if (task.status === 'completed') {
-            var db = getDB();
             var toUserId = isPublisher ? task.takerId : task.publisherId;
-            var hasReview = false;
-            for (var i = 0; i < (db.reviews || []).length; i++) {
-                if (db.reviews[i].taskId === task.id && db.reviews[i].fromUserId === currentUser.id) {
-                    hasReview = true; break;
-                }
-            }
+            var hasReview = await hasReviewed(task.id);
             if (!hasReview) {
                 html += '<a href="review.html?task=' + task.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
             } else {
@@ -940,54 +935,47 @@ function initChatDetail() {
         taskBar.style.display = 'flex';
     }
 
-    function renderTaskBarForService(task, chatId, currentUser, isPublisher) {
-        getActiveOrder(chatId).then(function(order) {
-            var html = '<div class="task-bar-info">' +
-                '<span class="task-bar-title">' + task.title + '</span>' +
-                '<span class="task-bar-reward">' + task.reward + '</span>' +
-                '</div><div class="task-bar-actions">';
-            if (!order) {
-                if (!isPublisher) {
-                    html += '<button type="button" class="btn btn-small" onclick="handleChatCreateOrder(\'' + task.id + '\', \'' + chatId + '\')">申请服务</button>';
+    async function renderTaskBarForService(task, chatId, currentUser, isPublisher) {
+        var order = await getActiveOrder(chatId);
+        var html = '<div class="task-bar-info">' +
+            '<span class="task-bar-title">' + task.title + '</span>' +
+            '<span class="task-bar-reward">' + task.reward + '</span>' +
+            '</div><div class="task-bar-actions">';
+        if (!order) {
+            if (!isPublisher) {
+                html += '<button type="button" class="btn btn-small" onclick="handleChatCreateOrder(\'' + task.id + '\', \'' + chatId + '\')">申请服务</button>';
+            }
+        } else {
+            html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
+            var isConsumer = currentUser && currentUser.id === order.consumerId;
+            var isProvider = currentUser && currentUser.id === order.providerId;
+            if (order.status === 'pending') {
+                if (isProvider) {
+                    html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'provider\')">同意接单</button>';
+                } else if (isConsumer) {
+                    html += '<span class="task-bar-waiting">等待对方同意...</span>';
                 }
-            } else {
-                html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
-                var isConsumer = currentUser && currentUser.id === order.consumerId;
-                var isProvider = currentUser && currentUser.id === order.providerId;
-                if (order.status === 'pending') {
-                    if (isProvider) {
-                        html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'provider\')">同意接单</button>';
-                    } else if (isConsumer) {
-                        html += '<span class="task-bar-waiting">等待对方同意...</span>';
-                    }
-                } else if (order.status === 'in_progress') {
-                    var myRole = isConsumer ? 'consumer' : 'provider';
-                    var myConfirmed = isConsumer ? order.consumerConfirmed : order.providerConfirmed;
-                    if (!myConfirmed) {
-                        html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'' + myRole + '\')">标记完成</button>';
-                    } else {
-                        html += '<span class="task-bar-waiting">等待对方确认...</span>';
-                    }
-                } else if (order.status === 'completed') {
-                    var db = getDB();
-                    var toUserId = isProvider ? order.consumerId : order.providerId;
-                    var hasReview = false;
-                    for (var i = 0; i < (db.reviews || []).length; i++) {
-                        if (db.reviews[i].taskId === order.serviceId && db.reviews[i].fromUserId === currentUser.id) {
-                            hasReview = true; break;
-                        }
-                    }
-                    if (!hasReview) {
-                        html += '<a href="review.html?task=' + order.serviceId + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
-                    } else {
-                        html += '<span class="task-bar-waiting">已完成</span>';
-                    }
+            } else if (order.status === 'in_progress') {
+                var myRole = isConsumer ? 'consumer' : 'provider';
+                var myConfirmed = isConsumer ? order.consumerConfirmed : order.providerConfirmed;
+                if (!myConfirmed) {
+                    html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'' + myRole + '\')">标记完成</button>';
+                } else {
+                    html += '<span class="task-bar-waiting">等待对方确认...</span>';
+                }
+            } else if (order.status === 'completed') {
+                var toUserId = isProvider ? order.consumerId : order.providerId;
+                var hasReview = await hasReviewed(order.serviceId);
+                if (!hasReview) {
+                    html += '<a href="review.html?task=' + order.serviceId + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+                } else {
+                    html += '<span class="task-bar-waiting">已完成</span>';
                 }
             }
-            html += '</div>';
-            taskBar.innerHTML = html;
-            taskBar.style.display = 'flex';
-        });
+        }
+        html += '</div>';
+        taskBar.innerHTML = html;
+        taskBar.style.display = 'flex';
     }
 
     renderMessages();
@@ -1117,21 +1105,25 @@ function initMyTasks() {
     if (tabs[0]) tabs[0].textContent = isServiceView ? '我发布的服务' : '我发布的任务';
     if (tabs[1]) tabs[1].textContent = isServiceView ? '我接取的服务' : '我接取的任务';
 
-    function render(type) {
+    async function render(type) {
         if (isServiceView && type === 'taken') {
-            getMyServiceOrders().then(function(orders) {
+            getMyServiceOrders().then(async function(orders) {
                 if (!orders || orders.length === 0) {
                     list.innerHTML = '<div class="card empty-state"><p>暂无服务</p></div>';
                     return;
                 }
-                list.innerHTML = orders.map(function(order) {
-                    var service = getTaskById(order.serviceId);
+                var enriched = await Promise.all(orders.map(async function(order) {
+                    var service = await fetchTaskById(order.serviceId);
+                    var provider = await fetchUserById(order.providerId);
+                    return { order: order, service: service, provider: provider };
+                }));
+                list.innerHTML = enriched.map(function(item) {
+                    var order = item.order;
                     var statusMap = { pending: '待确认', in_progress: '进行中', completed: '已完成', cancelled: '已取消', refunded: '已退款' };
-                    var provider = getUserById(order.providerId);
                     return '<div class="record-item">' +
-                        '<h3>' + (service ? service.title : '未知服务') + '</h3>' +
+                        '<h3>' + (item.service ? item.service.title : '未知服务') + '</h3>' +
                         '<p class="meta">类型：服务 ｜ 身份：服务申请者 ｜ 状态：' + (statusMap[order.status] || order.status) + ' ｜ 申请时间：' + formatDateTime(order.createdAt) + '</p>' +
-                        '<p>服务提供者：' + (provider ? provider.username : '未知') + '</p>' +
+                        '<p>服务提供者：' + (item.provider ? item.provider.username : '未知') + '</p>' +
                         '<div class="actions">' +
                             '<a href="task-detail.html?id=' + order.serviceId + '" class="btn btn-secondary">查看服务</a>' +
                             '<a href="chat-detail.html?chatId=' + order.chatId + '&partner=' + order.providerId + '&task=' + order.serviceId + '" class="btn btn-secondary">进入聊天</a>' +
@@ -1141,7 +1133,7 @@ function initMyTasks() {
             });
         } else {
             var apiCall = type === 'published' ? getMyPublishedTasks() : getMyTasks();
-            apiCall.then(function(tasks) {
+            apiCall.then(async function(tasks) {
                 if (isServiceView) {
                     tasks = tasks.filter(function(t) { return t.type === 'service'; });
                 } else {
@@ -1152,7 +1144,15 @@ function initMyTasks() {
                     list.innerHTML = '<div class="card empty-state"><p>' + emptyText + '</p></div>';
                     return;
                 }
-                list.innerHTML = tasks.map(function(task) {
+                var enriched = await Promise.all(tasks.map(async function(task) {
+                    var hasReview = false;
+                    if (task.status === 'completed') {
+                        hasReview = await hasReviewed(task.id);
+                    }
+                    return { task: task, hasReview: hasReview };
+                }));
+                list.innerHTML = enriched.map(function(item) {
+                    var task = item.task;
                     var role = type === 'published' ? '任务发起者' : '任务接单者';
                     var otherName = type === 'published' ? (task.takerName || '暂无') : task.publisherName;
                     var statusMap = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
@@ -1163,12 +1163,7 @@ function initMyTasks() {
                         actionsHtml += '<a href="chat-detail.html?chatId=c-' + partnerId + '&partner=' + partnerId + '&task=' + task.id + '" class="btn btn-secondary">联系对方</a>';
                     }
                     if (task.status === 'completed') {
-                        var db = getDB();
-                        var hasReview = false;
-                        for (var r = 0; r < (db.reviews || []).length; r++) {
-                            if (db.reviews[r].taskId === task.id) { hasReview = true; break; }
-                        }
-                        if (!hasReview) {
+                        if (!item.hasReview) {
                             actionsHtml += '<a href="review.html?task=' + task.id + '&to=' + partnerId + '" class="btn btn-secondary">去评价</a>';
                         }
                     }
@@ -1205,169 +1200,54 @@ function initOrderCenter() {
     var filterSelect = document.getElementById('orderFilter');
     if (!list) return;
 
-    function renderAll() {
+    async function renderAll() {
         var currentUser = getCurrentUser();
         if (!currentUser) {
             list.innerHTML = '<div class="card empty-state"><p>请先登录</p></div>';
             return;
         }
-        var db = getDB();
-        var records = [];
-
-        (db.tasks || []).forEach(function(task) {
-            if (task.type === 'demand' && task.publisherId === currentUser.id) {
-                var statusInfo = getConversationStatusText(task, '', currentUser.id);
-                records.push({
-                    id: task.id,
-                    title: task.title,
-                    filterType: 'demand-published',
-                    typeLabel: '需求',
-                    roleLabel: '任务发起者',
-                    partnerName: task.takerName || '暂无',
-                    status: statusInfo.text || (task.status === 'pending' ? '待接单' : '进行中'),
-                    statusClass: statusInfo.className || 'status-pending',
-                    time: task.publishTime,
-                    timeStr: formatDateTime(task.publishTime),
-                    task: task
-                });
-            }
-        });
-
-        (db.tasks || []).forEach(function(task) {
-            if (task.type === 'demand' && task.takerId === currentUser.id) {
-                var statusInfo = getConversationStatusText(task, '', currentUser.id);
-                records.push({
-                    id: task.id,
-                    title: task.title,
-                    filterType: 'demand-taken',
-                    typeLabel: '需求',
-                    roleLabel: '任务接单者',
-                    partnerName: task.publisherName,
-                    status: statusInfo.text || '进行中',
-                    statusClass: statusInfo.className || 'status-in_progress',
-                    time: task.publishTime,
-                    timeStr: formatDateTime(task.publishTime),
-                    task: task
-                });
-            }
-        });
-
-        var serviceIdsWithOrder = {};
-        (db.serviceOrders || []).forEach(function(order) {
-            if (order.providerId === currentUser.id) {
-                serviceIdsWithOrder[order.serviceId] = true;
-            }
-        });
-        (db.tasks || []).forEach(function(task) {
-            if (task.type === 'service' && task.publisherId === currentUser.id && !serviceIdsWithOrder[task.id]) {
-                records.push({
-                    id: task.id,
-                    title: task.title,
-                    filterType: 'service-published',
-                    typeLabel: '服务',
-                    roleLabel: '服务提供者',
-                    partnerName: '-',
-                    status: '可预约',
-                    statusClass: 'status-available',
-                    time: task.publishTime,
-                    timeStr: formatDateTime(task.publishTime),
-                    task: task
-                });
-            }
-        });
-
-        (db.serviceOrders || []).forEach(function(order) {
-            if (order.providerId === currentUser.id) {
-                var service = getTaskById(order.serviceId);
-                var consumer = getUserById(order.consumerId);
-                var statusInfo = getConversationStatusText(service, order.chatId, currentUser.id);
-                records.push({
-                    id: order.id,
-                    title: service ? service.title : '未知服务',
-                    filterType: 'service-published',
-                    typeLabel: '服务',
-                    roleLabel: '服务提供者',
-                    partnerName: consumer ? consumer.username : '未知',
-                    status: statusInfo.text || getOrderStatusText(order.status),
-                    statusClass: statusInfo.className || 'status-pending',
-                    time: order.createdAt,
-                    timeStr: formatDateTime(order.createdAt),
-                    task: service,
-                    order: order
-                });
-            }
-        });
-
-        (db.serviceOrders || []).forEach(function(order) {
-            if (order.consumerId === currentUser.id) {
-                var service = getTaskById(order.serviceId);
-                var provider = getUserById(order.providerId);
-                var statusInfo = getConversationStatusText(service, order.chatId, currentUser.id);
-                records.push({
-                    id: order.id,
-                    title: service ? service.title : '未知服务',
-                    filterType: 'service-taken',
-                    typeLabel: '服务',
-                    roleLabel: '服务申请者',
-                    partnerName: provider ? provider.username : '未知',
-                    status: statusInfo.text || getOrderStatusText(order.status),
-                    statusClass: statusInfo.className || 'status-pending',
-                    time: order.createdAt,
-                    timeStr: formatDateTime(order.createdAt),
-                    task: service,
-                    order: order
-                });
-            }
-        });
-
-        records.sort(function(a, b) {
-            return new Date(b.time) - new Date(a.time);
-        });
 
         var filterValue = filterSelect ? filterSelect.value : 'all';
-        if (filterValue !== 'all') {
-            records = records.filter(function(r) {
-                return r.filterType === filterValue;
-            });
-        }
-
-        if (records.length === 0) {
-            list.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
-            return;
-        }
-
-        list.innerHTML = records.map(function(r) {
-            var statusBadge = r.statusClass
-                ? '<span class="status-badge ' + r.statusClass + '">' + r.status + '</span>'
-                : '<span class="status-badge">' + r.status + '</span>';
-
-            var actionsHtml = '<a href="task-detail.html?id=' + (r.task ? r.task.id : '') + '" class="btn btn-secondary">查看详情</a>';
-
-            if (r.task) {
-                var chatPartnerId = '';
-                var chatTaskId = r.task.id;
-                if (r.task.type === 'demand') {
-                    if (r.roleLabel === '任务发起者' && r.task.takerId) chatPartnerId = r.task.takerId;
-                    else if (r.roleLabel === '任务接单者') chatPartnerId = r.task.publisherId;
-                } else if (r.order) {
-                    chatPartnerId = r.roleLabel === '服务提供者' ? r.order.consumerId : r.order.providerId;
-                }
-                if (chatPartnerId) {
-                    actionsHtml += '<a href="chat-detail.html?chatId=c-' + chatPartnerId + '&partner=' + chatPartnerId + '&task=' + chatTaskId + '" class="btn btn-secondary">联系对方</a>';
-                }
+        getOrderCenterRecords(filterValue).then(async function(records) {
+            if (records.length === 0) {
+                list.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
+                return;
             }
 
-            if (r.status === '已完成') {
-                var db2 = getDB();
+            var enriched = await Promise.all(records.map(async function(r) {
                 var hasReview = false;
-                var taskIdForReview = r.task ? r.task.id : '';
-                for (var rev = 0; rev < (db2.reviews || []).length; rev++) {
-                    if (db2.reviews[rev].taskId === taskIdForReview && db2.reviews[rev].fromUserId === currentUser.id) {
-                        hasReview = true; break;
+                if (r.status === '已完成') {
+                    var taskIdForReview = r.task ? r.task.id : '';
+                    hasReview = taskIdForReview ? await hasReviewed(taskIdForReview) : false;
+                }
+                return { r: r, hasReview: hasReview };
+            }));
+
+            list.innerHTML = enriched.map(function(item) {
+                var r = item.r;
+                var statusBadge = r.statusClass
+                    ? '<span class="status-badge ' + r.statusClass + '">' + r.status + '</span>'
+                    : '<span class="status-badge">' + r.status + '</span>';
+
+                var actionsHtml = '<a href="task-detail.html?id=' + (r.task ? r.task.id : '') + '" class="btn btn-secondary">查看详情</a>';
+
+                if (r.task) {
+                    var chatPartnerId = '';
+                    var chatTaskId = r.task.id;
+                    if (r.task.type === 'demand') {
+                        if (r.roleLabel === '任务发起者' && r.task.takerId) chatPartnerId = r.task.takerId;
+                        else if (r.roleLabel === '任务接单者') chatPartnerId = r.task.publisherId;
+                    } else if (r.order) {
+                        chatPartnerId = r.roleLabel === '服务提供者' ? r.order.consumerId : r.order.providerId;
+                    }
+                    if (chatPartnerId) {
+                        actionsHtml += '<a href="chat-detail.html?chatId=c-' + chatPartnerId + '&partner=' + chatPartnerId + '&task=' + chatTaskId + '" class="btn btn-secondary">联系对方</a>';
                     }
                 }
-                if (!hasReview) {
+
+                if (r.status === '已完成' && !item.hasReview) {
                     var toUserId = '';
+                    var taskIdForReview = r.task ? r.task.id : '';
                     if (r.task && r.task.type === 'demand') {
                         toUserId = r.roleLabel === '任务发起者' ? r.task.takerId : r.task.publisherId;
                     } else if (r.order) {
@@ -1377,15 +1257,15 @@ function initOrderCenter() {
                         actionsHtml += '<a href="review.html?task=' + taskIdForReview + '&to=' + toUserId + '" class="btn btn-secondary">去评价</a>';
                     }
                 }
-            }
 
-            return '<div class="record-item">' +
-                '<h3>' + r.title + '</h3>' +
-                '<p class="meta">' + statusBadge + '类型：' + r.typeLabel + ' ｜ 身份：' + r.roleLabel + ' ｜ 时间：' + r.timeStr + '</p>' +
-                '<p>对方：' + r.partnerName + '</p>' +
-                '<div class="actions">' + actionsHtml + '</div>' +
-            '</div>';
-        }).join('');
+                return '<div class="record-item">' +
+                    '<h3>' + r.title + '</h3>' +
+                    '<p class="meta">' + statusBadge + '类型：' + r.typeLabel + ' ｜ 身份：' + r.roleLabel + ' ｜ 时间：' + r.timeStr + '</p>' +
+                    '<p>对方：' + r.partnerName + '</p>' +
+                    '<div class="actions">' + actionsHtml + '</div>' +
+                '</div>';
+            }).join('');
+        });
     }
 
     renderAll();
