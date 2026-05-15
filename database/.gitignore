@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local Configuration ###
+application-local.yml
+application-*.yml
+!.gitignore
