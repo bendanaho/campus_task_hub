@@ -9,28 +9,16 @@ import java.time.LocalDateTime;
 public class UserResponse {
 
     private Long id;
-
     private String username;
-
     private String phone;
-
     private String email;
-
-    private String avatar;
-
+    private String avatarUrl;
     private BigDecimal creditScore;
-
     private Integer authStatus;
-
     private String college;
-
     private String className;
-
     private String bio;
-
     private BigDecimal balance;
-
-    private Integer role;
-
+    private String role;
     private LocalDateTime createdAt;
 }

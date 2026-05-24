@@ -1,0 +1,12 @@
+### 健康检查
+GET http://localhost:8080/api/test
+
+### 用户注册
+POST http://localhost:8080/api/register
+Content-Type: application/json
+
+{
+  "username": "test99",
+  "phone": "13800138099",
+  "password": "Test@123456"
+}
