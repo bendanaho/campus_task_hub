@@ -1,0 +1,239 @@
+### ============================================================
+### M1 用户认证与授权模块
+### ============================================================
+
+### M1.1 用户注册
+POST http://localhost:8080/register
+Content-Type: application/json
+
+{
+  "username": "testuser01",
+
+  "phone": "13800138001",
+  "email": "test01@example.com",
+  "password": "Test@123456"
+}
+
+### M1.1 用户登录（用户名/手机号/邮箱 + 密码）
+POST http://localhost:8080/login
+Content-Type: application/json
+
+{
+  "account": "testuser01",
+  "password": "Test@123456"
+}
+
+### M1.1 用户登出
+POST http://localhost:8080/logout
+Content-Type: application/json
+
+### M1.2 微信登录（预留）
+POST http://localhost:8080/login/wechat
+Content-Type: application/json
+
+{
+  "code": "wx_auth_code_placeholder"
+}
+
+### M1.3 查看用户信息
+GET http://localhost:8080/users/1
+Content-Type: application/json
+
+### M1.3 修改手机号
+PUT http://localhost:8080/user/phone
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "phone": "13900139001"
+}
+
+### M1.3 修改邮箱
+PUT http://localhost:8080/user/email
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "newemail@example.com"
+}
+
+### M1.4 校园实名认证
+POST http://localhost:8080/auth
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "realName": "张三",
+  "studentId": "2021001001",
+  "school": "某某大学",
+  "college": "计算机学院",
+  "className": "软件工程2101班"
+}
+
+### M1.5 查询用户余额
+GET http://localhost:8080/user/balance
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+### ============================================================
+### M2 任务发布与接单撮合模块
+### ============================================================
+
+### M2.1 任务列表（可按类型、分类、关键词、分页查询）
+GET http://localhost:8080/tasks
+Content-Type: application/json
+
+### M2.2 查看任务详情
+GET http://localhost:8080/tasks/1
+Content-Type: application/json
+
+### M2.3 发布需求任务
+POST http://localhost:8080/tasks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "帮我取个快递",
+  "category": "快递代取",
+  "description": "在菜鸟驿站，中通快递，取件码1234，小件",
+  "reward": "5元",
+  "rewardValue": 5.00,
+  "deadline": "2026-06-01T18:00:00",
+  "contact": "微信联系",
+  "images": ["https://example.com/img1.jpg"]
+}
+
+### M2.4 接取任务（Idempotency-Key 防重复提交）
+POST http://localhost:8080/tasks/1/take
+Content-Type: application/json
+Authorization: Bearer {{token}}
+Idempotency-Key: {{$guid}}
+
+### M2.5 我接取的任务
+GET http://localhost:8080/tasks/my-taken
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M2.5 我发布的任务
+GET http://localhost:8080/tasks/my-published
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M2.6 任务完成确认（双方确认后系统释放资金）
+POST http://localhost:8080/tasks/1/complete
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+### ============================================================
+### M3 服务与交易服务模块
+### ============================================================
+
+### M3.1 发布服务单（存储在tasks表，type=service）
+POST http://localhost:8080/services
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "代写Python作业",
+  "category": "学习辅导",
+  "description": "Python数据分析大作业，需要爬虫+可视化，价格面议",
+  "reward": "面议",
+  "rewardValue": 50.00,
+  "deadline": "2026-06-10T23:59:59",
+  "contact": "站内联系",
+  "images": []
+}
+
+### M3.2 创建服务订单
+POST http://localhost:8080/service-orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "serviceId": 1,
+  "chatId": 1,
+  "price": 50.00,
+  "message": "我想预约这个服务"
+}
+
+### M3.3 服务订单确认
+POST http://localhost:8080/service-orders/1/confirm
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M3.4 查询某会话下的活跃订单
+GET http://localhost:8080/service-orders/active?chatId=1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M3.5 查询某会话下的历史服务订单
+GET http://localhost:8080/service-orders?chatId=1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M3.5 查询我的服务订单
+GET http://localhost:8080/service-orders/my
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+### ============================================================
+### M4 聊天消息与通信模块
+### ============================================================
+
+### M4.1 会话列表（按最后消息时间倒序）
+GET http://localhost:8080/conversations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M4.2 消息记录
+GET http://localhost:8080/conversations/1/messages
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M4.3 发送消息
+POST http://localhost:8080/conversations/1/messages
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "content": "你好，我想了解一下这个任务"
+}
+
+### M4.4 撤回消息
+POST http://localhost:8080/messages/1/withdraw
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### M4.5 确认或创建会话（根据partnerId和taskId）
+POST http://localhost:8080/conversations/ensure
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "partnerId": 2,
+  "taskId": 1
+}
+
+
+### ============================================================
+### M6 评价与信誉管理模块
+### ============================================================
+
+### M6.1 提交评价（任务完成后对对方评分）
+POST http://localhost:8080/reviews
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "taskId": 1,
+  "revieweeId": 2,
+  "rating": 5,
+  "content": "非常靠谱，准时完成任务！"
+}
+
+### M6.3 查看用户收到的评价
+GET http://localhost:8080/reviews?userId=2
+Content-Type: application/json

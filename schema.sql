@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL COMMENT '加密后的密码',
     wechat_openid VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '微信OpenID（NFR6预留）',
     wechat_unionid VARCHAR(100) DEFAULT NULL COMMENT '微信UnionID（NFR6预留）',
-    avatar_url VARCHAR(500) DEFAULT NULL COMMENT '头像地址',
+    avatar VARCHAR(500) DEFAULT NULL COMMENT '头像地址',
     real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
     student_id VARCHAR(50) DEFAULT NULL COMMENT '学号',
     school VARCHAR(100) DEFAULT NULL COMMENT '学校',
@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
     class_name VARCHAR(100) DEFAULT NULL COMMENT '班级',
     bio VARCHAR(500) DEFAULT NULL COMMENT '个人简介',
     balance DECIMAL(10,2) DEFAULT 0.00 COMMENT '账户余额',
-    credit_score INT DEFAULT 100 COMMENT '信用分',
+    credit_score DECIMAL(10,2) DEFAULT 5.00 COMMENT '信用分',
     auth_status TINYINT DEFAULT 0 COMMENT '实名认证状态 0=未认证 1=已认证',
-    role ENUM('user','admin') DEFAULT 'user' COMMENT '角色',
+    role INT DEFAULT 0 COMMENT '角色 0=普通用户 1=管理员',
     version INT DEFAULT 0 COMMENT '乐观锁版本号',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -62,21 +62,30 @@ CREATE TABLE IF NOT EXISTS task_categories (
 CREATE TABLE IF NOT EXISTS tasks (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(200) NOT NULL COMMENT '任务标题',
+    type INT NOT NULL DEFAULT 0 COMMENT '任务类型 0=需求方 1=服务方',
+    category VARCHAR(50) NOT NULL COMMENT '任务分类',
     description TEXT COMMENT '任务描述',
-    category_id BIGINT NOT NULL COMMENT '分类ID',
     publisher_id BIGINT NOT NULL COMMENT '发布者ID',
-    assignee_id BIGINT DEFAULT NULL COMMENT '接单者ID',
-    reward DECIMAL(10,2) NOT NULL COMMENT '赏金',
-    status ENUM('open','in_progress','completed','cancelled','expired') DEFAULT 'open' COMMENT '任务状态',
+    publisher_name VARCHAR(50) NOT NULL COMMENT '发布者用户名（冗余，减少JOIN）',
+    publisher_credit DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '发布时信用分快照',
+    reward VARCHAR(50) NOT NULL COMMENT '报酬描述（例如：5元、面议）',
+    reward_value DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '报酬数值',
     deadline DATETIME DEFAULT NULL COMMENT '截止时间',
-    location VARCHAR(255) DEFAULT NULL COMMENT '地点',
-    images JSON DEFAULT NULL COMMENT '图片列表',
+    publish_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
+    status INT NOT NULL DEFAULT 0 COMMENT '任务状态 0=待接单 1=进行中 2=已完成 3=可接单(服务)',
+    contact VARCHAR(100) DEFAULT '站内联系' COMMENT '联系方式',
+    images TEXT DEFAULT NULL COMMENT '图片列表(JSON字符串)',
+    taker_id BIGINT DEFAULT NULL COMMENT '接单者ID',
+    taker_name VARCHAR(50) DEFAULT NULL COMMENT '接单者用户名（冗余）',
+    payment_status INT DEFAULT NULL COMMENT '支付状态 0=冻结 1=已释放',
+    publisher_confirmed INT DEFAULT 0 COMMENT '发布者确认完成 0=未确认 1=已确认',
+    taker_confirmed INT DEFAULT 0 COMMENT '接单者确认完成 0=未确认 1=已确认',
+    version INT DEFAULT 0 COMMENT '乐观锁版本号',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (category_id) REFERENCES task_categories(id),
+    deleted_at DATETIME DEFAULT NULL COMMENT '软删除时间',
     FOREIGN KEY (publisher_id) REFERENCES users(id),
-    FOREIGN KEY (assignee_id) REFERENCES users(id)
+    FOREIGN KEY (taker_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务表';
 
 -- -------------------------------------------
@@ -139,6 +148,23 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     FOREIGN KEY (sender_id) REFERENCES users(id),
     FOREIGN KEY (receiver_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
+
+-- -------------------------------------------
+-- 7.1 会话表
+-- -------------------------------------------
+CREATE TABLE IF NOT EXISTS conversations (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user1_id BIGINT NOT NULL COMMENT '用户1 ID',
+    user2_id BIGINT NOT NULL COMMENT '用户2 ID',
+    task_id BIGINT DEFAULT NULL COMMENT '关联任务ID',
+    last_message TEXT DEFAULT NULL COMMENT '最后一条消息内容',
+    last_time DATETIME DEFAULT NULL COMMENT '最后消息时间',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user1_id) REFERENCES users(id),
+    FOREIGN KEY (user2_id) REFERENCES users(id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话表';
 
 -- -------------------------------------------
 -- 8. 举报表
