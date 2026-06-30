@@ -1208,8 +1208,36 @@ function initReview() {
     var form = document.querySelector('.form-container form');
     if (!form) return;
 
-    var taskId = getUrlParam('task');
+    var orderId = getUrlParam('order');
     var toUserId = getUrlParam('to');
+    var toUserName = '';
+    var submitBtnEl = form.querySelector('.form-actions button[type="button"]');
+
+    // 填充"对应帖子/被评价对象"，并处理"订单未完成 / 已评价"
+    (async function fillReviewInfo() {
+        var record = null;
+        if (orderId) {
+            var mine = await getMyOrders();
+            record = mine.find(function(x) { return x.order.id === orderId; });
+        }
+        var taskNameInput = document.getElementById('taskName');
+        var targetInput = document.getElementById('reviewTarget');
+        if (record) {
+            toUserName = record.partnerName;
+            if (taskNameInput) { taskNameInput.value = record.title; taskNameInput.readOnly = true; }
+            if (targetInput) { targetInput.value = toUserName; targetInput.readOnly = true; }
+            if (record.order.status !== 'completed') {
+                alert('该订单尚未完成，暂不能评价。');
+            } else if (await hasReviewed(orderId) && submitBtnEl) {
+                submitBtnEl.disabled = true;
+                submitBtnEl.textContent = '你已评价';
+            }
+        } else if (toUserId) {
+            var u = await fetchUserById(toUserId);
+            toUserName = u ? u.username : '';
+            if (targetInput) targetInput.value = toUserName;
+        }
+    })();
 
     var selectedRating = 5;
     var starBtns = document.querySelectorAll('.rating-star');
@@ -1260,7 +1288,7 @@ function initReview() {
             }
 
             submitReview({
-                taskId: taskId, toUserId: toUserId,
+                orderId: orderId, toUserId: toUserId, toUserName: toUserName,
                 rating: selectedRating, content: content,
                 images: uploadedImages
             }).then(function() {
