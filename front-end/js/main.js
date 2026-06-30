@@ -11,8 +11,7 @@ function showDemoMessage(message) {
 var NAV_ITEMS = [
     { label: '首页', href: 'index.html' },
     { label: '互助大厅', href: 'task-hall.html' },
-    { label: '发布任务', href: 'publish-task.html' },
-    { label: '发布服务', href: 'take-task.html' },
+    { label: '发布互助', href: 'publish-task.html' },
     { label: '消息中心', href: 'message-center.html' },
     { label: '我的订单', href: 'order-center.html' }
 ];
@@ -476,18 +475,17 @@ function handleTakeTask(taskId) {
 // ==================== 发布任务/服务 ====================
 
 function initPublishForm() {
-    var isTaskPage = window.location.pathname.includes('publish-task.html');
-    var isServicePage = window.location.pathname.includes('take-task.html');
-    if (!isTaskPage && !isServicePage) return;
-    if (!protectPage(['publish-task.html', 'take-task.html'])) return;
+    if (!window.location.pathname.includes('publish-task.html')) return;
+    if (!protectPage(['publish-task.html'])) return;
 
     var form = document.querySelector('.form-container form');
     if (!form) return;
 
+    // 注入图片上传区
     var imageSection = document.createElement('div');
     imageSection.className = 'form-group';
     imageSection.innerHTML = '<label>上传图片（可选，最多3张）</label>' +
-        '<input type="file" id="taskImages" class="form-control" accept="image/*" multiple>' +
+        '<input type="file" id="postImages" class="form-control" accept="image/*" multiple>' +
         '<div id="imagePreview" class="image-preview-area"></div>';
 
     var actions = form.querySelector('.form-actions');
@@ -495,7 +493,7 @@ function initPublishForm() {
         form.insertBefore(imageSection, actions);
     }
 
-    var imageInput = document.getElementById('taskImages');
+    var imageInput = document.getElementById('postImages');
     var previewArea = document.getElementById('imagePreview');
     var uploadedImages = [];
 
@@ -518,41 +516,55 @@ function initPublishForm() {
         });
     }
 
+    // 根据"出钱/收钱"切换专属字段与文案
+    var deadlineGroup = document.getElementById('deadlineGroup');
+    var serviceTimeGroup = document.getElementById('serviceTimeGroup');
+    var rewardLabel = document.getElementById('rewardLabel');
+
+    function getSide() {
+        var checked = form.querySelector('input[name="publisherSide"]:checked');
+        return checked ? checked.value : 'payer';
+    }
+    function syncFields() {
+        var side = getSide();
+        if (deadlineGroup) deadlineGroup.style.display = side === 'payer' ? '' : 'none';
+        if (serviceTimeGroup) serviceTimeGroup.style.display = side === 'earner' ? '' : 'none';
+        if (rewardLabel) rewardLabel.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '期望报酬（你的收费）';
+    }
+    form.querySelectorAll('input[name="publisherSide"]').forEach(function(r) {
+        r.addEventListener('change', syncFields);
+    });
+    syncFields();
+
     var publishBtn = form.querySelector('button[type="button"]');
     if (!publishBtn) return;
 
     publishBtn.addEventListener('click', function() {
-        var title, category, description, reward, deadline, contact;
-
-        if (isTaskPage) {
-            title = document.getElementById('taskTitle').value.trim();
-            category = document.getElementById('taskCategory').value;
-            description = document.getElementById('taskDesc').value.trim();
-            reward = document.getElementById('taskReward').value.trim();
-            deadline = document.getElementById('taskDeadline').value;
-            contact = document.getElementById('taskContact').value.trim();
-        } else {
-            title = document.getElementById('serviceTitle').value.trim();
-            category = document.getElementById('serviceCategory').value;
-            description = document.getElementById('serviceDesc').value.trim();
-            reward = document.getElementById('serviceReward').value.trim();
-            deadline = '';
-            contact = document.getElementById('serviceContact').value.trim();
-        }
+        var side = getSide();
+        var title = document.getElementById('postTitle').value.trim();
+        var category = document.getElementById('postCategory').value;
+        var description = document.getElementById('postDesc').value.trim();
+        var reward = document.getElementById('postReward').value.trim();
+        var contact = document.getElementById('postContact').value.trim();
 
         if (!title || !category || !description || !reward) {
             alert('请填写必填项。'); return;
         }
 
         var data = {
-            title: title, category: category, description: description,
-            reward: reward, deadline: deadline, contact: contact,
-            images: uploadedImages
+            title: title,
+            publisherSide: side,
+            category: category,
+            description: description,
+            reward: reward,
+            contact: contact,
+            images: uploadedImages,
+            deadline: side === 'payer' ? document.getElementById('postDeadline').value : '',
+            serviceTime: side === 'earner' ? document.getElementById('postServiceTime').value.trim() : ''
         };
 
-        var apiCall = isTaskPage ? publishTask(data) : publishService(data);
-        apiCall.then(function(res) {
-            alert(isTaskPage ? '任务发布成功！' : '服务发布成功！');
+        publishPost(data).then(function() {
+            alert('发布成功！');
             window.location.href = 'task-hall.html';
         }).catch(function(err) {
             alert(err.message || '发布失败');

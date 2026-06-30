@@ -1028,3 +1028,36 @@ html {
 .filter-bar select {
     max-width: 240px;
 }
+
+/* 发布页：出钱/收钱 二选一 */
+.side-options {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.side-option {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid #d8dee9;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+.side-option:has(input:checked) {
+    border-color: #2f80ed;
+    background-color: #eaf2fe;
+}
+.side-option input {
+    width: auto;
+    margin: 0;
+}
+.side-option span {
+    display: inline;
+    margin: 0;
+    font-weight: 500;
+}

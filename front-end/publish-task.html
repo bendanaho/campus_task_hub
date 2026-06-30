@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>发布任务 - 校园互助平台</title>
+    <title>发布互助 - 校园互助平台</title>
     <link rel="stylesheet" href="css/style.css" />
     <script src="js/utils.js" defer></script>
     <script src="js/mock-data.js" defer></script>
@@ -23,24 +23,38 @@
     <main class="page">
         <div class="container">
             <div class="card form-container">
-                <h1 class="form-title">发布任务</h1>
-                <p class="note page-intro">发布你的需求，等待其他同学接单并完成任务。</p>
+                <h1 class="form-title">发布互助</h1>
+                <p class="note page-intro">先选择你是出钱找人帮忙，还是收钱帮别人做，再填写具体信息。</p>
 
                 <form>
                     <div class="form-group">
-                        <label for="taskTitle">任务标题</label>
+                        <label>我想发布</label>
+                        <div class="side-options">
+                            <label class="side-option">
+                                <input type="radio" name="publisherSide" value="payer" checked />
+                                <span>我出钱，请别人帮我做（悬赏求助）</span>
+                            </label>
+                            <label class="side-option">
+                                <input type="radio" name="publisherSide" value="earner" />
+                                <span>我收钱，帮别人做（提供服务）</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postTitle">标题</label>
                         <input
                             type="text"
-                            id="taskTitle"
+                            id="postTitle"
                             class="form-control"
-                            placeholder="请输入任务标题"
+                            placeholder="请输入标题"
                         />
                     </div>
 
                     <div class="form-group">
-                        <label for="taskCategory">任务分类</label>
-                        <select id="taskCategory" class="form-control placeholder-select" required>
-                            <option value="" selected disabled>请选择任务分类</option>
+                        <label for="postCategory">分类</label>
+                        <select id="postCategory" class="form-control placeholder-select" required>
+                            <option value="" selected disabled>请选择分类</option>
                             <option value="errand">跑腿代办（快递、外卖、代买）</option>
                             <option value="life-service">生活服务（搬运、打印、帮忙）</option>
                             <option value="skill-help">技能帮助（维修、设计、编程）</option>
@@ -48,52 +62,64 @@
                             <option value="material-share">资料共享（课件、笔记、资料）</option>
                             <option value="item-trade">物品交易（二手、闲置、交换）</option>
                             <option value="teamwork">组队协作（搭子、组队、合作）</option>
-                            <option value="other">其他（其他类型任务）</option>
+                            <option value="other">其他（其他类型）</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="taskDesc">任务描述</label>
+                        <label for="postDesc">描述</label>
                         <textarea
-                            id="taskDesc"
+                            id="postDesc"
                             class="form-control"
-                            placeholder="请输入任务描述"
+                            placeholder="请输入详细描述"
                         ></textarea>
                     </div>
 
                     <div class="form-group">
-                        <label for="taskReward">报酬金额</label>
+                        <label for="postReward" id="rewardLabel">报酬金额</label>
                         <input
                             type="text"
-                            id="taskReward"
+                            id="postReward"
                             class="form-control"
                             placeholder="请输入报酬金额"
                         />
                     </div>
 
-                    <div class="form-group">
-                        <label for="taskDeadline">截止时间</label>
+                    <!-- 仅"我出钱"显示 -->
+                    <div class="form-group" id="deadlineGroup">
+                        <label for="postDeadline">截止时间</label>
                         <input
                             type="datetime-local"
-                            id="taskDeadline"
+                            id="postDeadline"
                             class="form-control"
                         />
                     </div>
 
-                    <div class="form-group">
-                        <label for="taskContact">联系方式（可选）</label>
+                    <!-- 仅"我收钱"显示 -->
+                    <div class="form-group" id="serviceTimeGroup">
+                        <label for="postServiceTime">可服务时间</label>
                         <input
                             type="text"
-                            id="taskContact"
+                            id="postServiceTime"
+                            class="form-control"
+                            placeholder="如 工作日晚间、周末全天"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postContact">联系方式（可选）</label>
+                        <input
+                            type="text"
+                            id="postContact"
                             class="form-control"
                             placeholder="请输入联系方式"
                         />
                     </div>
 
                     <div class="form-actions">
-                        <button type="button" class="btn btn-publish">发布任务</button>
+                        <button type="button" class="btn btn-publish">发布</button>
                         <button type="reset" class="btn btn-secondary">重置</button>
-                        <a href="index.html" class="btn btn-gray">返回</a>
+                        <a href="task-hall.html" class="btn btn-gray">返回大厅</a>
                     </div>
                 </form>
             </div>
