@@ -338,7 +338,7 @@ function initTaskHall() {
         var keywordInput = document.getElementById('taskKeyword');
         var sortSelect = document.getElementById('sortSelect');
 
-        var selectedType = typeFilter ? typeFilter.value : 'all';
+        var selectedSide = typeFilter ? typeFilter.value : 'all';
         var keyword = keywordInput ? keywordInput.value.trim() : '';
         var sortValue = sortSelect ? sortSelect.value : '';
 
@@ -346,7 +346,7 @@ function initTaskHall() {
         var selectedCategories = Array.from(checkedInputs).map(function(input) { return input.value; });
 
         var filters = {
-            type: selectedType,
+            side: selectedSide,
             categories: selectedCategories,
             keyword: keyword,
             sort: sortValue
@@ -361,23 +361,20 @@ function initTaskHall() {
             if (emptyState) emptyState.style.display = 'none';
 
             taskList.innerHTML = tasks.map(function(task) {
-                var typeLabel = task.type === 'demand' ? '需求单' : '服务单';
-                var typeClass = task.type === 'demand' ? 'badge-demand' : 'badge-service';
+                var typeLabel = task.publisherSide === 'payer' ? '悬赏求助' : '提供服务';
+                var typeClass = task.publisherSide === 'payer' ? 'badge-demand' : 'badge-service';
                 var catName = CATEGORY_MAP[task.category] || task.category;
                 var creditColor = getCreditColorClass(task.publisherCredit);
                 var timeStr = timeAgo(task.publishTime);
 
-                var actionBtn = '';
-                if (task.type === 'demand') {
-                    actionBtn = '<button type="button" class="btn btn-demand" onclick="handleTakeTask(\'' + task.id + '\')">接单</button>';
-                } else {
-                    actionBtn = '<a href="chat-detail.html?chatId=c-' + task.publisherId + '&partner=' + task.publisherId + '&task=' + task.id + '" class="btn btn-service">联系服务者</a>';
-                }
+                var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : '下单找他';
+                var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : 'btn-service';
+                var actionBtn = '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
 
                 var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
                     return '<img src="' + img + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
                 }).join('') + '</div>' : '';
-                return '<div class="task-item" data-type="' + task.type + '" data-category="' + task.category + '">' +
+                return '<div class="task-item" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
                     '<div class="task-item-main">' +
                         '<div class="task-item-top">' +
                             '<h3>' + task.title + '</h3>' +
@@ -457,19 +454,22 @@ function initTaskHall() {
     updateFilterText();
 }
 
-function handleTakeTask(taskId) {
+// 点"接单赚钱/下单找他" → 跳到与发布者的聊天页，在那里发起订单（订单创建在 Step5 聊天页完成）
+function goToOrderChat(postId, publisherId) {
     if (!isLoggedIn()) {
         alert('请先登录。');
         var redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
         window.location.href = 'login.html?redirect=' + redirectUrl;
         return;
     }
-    takeTask(taskId).then(function() {
-        alert('操作成功！');
-        window.location.reload();
-    }).catch(function(err) {
-        alert(err.message || '操作失败');
-    });
+    var me = getCurrentUser();
+    if (me && me.id === publisherId) {
+        alert('这是你自己发布的帖子。');
+        return;
+    }
+    var chatId = 'c-' + postId + '-' + me.id;
+    window.location.href = 'chat-detail.html?chatId=' + encodeURIComponent(chatId) +
+        '&partner=' + encodeURIComponent(publisherId) + '&task=' + encodeURIComponent(postId);
 }
 
 // ==================== 发布任务/服务 ====================
@@ -591,8 +591,8 @@ function initTaskDetail() {
 
         var task = result.task;
         var catName = CATEGORY_MAP[task.category] || task.category;
-        var typeLabel = task.type === 'demand' ? '需求单' : '服务单';
-        var statusMap = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
+        var typeLabel = task.publisherSide === 'payer' ? '悬赏求助（发布者出钱）' : '提供服务（发布者收钱）';
+        var statusMap = { open: '可下单', closed: '已结束' };
         var statusText = statusMap[task.status] || task.status;
 
         var imagesHtml = '';
@@ -606,21 +606,25 @@ function initTaskDetail() {
 
         var box = document.querySelector('.detail-box');
         if (box) {
-            var contactChatLink = 'chat-detail.html?chatId=c-' + task.publisherId + '&partner=' + task.publisherId + '&task=' + task.id;
-            box.innerHTML = '<p><strong>任务标题：</strong>' + task.title + '</p>' +
-                '<p><strong>任务类型：</strong>' + typeLabel + '</p>' +
-                '<p><strong>任务分类：</strong>' + catName + '</p>' +
-                '<p><strong>任务描述：</strong>' + task.description + '</p>' +
-                '<p><strong>任务发起者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
+            var currentUser = getCurrentUser();
+            var isMine = currentUser && currentUser.id === task.publisherId;
+            var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : '下单找他';
+            var serviceTimeHtml = (task.publisherSide === 'earner' && task.serviceTime)
+                ? '<p><strong>可服务时间：</strong>' + task.serviceTime + '</p>' : '';
+            box.innerHTML = '<p><strong>标题：</strong>' + task.title + '</p>' +
+                '<p><strong>类型：</strong>' + typeLabel + '</p>' +
+                '<p><strong>分类：</strong>' + catName + '</p>' +
+                '<p><strong>描述：</strong>' + task.description + '</p>' +
+                '<p><strong>发布者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
                 '<p><strong>报酬金额：</strong>' + task.reward + '</p>' +
+                serviceTimeHtml +
                 '<p><strong>发布时间：</strong>' + formatDateTime(task.publishTime) + '</p>' +
-                (task.deadline ? '<p><strong>截止时间：</strong>' + formatDateTime(task.deadline) + '</p>' : '') +
-                '<p><strong>任务状态：</strong>' + statusText + '</p>' +
+                (task.publisherSide === 'payer' && task.deadline ? '<p><strong>截止时间：</strong>' + formatDateTime(task.deadline) + '</p>' : '') +
+                '<p><strong>状态：</strong>' + statusText + '</p>' +
                 imagesHtml +
                 '<div class="actions">' +
-                    (task.type === 'demand' ? '<button type="button" class="btn" onclick="handleTakeTask(\'' + task.id + '\')">接单</button>' : '<a href="' + contactChatLink + '" class="btn">联系服务者</a>') +
-                    (task.type === 'demand' ? '<a href="' + contactChatLink + '" class="btn btn-secondary">联系对方</a>' : '') +
+                    (isMine ? '<span class="note">这是你发布的帖子</span>' : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>') +
                     '<a href="task-hall.html" class="btn btn-gray">返回互助大厅</a>' +
                 '</div>';
         }
