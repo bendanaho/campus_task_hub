@@ -633,64 +633,27 @@ function initTaskDetail() {
 
 // ==================== 消息中心 ====================
 
+// 统一按订单（payer/earner）给出会话状态文案
 async function getConversationStatusText(task, chatId, currentUserId) {
-    if (!task || !currentUserId) return { text: '', className: '' };
-    if (task.type === 'demand') {
-        if (task.status === 'pending') {
-            return { text: '待接单', className: 'status-pending' };
-        }
-        if (task.status === 'in_progress') {
-            var isPub = currentUserId === task.publisherId;
-            var isTak = currentUserId === task.takerId;
-            var pConf = task.publisherConfirmed;
-            var tConf = task.takerConfirmed;
-            if (!pConf && !tConf) return { text: '进行中', className: 'status-in_progress' };
-            if (pConf && !tConf) {
-                if (isPub) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
-                if (isTak) return { text: '待我确认', className: 'status-pending' };
-            }
-            if (!pConf && tConf) {
-                if (isPub) return { text: '待我确认', className: 'status-pending' };
-                if (isTak) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
-            }
-            return { text: '进行中', className: 'status-in_progress' };
-        }
-        if (task.status === 'completed') {
-            return { text: '已完成', className: 'status-completed' };
-        }
-    } else {
-        var order = await getOrderByChatId(chatId);
-        if (order) {
-            var isCon = currentUserId === order.consumerId;
-            var isPro = currentUserId === order.providerId;
-            if (order.status === 'pending') {
-                if (!order.providerConfirmed) {
-                    if (isPro) return { text: '待我确认', className: 'status-pending' };
-                    if (isCon) return { text: '待对方确认', className: 'status-pending' };
-                }
-                return { text: '待确认', className: 'status-pending' };
-            }
-            if (order.status === 'in_progress') {
-                var cConf = order.consumerConfirmed;
-                var pConf = order.providerConfirmed;
-                if (!cConf && !pConf) return { text: '进行中', className: 'status-in_progress' };
-                if (cConf && !pConf) {
-                    if (isCon) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
-                    if (isPro) return { text: '待我确认', className: 'status-pending' };
-                }
-                if (!cConf && pConf) {
-                    if (isCon) return { text: '待我确认', className: 'status-pending' };
-                    if (isPro) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
-                }
-                return { text: '进行中', className: 'status-in_progress' };
-            }
-            if (order.status === 'completed') {
-                return { text: '已完成', className: 'status-completed' };
-            }
-        }
-        if (task.status === 'available') return { text: '可预约', className: 'status-available' };
+    if (!currentUserId) return { text: '', className: '' };
+    var order = await getOrder(chatId);
+    if (!order || order.status === 'cancelled') {
+        return { text: '待下单', className: 'status-pending' };
     }
-    return { text: '', className: '' };
+    var isPayer = currentUserId === order.payerId;
+    if (order.status === 'pending') {
+        var isPublisher = task && currentUserId === task.publisherId;
+        return { text: isPublisher ? '待我接受' : '待对方接受', className: 'status-pending' };
+    }
+    if (order.status === 'in_progress') {
+        var myConfirmed = isPayer ? order.payerConfirmed : order.earnerConfirmed;
+        var otherConfirmed = isPayer ? order.earnerConfirmed : order.payerConfirmed;
+        if (otherConfirmed && !myConfirmed) return { text: '待我确认', className: 'status-pending' };
+        if (myConfirmed && !otherConfirmed) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
+        return { text: '进行中', className: 'status-in_progress' };
+    }
+    if (order.status === 'completed') return { text: '已完成', className: 'status-completed' };
+    return { text: getOrderStatusText(order.status), className: 'status-pending' };
 }
 
 function initMessageCenter() {
@@ -713,19 +676,10 @@ function initMessageCenter() {
             var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
 
             if (task && currentUser) {
-                if (task.type === 'demand') {
-                    if (currentUser.id === task.publisherId) {
-                        roleText = '我是任务发起者';
-                    } else if (currentUser.id === task.takerId) {
-                        roleText = '我是任务接单者';
-                    }
-                } else {
-                    if (currentUser.id === task.publisherId) {
-                        roleText = '我是服务提供者';
-                    } else {
-                        roleText = '我是服务申请者';
-                    }
-                }
+                var iAmPayer = (currentUser.id === task.publisherId)
+                    ? (task.publisherSide === 'payer')
+                    : (task.publisherSide === 'earner');
+                roleText = iAmPayer ? '我是付款方' : '我是收款方';
             }
 
             // 最后一条消息前缀
@@ -809,15 +763,12 @@ function initChatDetail() {
                 var roleText = '';
                 var currentUser = getCurrentUser();
                 if (task && currentUser) {
-                    if (task.type === 'demand') {
-                        if (currentUser.id === task.publisherId) roleText = '我是任务发起者';
-                        else if (currentUser.id === task.takerId) roleText = '我是任务接单者';
-                    } else {
-                        if (currentUser.id === task.publisherId) roleText = '我是服务提供者';
-                        else roleText = '我是服务申请者';
-                    }
+                    var iAmPayer = (currentUser.id === task.publisherId)
+                        ? (task.publisherSide === 'payer')
+                        : (task.publisherSide === 'earner');
+                    roleText = iAmPayer ? '我是付款方' : '我是收款方';
                 }
-                metaEls[1].textContent = '对应任务：' + (task ? task.title : '') + (roleText ? ' ｜ ' + roleText : '');
+                metaEls[1].textContent = '对应帖子：' + (task ? task.title : '') + (roleText ? ' ｜ ' + roleText : '');
             });
         }
     }
@@ -908,90 +859,78 @@ function initChatDetail() {
 
     async function renderTaskBar() {
         if (!taskId) { taskBar.style.display = 'none'; return; }
-        getTaskDetail(taskId).then(async function(result) {
-            var task = result && result.task;
-            if (!task) { taskBar.style.display = 'none'; return; }
-            var currentUser = getCurrentUser();
-            var isPublisher = currentUser && currentUser.id === task.publisherId;
-            if (task.type === 'demand') {
-                await renderTaskBarForDemand(task, isPublisher, currentUser);
-            } else {
-                await renderTaskBarForService(task, chatId, currentUser, isPublisher);
-            }
-        });
-    }
+        var result = await getTaskDetail(taskId);
+        var task = result && result.task;
+        if (!task) { taskBar.style.display = 'none'; return; }
+        var currentUser = getCurrentUser();
 
-    async function renderTaskBarForDemand(task, isPublisher, currentUser) {
+        var order = await getOrder(chatId);
+        if (order && order.postId !== task.id) order = null; // 只认本帖的订单
+
         var html = '<div class="task-bar-info">' +
             '<span class="task-bar-title">' + task.title + '</span>' +
-            '<span class="task-bar-reward">' + task.reward + '</span>' +
-            '<span class="task-bar-status">' + getTaskStatusText(task.status) + '</span>' +
-            '</div><div class="task-bar-actions">';
-        if (task.status === 'pending' && !isPublisher) {
-            html += '<button type="button" class="btn btn-small" onclick="handleChatTakeTask(\'' + task.id + '\')">接单</button>';
-        } else if (task.status === 'in_progress') {
-            var myRole = isPublisher ? 'publisher' : 'taker';
-            var myConfirmed = isPublisher ? task.publisherConfirmed : task.takerConfirmed;
-            if (!myConfirmed) {
-                html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmTask(\'' + task.id + '\', \'' + myRole + '\')">标记完成</button>';
-            } else {
-                html += '<span class="task-bar-waiting">等待对方确认...</span>';
-            }
-        } else if (task.status === 'completed') {
-            var toUserId = isPublisher ? task.takerId : task.publisherId;
-            var hasReview = await hasReviewed(task.id);
-            if (!hasReview) {
-                html += '<a href="review.html?task=' + task.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
-            } else {
-                html += '<span class="task-bar-waiting">已完成</span>';
-            }
-        }
-        html += '</div>';
-        taskBar.innerHTML = html;
-        taskBar.style.display = 'flex';
-    }
-
-    async function renderTaskBarForService(task, chatId, currentUser, isPublisher) {
-        var order = await getActiveOrder(chatId);
-        var html = '<div class="task-bar-info">' +
-            '<span class="task-bar-title">' + task.title + '</span>' +
-            '<span class="task-bar-reward">' + task.reward + '</span>' +
-            '</div><div class="task-bar-actions">';
-        if (!order) {
-            if (!isPublisher) {
-                html += '<button type="button" class="btn btn-small" onclick="handleChatCreateOrder(\'' + task.id + '\', \'' + chatId + '\')">申请服务</button>';
-            }
-        } else {
+            '<span class="task-bar-reward">' + task.reward + '</span>';
+        if (order && order.status !== 'cancelled') {
             html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
-            var isConsumer = currentUser && currentUser.id === order.consumerId;
-            var isProvider = currentUser && currentUser.id === order.providerId;
-            if (order.status === 'pending') {
-                if (isProvider) {
-                    html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'provider\')">同意接单</button>';
-                } else if (isConsumer) {
-                    html += '<span class="task-bar-waiting">等待对方同意...</span>';
-                }
-            } else if (order.status === 'in_progress') {
-                var myRole = isConsumer ? 'consumer' : 'provider';
-                var myConfirmed = isConsumer ? order.consumerConfirmed : order.providerConfirmed;
-                if (!myConfirmed) {
-                    html += '<button type="button" class="btn btn-small" onclick="handleChatConfirmOrder(\'' + order.id + '\', \'' + myRole + '\')">标记完成</button>';
-                } else {
-                    html += '<span class="task-bar-waiting">等待对方确认...</span>';
-                }
-            } else if (order.status === 'completed') {
-                var toUserId = isProvider ? order.consumerId : order.providerId;
-                var hasReview = await hasReviewed(order.serviceId);
-                if (!hasReview) {
-                    html += '<a href="review.html?task=' + order.serviceId + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
-                } else {
-                    html += '<span class="task-bar-waiting">已完成</span>';
-                }
-            }
         }
-        html += '</div>';
+        html += '</div><div class="task-bar-actions">' +
+            (await buildTaskBarActions(task, order, currentUser)) +
+            '</div>';
         taskBar.innerHTML = html;
         taskBar.style.display = 'flex';
+    }
+
+    // 按"在这笔订单里我是付款方还是收款方 + 订单状态"决定按钮（2 角色，取代原来的 4 角色分支）
+    async function buildTaskBarActions(task, order, currentUser) {
+        var isPublisher = currentUser && currentUser.id === task.publisherId;
+
+        // 尚无有效订单
+        if (!order || order.status === 'cancelled') {
+            if (isPublisher) {
+                return '<span class="task-bar-waiting">等待对方发起订单...</span>';
+            }
+            // 响应者发起：悬赏帖→我接单收钱；服务帖→我下单付钱
+            var amount = task.rewardValue || parseRewardValue(task.reward);
+            var label = task.publisherSide === 'payer' ? '接单赚钱' : ('下单（支付 ' + amount + ' 元）');
+            return '<button type="button" class="btn btn-small" onclick="handleOrderCreate(\'' + task.id + '\', \'' + chatId + '\')">' + label + '</button>';
+        }
+
+        var isPayer = currentUser && currentUser.id === order.payerId;
+
+        if (order.status === 'pending') {
+            if (isPublisher) {
+                return '<button type="button" class="btn btn-small" onclick="handleOrderAccept(\'' + order.id + '\')">接受订单</button>' +
+                    '<button type="button" class="btn btn-small btn-secondary" onclick="handleOrderCancel(\'' + order.id + '\')">拒绝</button>';
+            }
+            return '<span class="task-bar-waiting">等待对方接受...</span>' +
+                '<button type="button" class="btn btn-small btn-secondary" onclick="handleOrderCancel(\'' + order.id + '\')">撤回</button>';
+        }
+
+        if (order.status === 'in_progress') {
+            var moneyHint = isPayer
+                ? '已支付 ' + order.amount + ' 元·冻结中'
+                : '完成后到账 ' + order.amount + ' 元';
+            var myConfirmed = isPayer ? order.payerConfirmed : order.earnerConfirmed;
+            var actions = '<span class="task-bar-money">' + moneyHint + '</span>';
+            if (!myConfirmed) {
+                actions += '<button type="button" class="btn btn-small" onclick="handleOrderConfirm(\'' + order.id + '\')">确认完成</button>';
+            } else {
+                actions += '<span class="task-bar-waiting">等待对方确认...</span>';
+            }
+            return actions;
+        }
+
+        if (order.status === 'completed') {
+            var toUserId = isPayer ? order.earnerId : order.payerId;
+            var reviewed = await hasReviewed(order.id);
+            if (!reviewed) {
+                return '<a href="review.html?order=' + order.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+            }
+            return '<span class="task-bar-waiting">已完成</span>';
+        }
+
+        // disputed / closed（阶段二）
+        return '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
     }
 
     renderMessages();
@@ -999,26 +938,15 @@ function initChatDetail() {
 
     // 确保 conversation 存在，使消息中心能显示该会话
     if (partnerId && taskId) {
-        getTaskDetail(taskId).then(function(result) {
-            var partnerName = '';
-            var taskTitle = '';
-            if (result && result.task) {
-                taskTitle = result.task.title;
-                var currentUser = getCurrentUser();
-                if (result.publisher && currentUser) {
-                    partnerName = result.publisher.id === currentUser.id
-                        ? (result.task.takerName || '接单人')
-                        : result.publisher.username;
-                } else if (result.publisher) {
-                    partnerName = result.publisher.username;
-                }
-            }
+        Promise.all([fetchUserById(partnerId), getTaskDetail(taskId)]).then(function(arr) {
+            var partner = arr[0];
+            var result = arr[1];
             ensureConversation({
                 chatId: chatId,
                 partnerId: partnerId,
-                partnerName: partnerName,
+                partnerName: partner ? partner.username : '',
                 taskId: taskId,
-                taskTitle: taskTitle
+                taskTitle: result && result.task ? result.task.title : ''
             });
         });
     }
@@ -1041,56 +969,52 @@ function initChatDetail() {
 
 // ==================== 聊天全局函数 ====================
 
-function getTaskStatusText(status) {
-    var map = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
-    return map[status] || status;
-}
-
 function getOrderStatusText(status) {
-    var map = { pending: '待确认', in_progress: '进行中', completed: '已完成', cancelled: '已取消', refunded: '已退款' };
+    var map = {
+        pending: '待接受', in_progress: '进行中', completed: '已完成',
+        cancelled: '已取消', disputed: '争议处理中', closed: '已结案'
+    };
     return map[status] || status;
 }
 
-window.handleChatTakeTask = function(taskId) {
-    takeTask(taskId).then(function() {
-        alert('接单成功！');
-        window.location.reload();
-    }).catch(function(err) {
-        alert(err.message || '接单失败');
-    });
-};
-
-window.handleChatConfirmTask = function(taskId, role) {
-    confirmTaskComplete(taskId, role).then(function(res) {
-        if (res.task && res.task.status === 'completed') {
-            alert('任务已完成，款项已结算！');
-        } else {
-            alert('已标记完成，等待对方确认。');
-        }
+// 响应者发起订单（接单/下单）
+window.handleOrderCreate = function(postId, chatId) {
+    createOrder(postId, chatId).then(function() {
+        alert('已发起订单，等待对方接受！');
         window.location.reload();
     }).catch(function(err) {
         alert(err.message || '操作失败');
     });
 };
 
-window.handleChatCreateOrder = function(serviceId, chatId) {
-    createServiceOrder(serviceId, chatId).then(function() {
-        alert('申请成功，等待提供者确认！');
+// 发布者接受订单
+window.handleOrderAccept = function(orderId) {
+    acceptOrder(orderId).then(function() {
+        alert('已接受订单，开始执行！');
         window.location.reload();
     }).catch(function(err) {
-        alert(err.message || '申请失败');
+        alert(err.message || '操作失败');
     });
 };
 
-window.handleChatConfirmOrder = function(orderId, role) {
-    confirmServiceOrder(orderId, role).then(function(res) {
-        var order = res.order;
-        if (order.status === 'in_progress' && role === 'provider') {
-            alert('已同意接单，服务开始执行！');
-        } else if (order.status === 'completed') {
-            alert('服务已完成，款项已结算！');
+// 取消订单（pending 阶段：发布者拒绝 / 响应者撤回）
+window.handleOrderCancel = function(orderId) {
+    if (!confirm('确定取消该订单吗？')) return;
+    cancelOrder(orderId).then(function() {
+        alert('订单已取消。');
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '操作失败');
+    });
+};
+
+// 确认完成（任一方，双方都确认才结算）
+window.handleOrderConfirm = function(orderId) {
+    confirmOrder(orderId).then(function(res) {
+        if (res.order && res.order.status === 'completed') {
+            alert('订单已完成，款项已结算！');
         } else {
-            alert('已标记完成，等待对方确认。');
+            alert('已确认完成，等待对方确认。');
         }
         window.location.reload();
     }).catch(function(err) {
