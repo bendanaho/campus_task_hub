@@ -1140,6 +1140,15 @@ function initOrderCenter() {
     var filterSelect = document.getElementById('orderFilter');
     if (!list) return;
 
+    function orderStatusClass(status) {
+        var map = {
+            pending: 'status-pending', in_progress: 'status-in_progress',
+            completed: 'status-completed', cancelled: 'status-cancelled',
+            disputed: 'status-pending', closed: 'status-completed'
+        };
+        return map[status] || '';
+    }
+
     async function renderAll() {
         var currentUser = getCurrentUser();
         if (!currentUser) {
@@ -1148,64 +1157,40 @@ function initOrderCenter() {
         }
 
         var filterValue = filterSelect ? filterSelect.value : 'all';
-        getOrderCenterRecords(filterValue).then(async function(records) {
-            if (records.length === 0) {
-                list.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
-                return;
+        var moneyRole = (filterValue === 'payer' || filterValue === 'earner') ? filterValue : undefined;
+        var records = await getMyOrders(moneyRole);
+        if (!records || records.length === 0) {
+            list.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
+            return;
+        }
+
+        var enriched = await Promise.all(records.map(async function(r) {
+            var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
+            return { r: r, reviewed: reviewed };
+        }));
+
+        list.innerHTML = enriched.map(function(item) {
+            var r = item.r;
+            var o = r.order;
+            var roleLabel = r.myRole === 'payer' ? '我付款' : '我收款';
+            var amountText = (r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元';
+            var statusBadge = '<span class="status-badge ' + orderStatusClass(o.status) + '">' + getOrderStatusText(o.status) + '</span>';
+
+            var actionsHtml = '<a href="task-detail.html?id=' + o.postId + '" class="btn btn-secondary">查看详情</a>' +
+                '<a href="chat-detail.html?chatId=' + o.chatId + '&partner=' + r.partnerId + '&task=' + o.postId + '" class="btn btn-secondary">进入聊天</a>';
+
+            if (o.status === 'completed' && !item.reviewed) {
+                var toUserId = r.myRole === 'payer' ? o.earnerId : o.payerId;
+                actionsHtml += '<a href="review.html?order=' + o.id + '&to=' + toUserId + '" class="btn btn-secondary">去评价</a>';
             }
 
-            var enriched = await Promise.all(records.map(async function(r) {
-                var hasReview = false;
-                if (r.status === '已完成') {
-                    var taskIdForReview = r.task ? r.task.id : '';
-                    hasReview = taskIdForReview ? await hasReviewed(taskIdForReview) : false;
-                }
-                return { r: r, hasReview: hasReview };
-            }));
-
-            list.innerHTML = enriched.map(function(item) {
-                var r = item.r;
-                var statusBadge = r.statusClass
-                    ? '<span class="status-badge ' + r.statusClass + '">' + r.status + '</span>'
-                    : '<span class="status-badge">' + r.status + '</span>';
-
-                var actionsHtml = '<a href="task-detail.html?id=' + (r.task ? r.task.id : '') + '" class="btn btn-secondary">查看详情</a>';
-
-                if (r.task) {
-                    var chatPartnerId = '';
-                    var chatTaskId = r.task.id;
-                    if (r.task.type === 'demand') {
-                        if (r.roleLabel === '任务发起者' && r.task.takerId) chatPartnerId = r.task.takerId;
-                        else if (r.roleLabel === '任务接单者') chatPartnerId = r.task.publisherId;
-                    } else if (r.order) {
-                        chatPartnerId = r.roleLabel === '服务提供者' ? r.order.consumerId : r.order.providerId;
-                    }
-                    if (chatPartnerId) {
-                        actionsHtml += '<a href="chat-detail.html?chatId=c-' + chatPartnerId + '&partner=' + chatPartnerId + '&task=' + chatTaskId + '" class="btn btn-secondary">联系对方</a>';
-                    }
-                }
-
-                if (r.status === '已完成' && !item.hasReview) {
-                    var toUserId = '';
-                    var taskIdForReview = r.task ? r.task.id : '';
-                    if (r.task && r.task.type === 'demand') {
-                        toUserId = r.roleLabel === '任务发起者' ? r.task.takerId : r.task.publisherId;
-                    } else if (r.order) {
-                        toUserId = r.roleLabel === '服务提供者' ? r.order.consumerId : r.order.providerId;
-                    }
-                    if (toUserId) {
-                        actionsHtml += '<a href="review.html?task=' + taskIdForReview + '&to=' + toUserId + '" class="btn btn-secondary">去评价</a>';
-                    }
-                }
-
-                return '<div class="record-item">' +
-                    '<h3>' + r.title + '</h3>' +
-                    '<p class="meta">' + statusBadge + '类型：' + r.typeLabel + ' ｜ 身份：' + r.roleLabel + ' ｜ 时间：' + r.timeStr + '</p>' +
-                    '<p>对方：' + r.partnerName + '</p>' +
-                    '<div class="actions">' + actionsHtml + '</div>' +
-                '</div>';
-            }).join('');
-        });
+            return '<div class="record-item">' +
+                '<h3>' + r.title + '</h3>' +
+                '<p class="meta">' + statusBadge + '身份：' + roleLabel + ' ｜ 金额：' + amountText + ' ｜ 时间：' + formatDateTime(o.createdAt) + '</p>' +
+                '<p>对方：' + r.partnerName + '</p>' +
+                '<div class="actions">' + actionsHtml + '</div>' +
+            '</div>';
+        }).join('');
     }
 
     renderAll();
