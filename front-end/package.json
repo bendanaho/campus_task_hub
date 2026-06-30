@@ -1,0 +1,9 @@
+{
+  "name": "campus-task-hub-frontend",
+  "version": "1.0.0",
+  "description": "校园互助平台前端（原生 HTML/CSS/JS）",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}

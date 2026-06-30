@@ -609,6 +609,14 @@ function _findUserInDb(db, id) {
     return null;
 }
 
+// 同理：要写帖子（如改 status）必须在同一个 db 里取，不能用 _mockGetTaskById
+function _findPostInDb(db, id) {
+    for (var i = 0; i < (db.tasks || []).length; i++) {
+        if (db.tasks[i].id === id) return db.tasks[i];
+    }
+    return null;
+}
+
 // ---------- 帖子 ----------
 
 function mockGetTasks(filters) {
@@ -832,7 +840,7 @@ function mockAcceptOrder(orderId) {
                 reject(new Error('订单当前状态不可接受'));
                 return;
             }
-            var post = _mockGetTaskById(order.postId);
+            var post = _findPostInDb(db, order.postId);
             if (!post || post.publisherId !== currentUser.id) {
                 reject(new Error('只有帖子发布者可以接受订单'));
                 return;
