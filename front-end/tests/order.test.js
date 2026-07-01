@@ -129,7 +129,7 @@ test('纯互助帖全流程：报名(金额0) → 接受不冻结 → 双方确�
 test('实名门禁：未实名不能发布/下单；完成实名认证后放行', async function () {
     const app = createApp();
     // 新注册用户默认 unverified
-    await app.register({ username: '新同学', phone: '13900000000', password: '123456' });
+    await app.register({ username: '新同学', phone: '13900000000', password: '1' });
     await loginAs(app, '新同学');
 
     await assert.rejects(app.publishPost({
@@ -200,7 +200,7 @@ test('聊天转账：立即扣款到账；余额不足被拒', async function ()
 
 test('聊天收付款需实名', async function () {
     const app = createApp();
-    await app.register({ username: '未名', phone: '13911112222', password: '123456' });
+    await app.register({ username: '未名', phone: '13911112222', password: '1' });
     await loginAs(app, '未名');
     await assert.rejects(app.sendPaymentCard('cX', 'u2', 'request', 5), /实名认证/);
     await assert.rejects(app.sendPaymentCard('cX', 'u2', 'transfer', 5), /实名认证/);

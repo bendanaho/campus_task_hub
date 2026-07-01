@@ -30,7 +30,7 @@ function createInitialData() {
 
     var users = [
         {
-            id: 'u1', username: '张三', phone: '13800138001', email: 'zhangsan@example.com', password: '123456',
+            id: 'u1', username: '张三', phone: '13800138001', email: 'zhangsan@example.com', password: '1',
             avatar: 'https://picsum.photos/seed/avatar1/200/200',
             creditScore: 4.8, authStatus: 'verified', balance: 85,
             realName: '张小明', studentId: '2021010001',
@@ -38,7 +38,7 @@ function createInitialData() {
             bio: '乐于助人，常在线，愿意参与校园互助任务。'
         },
         {
-            id: 'u2', username: '李四', phone: '13800138002', email: 'lisi@example.com', password: '123456',
+            id: 'u2', username: '李四', phone: '13800138002', email: 'lisi@example.com', password: '1',
             avatar: 'https://picsum.photos/seed/avatar2/200/200',
             creditScore: 4.2, authStatus: 'verified', balance: 85,
             realName: '李华', studentId: '2021020002',
@@ -46,13 +46,13 @@ function createInitialData() {
             bio: '喜欢帮助别人，课余时间比较多。'
         },
         {
-            id: 'u3', username: '王同学', phone: '13800138003', email: 'wang@example.com', password: '123456',
+            id: 'u3', username: '王同学', phone: '13800138003', email: 'wang@example.com', password: '1',
             avatar: '', creditScore: 3.5, authStatus: 'verified', balance: 80,
             realName: '王同学', studentId: '2021030003', college: '外国语学院', className: '英语2103',
             bio: '新用户，正在探索平台功能。'
         },
         {
-            id: 'u4', username: '陈同学', phone: '13800138004', email: 'chen@example.com', password: '123456',
+            id: 'u4', username: '陈同学', phone: '13800138004', email: 'chen@example.com', password: '1',
             avatar: 'https://picsum.photos/seed/avatar4/200/200',
             creditScore: 2.8, authStatus: 'verified', balance: 100,
             realName: '陈志强', studentId: '2021030004',
@@ -60,7 +60,7 @@ function createInitialData() {
             bio: '做事认真负责，但有时回复较慢。'
         },
         {
-            id: 'u5', username: '赵同学', phone: '13800138005', email: 'zhao@example.com', password: '123456',
+            id: 'u5', username: '赵同学', phone: '13800138005', email: 'zhao@example.com', password: '1',
             avatar: 'https://picsum.photos/seed/avatar5/200/200',
             creditScore: 4.9, authStatus: 'verified', balance: 100,
             realName: '赵雨薇', studentId: '2021040005',
@@ -68,13 +68,13 @@ function createInitialData() {
             bio: '设计专业学生，擅长海报和PPT制作。'
         },
         {
-            id: 'u6', username: '刘同学', phone: '13800138006', email: 'liu@example.com', password: '123456',
+            id: 'u6', username: '刘同学', phone: '13800138006', email: 'liu@example.com', password: '1',
             avatar: '', creditScore: 3.9, authStatus: 'verified', balance: 100,
             realName: '刘志强', studentId: '2021060006', college: '理学院', className: '数学2101',
             bio: '数学系学生，乐于助人。'
         },
         {
-            id: 'u7', username: '孙同学', phone: '13800138007', email: 'sun@example.com', password: '123456',
+            id: 'u7', username: '孙同学', phone: '13800138007', email: 'sun@example.com', password: '1',
             avatar: 'https://picsum.photos/seed/avatar7/200/200',
             creditScore: 4.6, authStatus: 'verified', balance: 105,
             realName: '孙文博', studentId: '2021050007',
@@ -82,7 +82,7 @@ function createInitialData() {
             bio: '英语口语流利，喜欢交朋友。'
         },
         {
-            id: 'u8', username: '周同学', phone: '13800138008', email: 'zhou@example.com', password: '123456',
+            id: 'u8', username: '周同学', phone: '13800138008', email: 'zhou@example.com', password: '1',
             avatar: '', creditScore: 2.5, authStatus: 'verified', balance: 100,
             realName: '周佳', studentId: '2021080008', college: '文学院', className: '汉语言2101',
             bio: '校内打印店兼职，可以帮忙打印资料。'

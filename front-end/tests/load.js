@@ -48,9 +48,9 @@ function createApp() {
     return sandbox;
 }
 
-// 便捷登录（所有种子用户密码都是 123456）
+// 便捷登录（所有种子用户密码都是 1）
 async function loginAs(app, username) {
-    return app.login(username, '123456');
+    return app.login(username, '1');
 }
 
 // 读某用户当前余额
