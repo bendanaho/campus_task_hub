@@ -184,7 +184,7 @@ function createInitialData() {
             status: 'open', contact: '微信联系', images: []
         },
         {
-            id: 't12', title: '羽毛球搭子招募', publisherSide: 'payer', category: 'teamwork',
+            id: 't12', title: '羽毛球搭子招募', publisherSide: 'none', category: 'teamwork',
             description: '想找一位每周二、周四晚上一起打羽毛球的搭子，水平不限。',
             publisherId: 'u5', publisherName: '赵同学', publisherCredit: 4.9,
             reward: '无', rewardValue: 0,
@@ -192,7 +192,7 @@ function createInitialData() {
             status: 'open', contact: '站内联系', images: []
         },
         {
-            id: 't13', title: '数学建模比赛组队', publisherSide: 'payer', category: 'teamwork',
+            id: 't13', title: '数学建模比赛组队', publisherSide: 'none', category: 'teamwork',
             description: '准备参加校级数学建模比赛，想找会写论文或会编程的同学组队。',
             publisherId: 'u3', publisherName: '王同学', publisherCredit: 3.5,
             reward: '无', rewardValue: 0,

@@ -38,6 +38,10 @@
                                 <input type="radio" name="publisherSide" value="earner" />
                                 <span>我收钱，帮别人做（提供服务）</span>
                             </label>
+                            <label class="side-option">
+                                <input type="radio" name="publisherSide" value="none" />
+                                <span>不涉及金钱，找人一起做（组队/搭子）</span>
+                            </label>
                         </div>
                     </div>
 
@@ -75,7 +79,7 @@
                         ></textarea>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="rewardGroup">
                         <label for="postReward" id="rewardLabel">报酬金额</label>
                         <input
                             type="text"

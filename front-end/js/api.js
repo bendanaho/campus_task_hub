@@ -627,7 +627,7 @@ function mockGetTasks(filters) {
             var result = db.tasks.filter(function(t) { return t.status === 'open'; });
 
             if (filters) {
-                // side: 'payer'(别人出钱,我能赚) | 'earner'(别人收钱,我要花钱) | 'all'
+                // side: 'payer'(别人出钱,我能赚) | 'earner'(别人收钱,我要花钱) | 'none'(纯互助) | 'all'
                 if (filters.side && filters.side !== 'all') {
                     result = result.filter(function(t) { return t.publisherSide === filters.side; });
                 }
@@ -703,7 +703,7 @@ function mockPublishPost(data) {
                 reject(new Error('请先登录'));
                 return;
             }
-            var side = data.publisherSide === 'earner' ? 'earner' : 'payer';
+            var side = (data.publisherSide === 'earner' || data.publisherSide === 'none') ? data.publisherSide : 'payer';
             var db = _mockGetDB();
             // 注：发布不再预付/冻结，冻结发生在「发布者接受订单」时
             var newPost = {
@@ -771,6 +771,7 @@ function mockCreateOrder(postId, chatId) {
                 return;
             }
             // 角色：发布者出钱(payer)→发布者付款、响应者收款；发布者收钱(earner)→反之
+            // 纯互助(none)不涉及金钱，payerId/earnerId 仅作两方槽位、金额恒为 0
             var payerId, earnerId;
             if (post.publisherSide === 'payer') {
                 payerId = post.publisherId;
@@ -779,7 +780,7 @@ function mockCreateOrder(postId, chatId) {
                 earnerId = post.publisherId;
                 payerId = currentUser.id;
             }
-            var amount = post.rewardValue || parseRewardValue(post.reward);
+            var amount = post.publisherSide === 'none' ? 0 : (post.rewardValue || parseRewardValue(post.reward));
             var order = {
                 id: 'o-' + Date.now(),
                 postId: postId,

@@ -155,6 +155,10 @@ select {
     background-color: #16a34a;
 }
 
+.btn-mutual {
+    background-color: #6366f1;
+}
+
 .section {
     margin-top: 28px;
 }
@@ -306,6 +310,11 @@ textarea.form-control {
 .badge-service {
     background-color: #dcfce7;
     color: #15803d;
+}
+
+.badge-mutual {
+    background-color: #e0e7ff;
+    color: #4338ca;
 }
 
 .meta {

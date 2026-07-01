@@ -15,7 +15,7 @@ test('数据结构：统一为 orders 表、帖子带 publisherSide、无旧字�
     const db = app.getDB();
     assert.ok(Array.isArray(db.orders), 'orders 应存在');
     assert.ok(!('serviceOrders' in db), '不应再有 serviceOrders');
-    assert.ok(db.tasks.every(function (t) { return t.publisherSide === 'payer' || t.publisherSide === 'earner'; }), '每个帖子都有 publisherSide');
+    assert.ok(db.tasks.every(function (t) { return t.publisherSide === 'payer' || t.publisherSide === 'earner' || t.publisherSide === 'none'; }), '每个帖子都有 publisherSide');
     assert.ok(db.tasks.every(function (t) { return !('paymentStatus' in t) && !('takerId' in t) && !('type' in t); }), '帖子不应残留旧订单字段');
     assert.ok(db.reviews.every(function (r) { return 'auto' in r; }), '评价带 auto 标记');
 });
@@ -88,6 +88,40 @@ test('服务帖被下单后仍保持 open（可复用），不像悬赏帖那样
     await loginAs(app, '李四');
     await app.acceptOrder(created.order.id);
     assert.strictEqual(app.getTaskById('t18').status, 'open', '服务帖接单后仍 open');
+});
+
+// ---------- 纯互助（none，不涉及金钱）全流程 ----------
+
+test('纯互助帖全流程：报名(金额0) → 接受不冻结 → 双方确认完成不结算，帖子保持 open', async function () {
+    const app = createApp();
+    // t12 羽毛球搭子：发布者 u5，publisherSide=none
+    await loginAs(app, '张三'); // u1 报名参加
+    const u1Before = balanceOf(app, 'u1');
+
+    const created = await app.createOrder('t12', 'chatN');
+    const oid = created.order.id;
+    assert.strictEqual(created.order.status, 'pending');
+    assert.strictEqual(created.order.amount, 0, '纯互助订单金额恒为 0');
+
+    await loginAs(app, '赵同学'); // u5 发布者接受
+    const u5Before = balanceOf(app, 'u5');
+    const accepted = await app.acceptOrder(oid);
+    assert.strictEqual(accepted.order.status, 'in_progress');
+    assert.strictEqual(balanceOf(app, 'u1'), u1Before, '接受时不冻结任何余额');
+    assert.strictEqual(balanceOf(app, 'u5'), u5Before, '发布者余额不变');
+    assert.strictEqual(app.getTaskById('t12').status, 'open', '纯互助帖被接受后仍 open，可多人报名');
+
+    // 双方确认 → 完成，双方余额均不变
+    await app.confirmOrder(oid);       // u5 确认
+    await loginAs(app, '张三');
+    const done = await app.confirmOrder(oid); // u1 确认
+    assert.strictEqual(done.order.status, 'completed');
+    assert.strictEqual(balanceOf(app, 'u1'), u1Before, '完成后无结算');
+    assert.strictEqual(balanceOf(app, 'u5'), u5Before, '完成后无结算');
+
+    // 纯互助订单同样可评价
+    const r = await app.submitReview({ orderId: oid, toUserId: 'u5', toUserName: '赵同学', rating: 5, content: '很准时' });
+    assert.ok(r.success, '纯互助订单可正常评价');
 });
 
 // ---------- 非法操作拦截 ----------
@@ -239,8 +273,10 @@ test('getTasks 按 publisherSide 筛选且只返回 open 帖子', async function
     const app = createApp();
     const payerSide = await app.getTasks({ side: 'payer' });
     const earnerSide = await app.getTasks({ side: 'earner' });
+    const noneSide = await app.getTasks({ side: 'none' });
     const all = await app.getTasks({});
     assert.ok(payerSide.every(function (t) { return t.publisherSide === 'payer' && t.status === 'open'; }));
     assert.ok(earnerSide.every(function (t) { return t.publisherSide === 'earner' && t.status === 'open'; }));
-    assert.strictEqual(all.length, payerSide.length + earnerSide.length, '全部=两类之和（均为 open）');
+    assert.ok(noneSide.every(function (t) { return t.publisherSide === 'none' && t.status === 'open'; }));
+    assert.strictEqual(all.length, payerSide.length + earnerSide.length + noneSide.length, '全部=三类之和（均为 open）');
 });

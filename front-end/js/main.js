@@ -361,14 +361,14 @@ function initTaskHall() {
             if (emptyState) emptyState.style.display = 'none';
 
             taskList.innerHTML = tasks.map(function(task) {
-                var typeLabel = task.publisherSide === 'payer' ? '悬赏求助' : '提供服务';
-                var typeClass = task.publisherSide === 'payer' ? 'badge-demand' : 'badge-service';
+                var typeLabel = task.publisherSide === 'payer' ? '悬赏求助' : (task.publisherSide === 'none' ? '组队互助' : '提供服务');
+                var typeClass = task.publisherSide === 'payer' ? 'badge-demand' : (task.publisherSide === 'none' ? 'badge-mutual' : 'badge-service');
                 var catName = CATEGORY_MAP[task.category] || task.category;
                 var creditColor = getCreditColorClass(task.publisherCredit);
                 var timeStr = timeAgo(task.publishTime);
 
-                var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : '下单找他';
-                var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : 'btn-service';
+                var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
+                var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : (task.publisherSide === 'none' ? 'btn-mutual' : 'btn-service');
                 var actionBtn = '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
 
                 var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
@@ -380,7 +380,7 @@ function initTaskHall() {
                             '<h3>' + task.title + '</h3>' +
                             '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                         '</div>' +
-                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + task.reward + ' ｜ ' + timeStr + '</p>' +
+                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + task.reward) + ' ｜ ' + timeStr + '</p>' +
                         '<div class="task-item-body">' +
                             '<p class="task-desc">' + task.description + '</p>' +
                             bodyImages +
@@ -516,9 +516,10 @@ function initPublishForm() {
         });
     }
 
-    // 根据"出钱/收钱"切换专属字段与文案
+    // 根据"出钱/收钱/纯互助"切换专属字段与文案
     var deadlineGroup = document.getElementById('deadlineGroup');
     var serviceTimeGroup = document.getElementById('serviceTimeGroup');
+    var rewardGroup = document.getElementById('rewardGroup');
     var rewardLabel = document.getElementById('rewardLabel');
 
     function getSide() {
@@ -529,6 +530,8 @@ function initPublishForm() {
         var side = getSide();
         if (deadlineGroup) deadlineGroup.style.display = side === 'payer' ? '' : 'none';
         if (serviceTimeGroup) serviceTimeGroup.style.display = side === 'earner' ? '' : 'none';
+        // 纯互助不涉及金钱，隐藏报酬字段
+        if (rewardGroup) rewardGroup.style.display = side === 'none' ? 'none' : '';
         if (rewardLabel) rewardLabel.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '期望报酬（你的收费）';
     }
     form.querySelectorAll('input[name="publisherSide"]').forEach(function(r) {
@@ -547,6 +550,10 @@ function initPublishForm() {
         var reward = document.getElementById('postReward').value.trim();
         var contact = document.getElementById('postContact').value.trim();
 
+        // 纯互助无报酬，reward 固定为「无」；其余方向报酬为必填
+        if (side === 'none') {
+            reward = '无';
+        }
         if (!title || !category || !description || !reward) {
             alert('请填写必填项。'); return;
         }
@@ -591,7 +598,7 @@ function initTaskDetail() {
 
         var task = result.task;
         var catName = CATEGORY_MAP[task.category] || task.category;
-        var typeLabel = task.publisherSide === 'payer' ? '悬赏求助（发布者出钱）' : '提供服务（发布者收钱）';
+        var typeLabel = task.publisherSide === 'payer' ? '悬赏求助（发布者出钱）' : (task.publisherSide === 'none' ? '组队互助（不涉及金钱）' : '提供服务（发布者收钱）');
         var statusMap = { open: '可下单', closed: '已结束' };
         var statusText = statusMap[task.status] || task.status;
 
@@ -608,7 +615,7 @@ function initTaskDetail() {
         if (box) {
             var currentUser = getCurrentUser();
             var isMine = currentUser && currentUser.id === task.publisherId;
-            var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : '下单找他';
+            var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
             var serviceTimeHtml = (task.publisherSide === 'earner' && task.serviceTime)
                 ? '<p><strong>可服务时间：</strong>' + task.serviceTime + '</p>' : '';
             box.innerHTML = '<p><strong>标题：</strong>' + task.title + '</p>' +
@@ -617,7 +624,7 @@ function initTaskDetail() {
                 '<p><strong>描述：</strong>' + task.description + '</p>' +
                 '<p><strong>发布者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
-                '<p><strong>报酬金额：</strong>' + task.reward + '</p>' +
+                (task.publisherSide === 'none' ? '' : '<p><strong>报酬金额：</strong>' + task.reward + '</p>') +
                 serviceTimeHtml +
                 '<p><strong>发布时间：</strong>' + formatDateTime(task.publishTime) + '</p>' +
                 (task.publisherSide === 'payer' && task.deadline ? '<p><strong>截止时间：</strong>' + formatDateTime(task.deadline) + '</p>' : '') +
@@ -676,10 +683,14 @@ function initMessageCenter() {
             var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
 
             if (task && currentUser) {
-                var iAmPayer = (currentUser.id === task.publisherId)
-                    ? (task.publisherSide === 'payer')
-                    : (task.publisherSide === 'earner');
-                roleText = iAmPayer ? '我是付款方' : '我是收款方';
+                if (task.publisherSide === 'none') {
+                    roleText = (currentUser.id === task.publisherId) ? '我是发起者' : '我是参与者';
+                } else {
+                    var iAmPayer = (currentUser.id === task.publisherId)
+                        ? (task.publisherSide === 'payer')
+                        : (task.publisherSide === 'earner');
+                    roleText = iAmPayer ? '我是付款方' : '我是收款方';
+                }
             }
 
             // 最后一条消息前缀
@@ -763,10 +774,14 @@ function initChatDetail() {
                 var roleText = '';
                 var currentUser = getCurrentUser();
                 if (task && currentUser) {
-                    var iAmPayer = (currentUser.id === task.publisherId)
-                        ? (task.publisherSide === 'payer')
-                        : (task.publisherSide === 'earner');
-                    roleText = iAmPayer ? '我是付款方' : '我是收款方';
+                    if (task.publisherSide === 'none') {
+                        roleText = (currentUser.id === task.publisherId) ? '我是发起者' : '我是参与者';
+                    } else {
+                        var iAmPayer = (currentUser.id === task.publisherId)
+                            ? (task.publisherSide === 'payer')
+                            : (task.publisherSide === 'earner');
+                        roleText = iAmPayer ? '我是付款方' : '我是收款方';
+                    }
                 }
                 metaEls[1].textContent = '对应帖子：' + (task ? task.title : '') + (roleText ? ' ｜ ' + roleText : '');
             });
@@ -869,7 +884,8 @@ function initChatDetail() {
 
         var html = '<div class="task-bar-info">' +
             '<span class="task-bar-title">' + task.title + '</span>' +
-            '<span class="task-bar-reward">' + task.reward + '</span>';
+            // 纯互助不涉及金钱，不显示报酬
+            (task.publisherSide === 'none' ? '' : '<span class="task-bar-reward">' + task.reward + '</span>');
         if (order && order.status !== 'cancelled') {
             html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
         }
@@ -889,9 +905,10 @@ function initChatDetail() {
             if (isPublisher) {
                 return '<span class="task-bar-waiting">等待对方发起订单...</span>';
             }
-            // 响应者发起：悬赏帖→我接单收钱；服务帖→我下单付钱
+            // 响应者发起：悬赏帖→我接单收钱；服务帖→我下单付钱；纯互助→报名参加
             var amount = task.rewardValue || parseRewardValue(task.reward);
-            var label = task.publisherSide === 'payer' ? '接单赚钱' : ('下单（支付 ' + amount + ' 元）');
+            var label = task.publisherSide === 'payer' ? '接单赚钱'
+                : (task.publisherSide === 'none' ? '报名参加' : ('下单（支付 ' + amount + ' 元）'));
             return '<button type="button" class="btn btn-small" onclick="handleOrderCreate(\'' + task.id + '\', \'' + chatId + '\')">' + label + '</button>';
         }
 
@@ -907,9 +924,11 @@ function initChatDetail() {
         }
 
         if (order.status === 'in_progress') {
-            var moneyHint = isPayer
-                ? '已支付 ' + order.amount + ' 元·冻结中'
-                : '完成后到账 ' + order.amount + ' 元';
+            var moneyHint = task.publisherSide === 'none'
+                ? '组队进行中'
+                : (isPayer
+                    ? '已支付 ' + order.amount + ' 元·冻结中'
+                    : '完成后到账 ' + order.amount + ' 元');
             var myConfirmed = isPayer ? order.payerConfirmed : order.earnerConfirmed;
             var actions = '<span class="task-bar-money">' + moneyHint + '</span>';
             if (!myConfirmed) {
@@ -1012,7 +1031,8 @@ window.handleOrderCancel = function(orderId) {
 window.handleOrderConfirm = function(orderId) {
     confirmOrder(orderId).then(function(res) {
         if (res.order && res.order.status === 'completed') {
-            alert('订单已完成，款项已结算！');
+            // 纯互助订单无金钱结算
+            alert(res.order.amount > 0 ? '订单已完成，款项已结算！' : '互助已完成！');
         } else {
             alert('已确认完成，等待对方确认。');
         }
@@ -1065,8 +1085,11 @@ function initOrderCenter() {
         list.innerHTML = enriched.map(function(item) {
             var r = item.r;
             var o = r.order;
-            var roleLabel = r.myRole === 'payer' ? '我付款' : '我收款';
-            var amountText = (r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元';
+            var isMutual = r.post && r.post.publisherSide === 'none';
+            var roleLabel = isMutual
+                ? (r.post.publisherId === currentUser.id ? '发起者' : '参与者')
+                : (r.myRole === 'payer' ? '我付款' : '我收款');
+            var amountText = isMutual ? '不涉及金钱' : ((r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元');
             var statusBadge = '<span class="status-badge ' + orderStatusClass(o.status) + '">' + getOrderStatusText(o.status) + '</span>';
 
             var actionsHtml = '<a href="task-detail.html?id=' + o.postId + '" class="btn btn-secondary">查看详情</a>' +
