@@ -1023,113 +1023,6 @@ window.handleOrderConfirm = function(orderId) {
 };
 
 
-// ==================== 我的任务 ====================
-
-function initMyTasks() {
-    if (!window.location.pathname.includes('my-task.html')) return;
-    if (!protectPage(['my-task.html'])) return;
-
-    var list = document.querySelector('.record-list');
-    if (!list) return;
-
-    var viewType = getUrlParam('view') || 'task';
-    var isServiceView = viewType === 'service';
-
-    var sectionTitle = document.querySelector('.section-title');
-    if (sectionTitle) {
-        sectionTitle.textContent = isServiceView ? '我的服务' : '我的任务';
-    }
-    document.title = isServiceView ? '我的服务' : '我的任务';
-
-    var tabs = document.querySelectorAll('.tab');
-    if (tabs[0]) tabs[0].textContent = isServiceView ? '我发布的服务' : '我发布的任务';
-    if (tabs[1]) tabs[1].textContent = isServiceView ? '我接取的服务' : '我接取的任务';
-
-    async function render(type) {
-        if (isServiceView && type === 'taken') {
-            getMyServiceOrders().then(async function(orders) {
-                if (!orders || orders.length === 0) {
-                    list.innerHTML = '<div class="card empty-state"><p>暂无服务</p></div>';
-                    return;
-                }
-                var enriched = await Promise.all(orders.map(async function(order) {
-                    var service = await fetchTaskById(order.serviceId);
-                    var provider = await fetchUserById(order.providerId);
-                    return { order: order, service: service, provider: provider };
-                }));
-                list.innerHTML = enriched.map(function(item) {
-                    var order = item.order;
-                    var statusMap = { pending: '待确认', in_progress: '进行中', completed: '已完成', cancelled: '已取消', refunded: '已退款' };
-                    return '<div class="record-item">' +
-                        '<h3>' + (item.service ? item.service.title : '未知服务') + '</h3>' +
-                        '<p class="meta">类型：服务 ｜ 身份：服务申请者 ｜ 状态：' + (statusMap[order.status] || order.status) + ' ｜ 申请时间：' + formatDateTime(order.createdAt) + '</p>' +
-                        '<p>服务提供者：' + (item.provider ? item.provider.username : '未知') + '</p>' +
-                        '<div class="actions">' +
-                            '<a href="task-detail.html?id=' + order.serviceId + '" class="btn btn-secondary">查看服务</a>' +
-                            '<a href="chat-detail.html?chatId=' + order.chatId + '&partner=' + order.providerId + '&task=' + order.serviceId + '" class="btn btn-secondary">进入聊天</a>' +
-                        '</div>' +
-                    '</div>';
-                }).join('');
-            });
-        } else {
-            var apiCall = type === 'published' ? getMyPublishedTasks() : getMyTasks();
-            apiCall.then(async function(tasks) {
-                if (isServiceView) {
-                    tasks = tasks.filter(function(t) { return t.type === 'service'; });
-                } else {
-                    tasks = tasks.filter(function(t) { return t.type === 'demand'; });
-                }
-                if (!tasks || tasks.length === 0) {
-                    var emptyText = isServiceView ? '暂无服务' : '暂无任务';
-                    list.innerHTML = '<div class="card empty-state"><p>' + emptyText + '</p></div>';
-                    return;
-                }
-                var enriched = await Promise.all(tasks.map(async function(task) {
-                    var hasReview = false;
-                    if (task.status === 'completed') {
-                        hasReview = await hasReviewed(task.id);
-                    }
-                    return { task: task, hasReview: hasReview };
-                }));
-                list.innerHTML = enriched.map(function(item) {
-                    var task = item.task;
-                    var role = type === 'published' ? '任务发起者' : '任务接单者';
-                    var otherName = type === 'published' ? (task.takerName || '暂无') : task.publisherName;
-                    var statusMap = { pending: '待接单', in_progress: '进行中', completed: '已完成', available: '可接服务' };
-                    var partnerId = type === 'published' ? (task.takerId || task.publisherId) : task.publisherId;
-                    var typeLabel = task.type === 'demand' ? '需求' : '服务';
-                    var actionsHtml = '<a href="task-detail.html?id=' + task.id + '" class="btn btn-secondary">查看详情</a>';
-                    if (task.status === 'in_progress' || task.status === 'pending') {
-                        actionsHtml += '<a href="chat-detail.html?chatId=c-' + partnerId + '&partner=' + partnerId + '&task=' + task.id + '" class="btn btn-secondary">联系对方</a>';
-                    }
-                    if (task.status === 'completed') {
-                        if (!item.hasReview) {
-                            actionsHtml += '<a href="review.html?task=' + task.id + '&to=' + partnerId + '" class="btn btn-secondary">去评价</a>';
-                        }
-                    }
-                    return '<div class="record-item">' +
-                        '<h3>' + task.title + '</h3>' +
-                        '<p class="meta">类型：' + typeLabel + ' ｜ 身份：' + role + ' ｜ 状态：' + (statusMap[task.status] || task.status) + ' ｜ 发布时间：' + formatDateTime(task.publishTime) + '</p>' +
-                        '<p>' + (type === 'published' ? '任务接单者：' : '任务发起者：') + otherName + '</p>' +
-                        '<div class="actions">' + actionsHtml + '</div>' +
-                    '</div>';
-                }).join('');
-            });
-        }
-    }
-
-    tabs.forEach(function(tab, index) {
-        tab.addEventListener('click', function() {
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            tab.classList.add('active');
-            render(index === 0 ? 'published' : 'taken');
-        });
-    });
-
-    if (tabs[0]) tabs[0].classList.add('active');
-    render('published');
-}
-
 // ==================== 我的订单 ====================
 
 function initOrderCenter() {
@@ -1363,7 +1256,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initTaskDetail();
     initMessageCenter();
     initChatDetail();
-    initMyTasks();
     initOrderCenter();
     initReview();
     initLightbox();
