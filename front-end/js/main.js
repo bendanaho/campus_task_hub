@@ -234,8 +234,35 @@ function initProfilePage() {
                 infoContainer.insertBefore(createRow('学院', collegeText), insertBefore);
                 infoContainer.insertBefore(createRow('班级', classText), insertBefore);
                 infoContainer.insertBefore(createRow('信用评分', (user.creditScore || '5.0') + ' / 5.0'), insertBefore);
+                // 账户余额（平台虚拟钱包）+ 充值入口
+                infoContainer.insertBefore(createRow('账户余额',
+                    '<span id="balanceValue">…</span> 元 <a href="javascript:void(0)" class="edit-link" id="rechargeBtn">充值</a>'), insertBefore);
                 if (user.bio) {
                     infoContainer.insertBefore(createRow('个人简介', user.bio), insertBefore);
+                }
+
+                var renderBalance = function() {
+                    getMyBalance().then(function(res) {
+                        var el = document.getElementById('balanceValue');
+                        if (el) el.textContent = (res && typeof res.balance === 'number') ? res.balance : 0;
+                    });
+                };
+                renderBalance();
+
+                var rechargeBtn = document.getElementById('rechargeBtn');
+                if (rechargeBtn) {
+                    rechargeBtn.addEventListener('click', function() {
+                        var input = prompt('请输入充值金额（元）。说明：本平台为校园虚拟余额，非真实支付。', '50');
+                        if (input === null) return;
+                        var amt = Number(input);
+                        if (!isFinite(amt) || amt <= 0) { alert('请输入正确的充值金额。'); return; }
+                        recharge(amt).then(function(res) {
+                            alert('充值成功！当前余额 ' + res.balance + ' 元');
+                            renderBalance();
+                        }).catch(function(err) {
+                            alert(err.message || '充值失败');
+                        });
+                    });
                 }
             }
 
@@ -943,11 +970,32 @@ function initChatDetail() {
         if (order && order.status !== 'cancelled') {
             html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
         }
+        html += await buildBalanceHint(task, order, currentUser);
         html += '</div><div class="task-bar-actions">' +
             (await buildTaskBarActions(task, order, currentUser)) +
             '</div>';
         taskBar.innerHTML = html;
         taskBar.style.display = 'flex';
+    }
+
+    // 当「当前用户是本单付款方」时，在任务栏展示：当前余额 ｜ 本单需支付金额（不足则标红）
+    async function buildBalanceHint(task, order, currentUser) {
+        if (!currentUser || task.publisherSide === 'none') return '';
+        // 仅在「待付款/进行中/尚未下单」阶段提示，已完成/已取消不再提示
+        if (order && ['cancelled', 'completed', 'disputed', 'closed'].indexOf(order.status) >= 0) return '';
+        var isPublisher = currentUser.id === task.publisherId;
+        // 是否为本单付款方：有订单看 payerId；无订单时——服务帖(earner)由响应者付、悬赏帖(payer)由发布者付
+        var iAmPayer = order
+            ? (currentUser.id === order.payerId)
+            : (task.publisherSide === 'earner' ? !isPublisher : isPublisher);
+        if (!iAmPayer) return '';
+        var amount = order ? order.amount : (task.rewardValue || parseRewardValue(task.reward));
+        var bal = 0;
+        try { bal = (await getMyBalance()).balance || 0; } catch (e) { bal = 0; }
+        var short = bal < amount;
+        return '<span class="task-bar-balance' + (short ? ' insufficient' : '') + '">' +
+            '当前余额 ¥' + bal + ' ｜ 本单需 ¥' + amount + (short ? '（余额不足，请先充值）' : '') +
+            '</span>';
     }
 
     // 按"在这笔订单里我是付款方还是收款方 + 订单状态"决定按钮（2 角色，取代原来的 4 角色分支）

@@ -963,6 +963,17 @@ html {
     color: #1f6feb;
 }
 
+/* 付款方余额/本单费用提示 */
+.task-bar-balance {
+    font-size: 12px;
+    color: #6b7280;
+    white-space: nowrap;
+}
+.task-bar-balance.insufficient {
+    color: #ef4444;
+    font-weight: 600;
+}
+
 .task-bar-actions {
     display: flex;
     align-items: center;

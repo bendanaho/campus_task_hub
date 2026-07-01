@@ -108,6 +108,33 @@ async function submitAuth(data) {
     return res.json();
 }
 
+// 查询当前登录用户余额（实时读后端，避免本地缓存过期）→ { balance }
+async function getMyBalance() {
+    if (USE_MOCK) {
+        return mockGetMyBalance();
+    }
+    var res = await fetch(API_BASE + '/user/balance', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+// 充值：课设采用平台虚拟余额，此处为 mock 加钱；真实资金通道非本项目范围 → { success, balance }
+async function recharge(amount) {
+    if (USE_MOCK) {
+        return mockRecharge(amount);
+    }
+    var res = await fetch(API_BASE + '/user/recharge', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ amount: amount })
+    });
+    return res.json();
+}
+
 // ==================== 帖子（任务/服务统一为"帖子"）====================
 
 async function getTasks(filters) {
@@ -546,6 +573,36 @@ function mockSubmitAuth(data) {
             setCurrentUser(safeUser);
             resolve({ success: true, user: safeUser });
         }, 300);
+    });
+}
+
+function mockGetMyBalance() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var db = _mockGetDB();
+            var u = _findUserInDb(db, currentUser.id);
+            resolve({ balance: u ? (u.balance || 0) : 0 });
+        }, 50);
+    });
+}
+
+function mockRecharge(amount) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var amt = Number(amount);
+            if (!isFinite(amt) || amt <= 0) { reject(new Error('请输入正确的充值金额')); return; }
+            if (amt > 100000) { reject(new Error('单次充值金额不能超过 100000 元')); return; }
+            var db = _mockGetDB();
+            var u = _findUserInDb(db, currentUser.id);
+            if (!u) { reject(new Error('用户不存在')); return; }
+            u.balance = (u.balance || 0) + amt;
+            _mockSaveDB(db);
+            resolve({ success: true, balance: u.balance });
+        }, 100);
     });
 }
 

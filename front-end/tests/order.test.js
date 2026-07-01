@@ -143,6 +143,23 @@ test('实名门禁：未实名不能发布/下单；完成实名认证后放行'
     assert.strictEqual(created.order.status, 'pending', '实名后可正常下单');
 });
 
+// ---------- 余额 / 充值 ----------
+
+test('余额查询与充值（虚拟钱包）', async function () {
+    const app = createApp();
+    await loginAs(app, '王同学'); // u3，种子余额 80
+    assert.strictEqual((await app.getMyBalance()).balance, 80);
+
+    const r = await app.recharge(50);
+    assert.strictEqual(r.success, true);
+    assert.strictEqual(r.balance, 130, '充值后余额 80+50=130');
+    assert.strictEqual((await app.getMyBalance()).balance, 130, '再查一致');
+
+    await assert.rejects(app.recharge(0), /充值金额/, '金额 0 被拒');
+    await assert.rejects(app.recharge(-10), /充值金额/, '负数被拒');
+    await assert.rejects(app.recharge(200000), /不能超过/, '超额被拒');
+});
+
 // ---------- 非法操作拦截 ----------
 
 test('不能对自己发布的帖子下单/接单', async function () {
