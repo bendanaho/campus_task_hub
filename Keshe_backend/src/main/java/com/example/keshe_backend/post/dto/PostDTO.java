@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 帖子 DTO（对齐 JS 端 task 对象字段）
@@ -29,12 +31,12 @@ public class PostDTO {
     private BigDecimal rewardValue;
     private LocalDateTime deadline;
     private LocalDateTime publishTime;
-    private String status; // "open" / "closed"
+    private String status;
     private String contact;
-    private String images; // JSON 数组字符串
+    private List<String> images;  // 前端期望数组
     private String serviceTime;
 
-    private BigDecimal takerCredit; // 兼容前端，可为 null
+    private BigDecimal takerCredit;
 
     public static PostDTO from(Task task) {
         return PostDTO.builder()
@@ -52,8 +54,33 @@ public class PostDTO {
                 .publishTime(task.getPublishTime())
                 .status(task.getStatus())
                 .contact(task.getContact())
-                .images(task.getImages())
+                .images(parseImages(task.getImages()))
                 .serviceTime(task.getServiceTime())
                 .build();
+    }
+
+    private static List<String> parseImages(String imagesJson) {
+        if (imagesJson == null || imagesJson.isBlank()) {
+            return new ArrayList<>();
+        }
+        try {
+            // 简单 JSON 数组解析：["url1","url2"]
+            List<String> result = new ArrayList<>();
+            String content = imagesJson.trim();
+            if (content.startsWith("[")) content = content.substring(1);
+            if (content.endsWith("]")) content = content.substring(0, content.length() - 1);
+            if (content.isBlank()) return result;
+            for (String part : content.split(",")) {
+                String url = part.trim();
+                if (url.startsWith("\"") && url.endsWith("\"")) {
+                    url = url.substring(1, url.length() - 1);
+                    url = url.replace("\\\"", "\"");
+                }
+                if (!url.isBlank()) result.add(url);
+            }
+            return result;
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
     }
 }

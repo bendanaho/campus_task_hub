@@ -30,7 +30,7 @@ import java.time.LocalDateTime;
  */
 @Slf4j
 @Component
-@Profile("dev")
+@Profile("!prod")
 @RequiredArgsConstructor
 public class DataInitializer implements org.springframework.boot.CommandLineRunner {
 

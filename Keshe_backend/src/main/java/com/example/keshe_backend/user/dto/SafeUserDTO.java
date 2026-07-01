@@ -14,7 +14,7 @@ public class SafeUserDTO {
     private String email;
     private String avatar;
     private BigDecimal creditScore;
-    private Integer authStatus;
+    private String authStatus; // "verified" / "unverified"（对齐 JS mock）
     private String college;
     private String className;
     private String bio;
@@ -28,7 +28,7 @@ public class SafeUserDTO {
         dto.setEmail(maskEmail(user.getEmail()));
         dto.setAvatar(user.getAvatar());
         dto.setCreditScore(user.getCreditScore());
-        dto.setAuthStatus(user.getAuthStatus());
+        dto.setAuthStatus(user.getAuthStatus() != null && user.getAuthStatus() == 1 ? "verified" : "unverified");
         dto.setCollege(user.getCollege());
         dto.setClassName(user.getClassName());
         dto.setBio(user.getBio());

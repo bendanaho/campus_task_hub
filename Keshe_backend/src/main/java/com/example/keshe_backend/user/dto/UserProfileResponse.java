@@ -5,9 +5,6 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * 用户公开资料响应（对齐 JS mockGetUserProfile 返回格式）
- */
 @Data
 public class UserProfileResponse {
     private Long id;
@@ -16,7 +13,7 @@ public class UserProfileResponse {
     private String email;
     private String avatar;
     private BigDecimal creditScore;
-    private Integer authStatus; // 0=未认证 1=已认证
+    private String authStatus; // "verified" / "unverified"（对齐 JS mock）
     private String realName;
     private String studentId;
     private String college;
@@ -32,7 +29,7 @@ public class UserProfileResponse {
         dto.setEmail(user.getEmail());
         dto.setAvatar(user.getAvatar());
         dto.setCreditScore(user.getCreditScore());
-        dto.setAuthStatus(user.getAuthStatus());
+        dto.setAuthStatus(user.getAuthStatus() != null && user.getAuthStatus() == 1 ? "verified" : "unverified");
         dto.setRealName(user.getRealName());
         dto.setStudentId(user.getStudentId());
         dto.setCollege(user.getCollege());

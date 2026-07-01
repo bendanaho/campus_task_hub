@@ -126,6 +126,7 @@ public class PostService {
 
         Task task = new Task();
         task.setTitle(request.getTitle());
+        task.setType(0); // 旧字段兼容，后续迁移可移除
         task.setPublisherSide(side);
         task.setCategory(request.getCategory());
         task.setDescription(request.getDescription());
