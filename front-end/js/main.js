@@ -26,7 +26,10 @@ function renderNav() {
     var html = '';
     NAV_ITEMS.forEach(function(item) {
         var isActive = currentPage === item.href ? 'active' : '';
-        html += '<a href="' + item.href + '" class="' + isActive + '">' + item.label + '</a>';
+        // 消息中心项预留未读红点占位，由 updateNavUnread 异步填充
+        var badge = item.href === 'message-center.html'
+            ? '<span id="navUnreadBadge" class="nav-unread" style="display:none;"></span>' : '';
+        html += '<a href="' + item.href + '" class="' + isActive + '">' + item.label + badge + '</a>';
     });
 
     if (isLoggedIn()) {
@@ -37,6 +40,22 @@ function renderNav() {
     }
 
     navLinks.innerHTML = html;
+}
+
+// 更新导航栏「消息中心」上的总未读红点
+function updateNavUnread() {
+    var badge = document.getElementById('navUnreadBadge');
+    if (!badge) return;
+    if (!isLoggedIn()) { badge.style.display = 'none'; return; }
+    getUnreadCounts().then(function(res) {
+        var n = (res && res.total) || 0;
+        if (n > 0) {
+            badge.textContent = n > 99 ? '99+' : n;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    });
 }
 
 // ==================== 页面保护 ====================
@@ -683,6 +702,9 @@ function initMessageCenter() {
             return;
         }
 
+        var unread = await getUnreadCounts();
+        var unreadByChat = (unread && unread.byChat) || {};
+
         var enriched = await Promise.all(conversations.map(async function(c) {
             var currentUser = getCurrentUser();
             var roleText = '';
@@ -723,10 +745,14 @@ function initMessageCenter() {
             var statusBadge = item.statusInfo.text
                 ? '<span class="status-badge ' + item.statusInfo.className + '">' + item.statusInfo.text + '</span>'
                 : '';
+            var uc = unreadByChat[c.id] || 0;
+            var unreadBadge = uc > 0
+                ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>'
+                : '';
 
-            return '<div class="message-item">' +
+            return '<div class="message-item' + (uc > 0 ? ' has-unread' : '') + '">' +
                 '<div class="msg-header">' +
-                    '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + '</h3>' +
+                    '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
                     '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
                 '</div>' +
                 '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
@@ -961,6 +987,9 @@ function initChatDetail() {
 
     renderMessages();
     renderTaskBar();
+
+    // 打开聊天即把对方发来的未读消息标记为已读，并刷新导航栏红点
+    markMessagesRead(chatId).then(function() { updateNavUnread(); });
 
     // 确保 conversation 存在，使消息中心能显示该会话
     if (partnerId && taskId) {
@@ -1268,6 +1297,7 @@ function initLightbox() {
 
 document.addEventListener('DOMContentLoaded', function() {
     renderNav();
+    updateNavUnread();
     handleRegisterForm();
     handleLoginForm();
     handleLogout();

@@ -274,6 +274,30 @@ test('已有真实评价的一方不被默认好评覆盖', async function () {
     assert.strictEqual(toU3[0].auto, true);
 });
 
+// ---------- 未读消息 ----------
+
+test('未读消息：统计、进入会话后清零、新消息对收件方计未读', async function () {
+    const app = createApp();
+    await loginAs(app, '张三'); // u1：种子里 c1(李四)、c3(孙同学)各一条未读
+    let u = await app.getUnreadCounts();
+    assert.strictEqual(u.total, 2, '张三初始 2 条未读');
+    assert.strictEqual(u.byChat['c1'], 1);
+    assert.strictEqual(u.byChat['c3'], 1);
+
+    // 打开 c1 → 该会话未读清零，总数减少
+    await app.markMessagesRead('c1');
+    u = await app.getUnreadCounts();
+    assert.strictEqual(u.total, 1, '读掉 c1 后剩 1 条');
+    assert.ok(!u.byChat['c1'], 'c1 不再有未读');
+    assert.strictEqual(u.byChat['c3'], 1);
+
+    // 张三在 c1 发消息 → 对收件方李四(u2)计为未读
+    await app.sendMessage('c1', '好的，我马上下来');
+    await loginAs(app, '李四'); // u2
+    const u2 = await app.getUnreadCounts();
+    assert.strictEqual(u2.byChat['c1'], 1, '李四在 c1 收到张三的新消息，计 1 条未读');
+});
+
 // ---------- 我的订单 / 大厅筛选 ----------
 
 test('getMyOrders 按付款/收款角色筛选', async function () {

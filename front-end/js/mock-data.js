@@ -381,6 +381,19 @@ function createInitialData() {
             receiverId: '', content: '李四已确认服务完成，等待提供者确认（2天后自动确认）',
             time: hourAgo(10), taskId: 't19', taskTitle: '高数一对一答疑辅导',
             withdrawn: false
+        },
+        // 未读演示：李四、孙同学发给张三、尚未查看的消息（read:false）
+        {
+            id: 'm18', chatId: 'c1', senderId: 'u2', senderName: '李四',
+            receiverId: 'u1', content: '快递到了，你现在方便下来拿吗？',
+            time: hourAgo(0.3), taskId: 't1', taskTitle: '帮忙取快递',
+            withdrawn: false, read: false
+        },
+        {
+            id: 'm19', chatId: 'c3', senderId: 'u7', senderName: '孙同学',
+            receiverId: 'u1', content: '下次的快递也照旧放前台哈～',
+            time: hourAgo(0.6), taskId: 't15', taskTitle: '可长期代取快递',
+            withdrawn: false, read: false
         }
     ];
 

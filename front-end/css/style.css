@@ -79,6 +79,24 @@ select {
     background-color: rgba(255, 255, 255, 0.18);
 }
 
+/* 导航栏未读红点 */
+.nav-unread {
+    display: inline-block;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    margin-left: 6px;
+    border-radius: 9px;
+    background-color: #ef4444;
+    color: #fff;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+    font-weight: 600;
+    vertical-align: middle;
+    box-sizing: border-box;
+}
+
 .page {
     padding: 30px 0 50px;
 }
@@ -1015,6 +1033,21 @@ html {
 .message-item .msg-header h3 {
     margin: 0;
     font-size: 16px;
+}
+/* 会话未读徽标 */
+.message-item .msg-unread {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background-color: #ef4444;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+.message-item.has-unread {
+    border-left: 3px solid #ef4444;
 }
 .message-item .msg-time {
     color: #999;

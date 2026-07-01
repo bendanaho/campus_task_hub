@@ -288,6 +288,29 @@ async function withdrawMessage(messageId) {
     return res.json();
 }
 
+// 未读消息统计：{ total, byChat: { chatId: count } }
+async function getUnreadCounts() {
+    if (USE_MOCK) {
+        return mockGetUnreadCounts();
+    }
+    var res = await fetch(API_BASE + '/messages/unread', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+// 打开某会话后，把该会话中「别人发给我的」未读消息标记为已读
+async function markMessagesRead(chatId) {
+    if (USE_MOCK) {
+        return mockMarkMessagesRead(chatId);
+    }
+    var res = await fetch(API_BASE + '/conversations/' + chatId + '/read', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
 async function ensureConversation(data) {
     if (USE_MOCK) {
         return mockEnsureConversation(data);
@@ -1101,6 +1124,61 @@ function mockGetMessages(chatId) {
     });
 }
 
+// 当前用户参与的会话 id 集合（发过/收过消息，或有订单关系）
+function _userChatIds(db, userId) {
+    var ids = {};
+    (db.messages || []).forEach(function(m) {
+        if (m.senderId === userId || m.receiverId === userId) ids[m.chatId] = true;
+    });
+    (db.orders || []).forEach(function(o) {
+        if (o.payerId === userId || o.earnerId === userId) ids[o.chatId] = true;
+    });
+    return ids;
+}
+
+// 未读 = 我参与的会话里，别人(非我、非系统)发的、read===false 的消息
+function mockGetUnreadCounts() {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { resolve({ total: 0, byChat: {} }); return; }
+            var db = _mockGetDB();
+            var myChats = _userChatIds(db, currentUser.id);
+            var byChat = {};
+            var total = 0;
+            (db.messages || []).forEach(function(m) {
+                if (!myChats[m.chatId]) return;
+                if (m.senderId === currentUser.id || m.senderId === 'system') return;
+                if (m.read === false) {
+                    byChat[m.chatId] = (byChat[m.chatId] || 0) + 1;
+                    total++;
+                }
+            });
+            resolve({ total: total, byChat: byChat });
+        }, 50);
+    });
+}
+
+function mockMarkMessagesRead(chatId) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { resolve({ success: true, updated: 0 }); return; }
+            var db = _mockGetDB();
+            var updated = 0;
+            (db.messages || []).forEach(function(m) {
+                if (m.chatId === chatId && m.senderId !== currentUser.id &&
+                    m.senderId !== 'system' && m.read === false) {
+                    m.read = true;
+                    updated++;
+                }
+            });
+            if (updated > 0) _mockSaveDB(db);
+            resolve({ success: true, updated: updated });
+        }, 50);
+    });
+}
+
 function mockSendMessage(chatId, content) {
     return new Promise(function(resolve, reject) {
         setTimeout(function() {
@@ -1119,7 +1197,9 @@ function mockSendMessage(chatId, content) {
                 content: content,
                 time: new Date().toISOString(),
                 taskId: '',
-                taskTitle: ''
+                taskTitle: '',
+                withdrawn: false,
+                read: false
             };
             if (!db.messages) db.messages = [];
             db.messages.push(newMsg);
