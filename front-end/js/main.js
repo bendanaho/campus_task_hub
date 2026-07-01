@@ -1078,7 +1078,7 @@ function initChatDetail() {
     var sendBtn = document.getElementById('sendBtn');
     var chatInput = document.getElementById('chatInput');
     if (sendBtn && chatInput) {
-        sendBtn.addEventListener('click', function() {
+        var doSend = function() {
             var content = chatInput.value.trim();
             if (!content) return;
             sendMessage(chatId, content).then(function() {
@@ -1087,6 +1087,14 @@ function initChatDetail() {
             }).catch(function(err) {
                 alert(err.message || '发送失败');
             });
+        };
+        sendBtn.addEventListener('click', doSend);
+        // Enter 发送，Shift+Enter 换行（输入法组合中的回车不触发）
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                doSend();
+            }
         });
     }
 }
