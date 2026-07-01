@@ -489,6 +489,35 @@ textarea.form-control {
     opacity: 0.85;
 }
 
+/* 聊天内收款/转账卡片 */
+.chat-message.chat-payment {
+    background: none !important;
+    color: #333;
+    padding: 0;
+    max-width: 220px;
+}
+.pay-card {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+}
+.pay-card-head { font-size: 12px; color: #9a3412; }
+.pay-card-amount { font-size: 22px; font-weight: 700; color: #ea580c; margin: 2px 0; }
+.pay-card-status { font-size: 12px; color: #78716c; }
+.pay-card-actions { margin-top: 8px; }
+.pay-card.pay-paid { background: #f0fdf4; border-color: #86efac; }
+.pay-card.pay-paid .pay-card-amount { color: #16a34a; }
+.pay-card.pay-cancelled { background: #f5f5f5; border-color: #d4d4d4; }
+.pay-card.pay-cancelled .pay-card-amount { color: #9ca3af; text-decoration: line-through; }
+
+/* 收款 / 转账入口按钮行 */
+.chat-pay-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
 .chat-input-area {
     margin-top: 20px;
     display: flex;

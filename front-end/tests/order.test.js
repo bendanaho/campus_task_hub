@@ -160,6 +160,52 @@ test('余额查询与充值（虚拟钱包）', async function () {
     await assert.rejects(app.recharge(200000), /不能超过/, '超额被拒');
 });
 
+// ---------- 聊天收款 / 转账（直接支付） ----------
+
+test('聊天收款：发起→对方支付，金额直接划转', async function () {
+    const app = createApp();
+    // u3(王同学,80) 向 u2(李四,85) 发起收款 15
+    await loginAs(app, '王同学');
+    const card = await app.sendPaymentCard('cPay', 'u2', 'request', 15);
+    assert.strictEqual(card.message.type, 'payment');
+    assert.strictEqual(card.message.payment.status, 'pending');
+    assert.strictEqual(card.message.payment.payerId, 'u2', '付款方是对方');
+    assert.strictEqual(card.message.payment.receiverId, 'u3', '收款方是我');
+    assert.strictEqual(app.getUserById('u2').balance, 85, '未支付前不扣款');
+    assert.strictEqual(app.getUserById('u3').balance, 80);
+
+    // 收款方不能替对方支付
+    await assert.rejects(app.payPaymentCard(card.message.id), /只有付款方/);
+
+    // u2 支付 → u2 -15、u3 +15
+    await loginAs(app, '李四');
+    await app.payPaymentCard(card.message.id);
+    assert.strictEqual(app.getUserById('u2').balance, 70);
+    assert.strictEqual(app.getUserById('u3').balance, 95);
+    // 重复支付被拒
+    await assert.rejects(app.payPaymentCard(card.message.id), /已处理/);
+});
+
+test('聊天转账：立即扣款到账；余额不足被拒', async function () {
+    const app = createApp();
+    // u2(李四,85) 直接转 10 给 u3(王同学,80)
+    await loginAs(app, '李四');
+    const t = await app.sendPaymentCard('cPay', 'u3', 'transfer', 10);
+    assert.strictEqual(t.message.payment.status, 'paid', '转账立即完成');
+    assert.strictEqual(app.getUserById('u2').balance, 75);
+    assert.strictEqual(app.getUserById('u3').balance, 90);
+    // 余额不足
+    await assert.rejects(app.sendPaymentCard('cPay', 'u3', 'transfer', 99999), /余额不足/);
+});
+
+test('聊天收付款需实名', async function () {
+    const app = createApp();
+    await app.register({ username: '未名', phone: '13911112222', password: '123456' });
+    await loginAs(app, '未名');
+    await assert.rejects(app.sendPaymentCard('cX', 'u2', 'request', 5), /实名认证/);
+    await assert.rejects(app.sendPaymentCard('cX', 'u2', 'transfer', 5), /实名认证/);
+});
+
 // ---------- 非法操作拦截 ----------
 
 test('不能对自己发布的帖子下单/接单', async function () {

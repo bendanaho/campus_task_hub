@@ -315,6 +315,44 @@ async function withdrawMessage(messageId) {
     return res.json();
 }
 
+// 在聊天里发起「收款(request)」或「转账(transfer)」卡片。直接支付（不走托管）：
+// 转账立即扣款到账；收款为待对方支付。
+async function sendPaymentCard(chatId, partnerId, kind, amount) {
+    if (USE_MOCK) {
+        return mockSendPaymentCard(chatId, partnerId, kind, amount);
+    }
+    var res = await fetch(API_BASE + '/conversations/' + chatId + '/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ partnerId: partnerId, kind: kind, amount: amount })
+    });
+    return res.json();
+}
+
+// 付款方支付一张待支付的收款卡片
+async function payPaymentCard(messageId) {
+    if (USE_MOCK) {
+        return mockPayPaymentCard(messageId);
+    }
+    var res = await fetch(API_BASE + '/messages/' + messageId + '/pay', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
+// 发起方取消一张待支付的收款卡片
+async function cancelPaymentCard(messageId) {
+    if (USE_MOCK) {
+        return mockCancelPaymentCard(messageId);
+    }
+    var res = await fetch(API_BASE + '/messages/' + messageId + '/cancel-payment', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
 // 未读消息统计：{ total, byChat: { chatId: count } }
 async function getUnreadCounts() {
     if (USE_MOCK) {
@@ -1303,6 +1341,119 @@ function mockSendMessage(chatId, content) {
             _mockSaveDB(db);
             resolve(newMsg);
         }, 100);
+    });
+}
+
+// 直接转账：从 fromId 扣款、加到 toId（无托管）。余额不足则失败。
+function _transfer(db, fromId, toId, amount) {
+    var from = _findUserInDb(db, fromId);
+    var to = _findUserInDb(db, toId);
+    if (!from || !to) return { ok: false, error: '用户不存在' };
+    if ((from.balance || 0) < amount) return { ok: false, error: '余额不足，请先充值' };
+    from.balance -= amount;
+    to.balance = (to.balance || 0) + amount;
+    return { ok: true };
+}
+
+function _findMsgInDb(db, messageId) {
+    for (var i = 0; i < (db.messages || []).length; i++) {
+        if (db.messages[i].id === messageId) return db.messages[i];
+    }
+    return null;
+}
+
+function mockSendPaymentCard(chatId, partnerId, kind, amount) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var amt = Number(amount);
+            if (!isFinite(amt) || amt <= 0) { reject(new Error('请输入正确的金额')); return; }
+            if (amt > 100000) { reject(new Error('单笔金额不能超过 100000 元')); return; }
+            if (!partnerId || partnerId === currentUser.id) { reject(new Error('无效的收付款对象')); return; }
+            var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) { reject(new Error('请先完成实名认证后再操作')); return; }
+
+            var payerId, receiverId, status, paidAt = null;
+            if (kind === 'transfer') {
+                // 我向对方转账：立即扣款到账
+                payerId = currentUser.id; receiverId = partnerId;
+                var r = _transfer(db, payerId, receiverId, amt);
+                if (!r.ok) { reject(new Error(r.error)); return; }
+                status = 'paid'; paidAt = new Date().toISOString();
+            } else {
+                // 我发起收款：等待对方(付款方)支付
+                kind = 'request';
+                payerId = partnerId; receiverId = currentUser.id;
+                status = 'pending';
+            }
+            var content = (kind === 'request' ? '[收款] ¥' : '[转账] ¥') + amt;
+            var msg = {
+                id: 'm' + Date.now(),
+                chatId: chatId,
+                senderId: currentUser.id,
+                senderName: currentUser.username,
+                receiverId: partnerId,
+                content: content,
+                time: new Date().toISOString(),
+                taskId: '', taskTitle: '',
+                withdrawn: false, read: false,
+                type: 'payment',
+                payment: { kind: kind, amount: amt, payerId: payerId, receiverId: receiverId, status: status, paidAt: paidAt }
+            };
+            if (!db.messages) db.messages = [];
+            db.messages.push(msg);
+            for (var i = 0; i < (db.conversations || []).length; i++) {
+                if (db.conversations[i].id === chatId) {
+                    db.conversations[i].lastMessage = content;
+                    db.conversations[i].lastTime = msg.time;
+                    db.conversations[i].lastMessageSenderId = currentUser.id;
+                    break;
+                }
+            }
+            _mockSaveDB(db);
+            resolve({ success: true, message: msg });
+        }, 150);
+    });
+}
+
+function mockPayPaymentCard(messageId) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) { reject(new Error('请先完成实名认证后再操作')); return; }
+            var msg = _findMsgInDb(db, messageId);
+            if (!msg || msg.type !== 'payment') { reject(new Error('支付单不存在')); return; }
+            var p = msg.payment;
+            if (p.status !== 'pending') { reject(new Error('该收款已处理')); return; }
+            if (p.payerId !== currentUser.id) { reject(new Error('只有付款方可以支付')); return; }
+            var r = _transfer(db, p.payerId, p.receiverId, p.amount);
+            if (!r.ok) { reject(new Error(r.error)); return; }
+            p.status = 'paid';
+            p.paidAt = new Date().toISOString();
+            _mockSaveDB(db);
+            resolve({ success: true, message: msg });
+        }, 150);
+    });
+}
+
+function mockCancelPaymentCard(messageId) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var db = _mockGetDB();
+            var msg = _findMsgInDb(db, messageId);
+            if (!msg || msg.type !== 'payment') { reject(new Error('支付单不存在')); return; }
+            var p = msg.payment;
+            if (p.status !== 'pending') { reject(new Error('该收款已处理，无法取消')); return; }
+            if (msg.senderId !== currentUser.id) { reject(new Error('只有发起方可以取消')); return; }
+            p.status = 'cancelled';
+            _mockSaveDB(db);
+            resolve({ success: true, message: msg });
+        }, 150);
     });
 }
 

@@ -885,6 +885,39 @@ function initChatDetail() {
     }
     updateChatHeader();
 
+    // 渲染一张收款/转账卡片（气泡按发送者左右对齐，卡片自带样式）
+    function paymentCardHTML(m, currentUser, isSelf) {
+        var p = m.payment;
+        var side = isSelf ? 'chat-right' : 'chat-left';
+        var kindLabel = p.kind === 'request' ? '收款' : '转账';
+        var statusText = '', actions = '';
+        if (p.status === 'paid') {
+            statusText = '已完成';
+        } else if (p.status === 'cancelled') {
+            statusText = '已取消';
+        } else { // pending：仅收款卡片会处于此状态
+            var iAmPayer = currentUser && currentUser.id === p.payerId;
+            if (iAmPayer) {
+                statusText = '待你支付';
+                actions = '<button type="button" class="btn btn-small pay-card-btn" onclick="handlePayCard(\'' + m.id + '\')">支付 ¥' + p.amount + '</button>';
+            } else {
+                statusText = '等待对方支付';
+                if (currentUser && currentUser.id === m.senderId) {
+                    actions = '<button type="button" class="btn btn-small btn-secondary" onclick="handleCancelCard(\'' + m.id + '\')">取消</button>';
+                }
+            }
+        }
+        return '<div class="chat-message chat-payment ' + side + '">' +
+            '<div class="pay-card pay-' + p.status + '">' +
+                '<div class="pay-card-head">' + kindLabel + '</div>' +
+                '<div class="pay-card-amount">¥' + p.amount + '</div>' +
+                '<div class="pay-card-status">' + statusText + '</div>' +
+                (actions ? '<div class="pay-card-actions">' + actions + '</div>' : '') +
+            '</div>' +
+            '<div class="chat-time">' + formatDateTime(m.time) + '</div>' +
+        '</div>';
+    }
+
     function renderMessages() {
         getMessages(chatId).then(function(messages) {
             var currentUser = getCurrentUser();
@@ -899,6 +932,9 @@ function initChatDetail() {
                     return '<div class="chat-message withdrawn" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
                         withdrawText +
                     '</div>';
+                }
+                if (m.type === 'payment') {
+                    return paymentCardHTML(m, currentUser, isSelf);
                 }
                 if (m.senderId === 'system') {
                     return '<div class="chat-message system">' + m.content + '</div>';
@@ -1008,6 +1044,10 @@ function initChatDetail() {
         var amount = order ? order.amount : (task.rewardValue || parseRewardValue(task.reward));
         var bal = 0;
         try { bal = (await getMyBalance()).balance || 0; } catch (e) { bal = 0; }
+        // 变价订单(面议/按页计费，金额为 0)：只显示余额，费用走聊天收款/转账
+        if (!(amount > 0)) {
+            return '<span class="task-bar-balance">当前余额 ¥' + bal + ' ｜ 金额面议，可用下方收款/转账</span>';
+        }
         var short = bal < amount;
         return '<span class="task-bar-balance' + (short ? ' insufficient' : '') + '">' +
             '当前余额 ¥' + bal + ' ｜ 本单需 ¥' + amount + (short ? '（余额不足，请先充值）' : '') +
@@ -1113,6 +1153,32 @@ function initChatDetail() {
             }
         });
     }
+
+    // 收款 / 转账入口
+    var reqBtn = document.getElementById('requestPayBtn');
+    var transBtn = document.getElementById('transferBtn');
+    if (!partnerId) {
+        // 无对方信息时无法收付款，隐藏入口
+        if (reqBtn) reqBtn.style.display = 'none';
+        if (transBtn) transBtn.style.display = 'none';
+    } else {
+        var promptAndSend = function(kind, verb, confirmTransfer) {
+            if (!requireVerified()) return;
+            var input = prompt('请输入' + verb + '金额（元）：');
+            if (input === null) return;
+            var amt = Number(input);
+            if (!isFinite(amt) || amt <= 0) { alert('请输入正确的金额。'); return; }
+            if (confirmTransfer && !confirm('确认立即向对方转账 ¥' + amt + ' 元？余额将立即扣除。')) return;
+            sendPaymentCard(chatId, partnerId, kind, amt).then(function() {
+                renderMessages();
+                updateNavUnread();
+            }).catch(function(err) {
+                alert(err.message || '操作失败');
+            });
+        };
+        if (reqBtn) reqBtn.addEventListener('click', function() { promptAndSend('request', '收款', false); });
+        if (transBtn) transBtn.addEventListener('click', function() { promptAndSend('transfer', '转账', true); });
+    }
 }
 
 // ==================== 聊天全局函数 ====================
@@ -1124,6 +1190,27 @@ function getOrderStatusText(status) {
     };
     return map[status] || status;
 }
+
+// 付款方支付一张收款卡片
+window.handlePayCard = function(messageId) {
+    if (!requireVerified()) return;
+    payPaymentCard(messageId).then(function() {
+        alert('支付成功！');
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '支付失败');
+    });
+};
+
+// 发起方取消一张待支付的收款卡片
+window.handleCancelCard = function(messageId) {
+    if (!confirm('确定取消这笔收款吗？')) return;
+    cancelPaymentCard(messageId).then(function() {
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '取消失败');
+    });
+};
 
 // 响应者发起订单（接单/下单）
 window.handleOrderCreate = function(postId, chatId) {
