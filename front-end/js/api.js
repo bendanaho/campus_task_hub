@@ -790,14 +790,20 @@ function _isVerified(db, userId) {
     return !!(u && u.authStatus === 'verified');
 }
 
+// 悬赏(payer)帖过了截止时间即失效：不再展示、不可接单。服务/组队帖不设硬截止。
+function _isExpired(post) {
+    return !!(post && post.publisherSide === 'payer' && post.deadline &&
+        new Date(post.deadline).getTime() < Date.now());
+}
+
 // ---------- 帖子 ----------
 
 function mockGetTasks(filters) {
     return new Promise(function(resolve) {
         setTimeout(function() {
             var db = _mockGetDB();
-            // 大厅只展示挂出来的帖子
-            var result = db.tasks.filter(function(t) { return t.status === 'open'; });
+            // 大厅只展示挂出来、且未过截止时间的帖子
+            var result = db.tasks.filter(function(t) { return t.status === 'open' && !_isExpired(t); });
 
             if (filters) {
                 // side: 'payer'(别人出钱,我能赚) | 'earner'(别人收钱,我要花钱) | 'none'(纯互助) | 'all'
@@ -882,6 +888,10 @@ function mockPublishPost(data) {
                 reject(new Error('请先完成实名认证后再发布'));
                 return;
             }
+            if (side === 'payer' && data.deadline && new Date(data.deadline).getTime() < Date.now()) {
+                reject(new Error('截止时间不能早于当前时间'));
+                return;
+            }
             // 注：发布不再预付/冻结，冻结发生在「发布者接受订单」时
             var newPost = {
                 id: 't' + (db.tasks.length + 1) + '-' + Date.now(),
@@ -945,6 +955,10 @@ function mockCreateOrder(postId, chatId) {
             }
             if (post.publisherId === currentUser.id) {
                 reject(new Error('不能对自己发布的帖子下单/接单'));
+                return;
+            }
+            if (_isExpired(post)) {
+                reject(new Error('该悬赏已过截止时间，无法接单'));
                 return;
             }
             // 悬赏帖(payer)一次性：同帖只允许一个未完成订单；

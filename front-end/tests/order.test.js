@@ -244,6 +244,33 @@ test('账单：聊天转账双方各记一笔', async function () {
     assert.ok(b3.list.some(function (t) { return t.category === 'payment' && t.direction === 'in' && t.amount === 10; }), '收款方记收入');
 });
 
+// ---------- 悬赏截止时间 ----------
+
+test('悬赏帖过截止时间：不在大厅、不可接单', async function () {
+    const app = createApp();
+    // 把 t3(悬赏帖，发布者 u4) 的截止时间改到过去
+    var db = app.getDB();
+    for (var i = 0; i < db.tasks.length; i++) {
+        if (db.tasks[i].id === 't3') { db.tasks[i].deadline = new Date(Date.now() - 3600000).toISOString(); break; }
+    }
+    app.saveDB(db);
+
+    const hall = await app.getTasks({});
+    assert.ok(!hall.some(function (t) { return t.id === 't3'; }), '过期悬赏不应出现在大厅');
+
+    await loginAs(app, '王同学');
+    await assert.rejects(app.createOrder('t3', 'cExp'), /截止时间/, '过期悬赏不可接单');
+});
+
+test('发布悬赏：截止时间早于当前时间被拒', async function () {
+    const app = createApp();
+    await loginAs(app, '张三');
+    await assert.rejects(app.publishPost({
+        title: '过期悬赏', publisherSide: 'payer', category: 'other', description: 'x', reward: '5元',
+        deadline: new Date(Date.now() - 3600000).toISOString()
+    }), /截止时间不能早于/);
+});
+
 // ---------- 非法操作拦截 ----------
 
 test('不能对自己发布的帖子下单/接单', async function () {

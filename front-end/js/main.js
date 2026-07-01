@@ -456,7 +456,7 @@ function initTaskHall() {
                             '<h3>' + task.title + '</h3>' +
                             '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                         '</div>' +
-                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + task.reward) + ' ｜ ' + timeStr + '</p>' +
+                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + task.reward) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
                         '<div class="task-item-body">' +
                             '<p class="task-desc">' + task.description + '</p>' +
                             bodyImages +
@@ -680,8 +680,9 @@ function initTaskDetail() {
         var task = result.task;
         var catName = CATEGORY_MAP[task.category] || task.category;
         var typeLabel = task.publisherSide === 'payer' ? '悬赏求助（发布者出钱）' : (task.publisherSide === 'none' ? '组队互助（不涉及金钱）' : '提供服务（发布者收钱）');
+        var expired = task.publisherSide === 'payer' && task.deadline && new Date(task.deadline).getTime() < Date.now();
         var statusMap = { open: '可下单', closed: '已结束' };
-        var statusText = statusMap[task.status] || task.status;
+        var statusText = expired ? '已截止' : (statusMap[task.status] || task.status);
 
         var imagesHtml = '';
         if (task.images && task.images.length > 0) {
@@ -712,7 +713,9 @@ function initTaskDetail() {
                 '<p><strong>状态：</strong>' + statusText + '</p>' +
                 imagesHtml +
                 '<div class="actions">' +
-                    (isMine ? '<span class="note">这是你发布的帖子</span>' : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>') +
+                    (isMine ? '<span class="note">这是你发布的帖子</span>'
+                        : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
+                            : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>')) +
                     '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
                     '<a href="task-hall.html" class="btn btn-gray">返回互助大厅</a>' +
                 '</div>';
@@ -1077,6 +1080,10 @@ function initChatDetail() {
 
         // 尚无有效订单
         if (!order || order.status === 'cancelled') {
+            // 悬赏帖过了截止时间：不再允许接单
+            if (task.publisherSide === 'payer' && task.deadline && new Date(task.deadline).getTime() < Date.now()) {
+                return '<span class="task-bar-status">该悬赏已截止</span>';
+            }
             if (isPublisher) {
                 return '<span class="task-bar-waiting">等待对方发起订单...</span>';
             }
