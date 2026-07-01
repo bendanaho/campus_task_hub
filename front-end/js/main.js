@@ -2,6 +2,16 @@ function goTo(page) {
     window.location.href = page;
 }
 
+// 返回上一页：有历史则后退（浏览器/滚动恢复机制会带回原位置），否则回大厅兜底
+function goBack(fallback) {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        window.location.href = fallback || 'task-hall.html';
+    }
+}
+window.goBack = goBack;
+
 function showDemoMessage(message) {
     alert(message || '当前为静态演示页面，未接入实际业务逻辑。');
 }
@@ -596,9 +606,13 @@ function initPublishForm() {
         var side = getSide();
         if (deadlineGroup) deadlineGroup.style.display = side === 'payer' ? '' : 'none';
         if (serviceTimeGroup) serviceTimeGroup.style.display = side === 'earner' ? '' : 'none';
-        // 纯互助不涉及金钱，隐藏报酬字段
+        // 纯互助不涉及金钱，隐藏报酬字段，并默认把分类设为「组队协作」
         if (rewardGroup) rewardGroup.style.display = side === 'none' ? 'none' : '';
         if (rewardLabel) rewardLabel.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '期望报酬（你的收费）';
+        if (side === 'none') {
+            var cat = document.getElementById('postCategory');
+            if (cat) cat.value = 'teamwork';
+        }
     }
     form.querySelectorAll('input[name="publisherSide"]').forEach(function(r) {
         r.addEventListener('change', syncFields);
@@ -699,6 +713,7 @@ function initTaskDetail() {
                 imagesHtml +
                 '<div class="actions">' +
                     (isMine ? '<span class="note">这是你发布的帖子</span>' : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>') +
+                    '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
                     '<a href="task-hall.html" class="btn btn-gray">返回互助大厅</a>' +
                 '</div>';
         }
@@ -894,7 +909,8 @@ function initChatDetail() {
                     '<div class="chat-time">' + formatDateTime(m.time) + '</div>' +
                 '</div>';
             }).join('');
-            messageList.scrollTop = messageList.scrollHeight;
+            // 滚动容器是 chat-box（overflow-y:auto），滚它才能让最新消息落到最底部
+            chatBox.scrollTop = chatBox.scrollHeight;
             bindContextMenu();
         });
     }
@@ -1397,8 +1413,20 @@ document.addEventListener('DOMContentLoaded', function() {
     var scrollKey = 'scroll_' + location.pathname;
     var savedScroll = sessionStorage.getItem(scrollKey);
     if (savedScroll !== null) {
-        window.scrollTo(0, parseInt(savedScroll));
+        var target = parseInt(savedScroll, 10) || 0;
         sessionStorage.removeItem(scrollKey);
+        if (target > 0) {
+            // 列表/消息等内容异步渲染，页面高度会逐步增大——重试直到能滚到目标位置
+            var tries = 0;
+            var restore = function() {
+                window.scrollTo(0, target);
+                tries++;
+                if (Math.abs(window.scrollY - target) > 2 && tries < 30) {
+                    setTimeout(restore, 50);
+                }
+            };
+            restore();
+        }
     }
 
     document.addEventListener('click', function(e) {
