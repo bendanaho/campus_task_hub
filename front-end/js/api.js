@@ -1061,6 +1061,12 @@ function mockGetConversations() {
 
                 if (isParticipant && partnerId) {
                     var partner = _mockGetUserById(partnerId);
+                    // 预览取该会话「实际最新一条消息」，避免会话上写死的 lastMessage 与真实消息不同步
+                    var chatMsgs = (db.messages || []).filter(function(m) { return m.chatId === c.id; });
+                    var lastMsg = null;
+                    for (var k = 0; k < chatMsgs.length; k++) {
+                        if (!lastMsg || new Date(chatMsgs[k].time) > new Date(lastMsg.time)) lastMsg = chatMsgs[k];
+                    }
                     result.push({
                         id: c.id,
                         partnerId: partnerId,
@@ -1068,9 +1074,9 @@ function mockGetConversations() {
                         partnerAvatar: partner ? partner.avatar : '',
                         taskId: c.taskId,
                         taskTitle: c.taskTitle,
-                        lastMessage: c.lastMessage,
-                        lastTime: c.lastTime,
-                        lastMessageSenderId: c.lastMessageSenderId || ''
+                        lastMessage: lastMsg ? lastMsg.content : c.lastMessage,
+                        lastTime: lastMsg ? lastMsg.time : c.lastTime,
+                        lastMessageSenderId: lastMsg ? lastMsg.senderId : (c.lastMessageSenderId || '')
                     });
                 }
             });
