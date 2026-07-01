@@ -298,6 +298,31 @@ test('未读消息：统计、进入会话后清零、新消息对收件方计�
     assert.strictEqual(u2.byChat['c1'], 1, '李四在 c1 收到张三的新消息，计 1 条未读');
 });
 
+test('未下单也能建会话：只发消息，双方消息中心都能看到（未读归发布者）', async function () {
+    const app = createApp();
+    // t12 组队帖，发布者 u5(赵同学)；u3(王同学) 进聊天只发消息、不下单
+    await loginAs(app, '王同学'); // u3
+    await app.ensureConversation({ chatId: 'c-t12-u3', partnerId: 'u5', partnerName: '赵同学', taskId: 't12', taskTitle: '羽毛球搭子招募' });
+    await app.sendMessage('c-t12-u3', '你好，这个羽毛球搭子还招吗？');
+
+    assert.ok(!(app.getDB().orders || []).some(function (o) { return o.chatId === 'c-t12-u3'; }), '未创建订单');
+
+    // 响应者(u3)能看到会话，对方识别为发布者 u5
+    let convs = await app.getConversations();
+    const asResponder = convs.find(function (c) { return c.id === 'c-t12-u3'; });
+    assert.ok(asResponder, '响应者消息中心应能看到该会话');
+    assert.strictEqual(asResponder.partnerId, 'u5');
+
+    // 发布者(u5)也能看到，对方识别为 u3，且该消息计为未读
+    await loginAs(app, '赵同学'); // u5
+    convs = await app.getConversations();
+    const asPublisher = convs.find(function (c) { return c.id === 'c-t12-u3'; });
+    assert.ok(asPublisher, '发布者消息中心也应能看到该会话');
+    assert.strictEqual(asPublisher.partnerId, 'u3');
+    const unread = await app.getUnreadCounts();
+    assert.strictEqual(unread.byChat['c-t12-u3'], 1, '发布者对该会话应有 1 条未读');
+});
+
 // ---------- 我的订单 / 大厅筛选 ----------
 
 test('getMyOrders 按付款/收款角色筛选', async function () {

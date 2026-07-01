@@ -1044,41 +1044,36 @@ function mockGetConversations() {
             var result = [];
 
             (db.conversations || []).forEach(function(c) {
-                var partnerId = null;
-                var isParticipant = false;
-
-                // 方法1：通过消息记录确定参与者
-                var msgParticipants = {};
+                // 汇总该会话的参与者：消息发送/接收方 + 订单双方 + 帖子发布者。
+                // 帖子发布者一定是会话的一方，这样即便响应者只发了消息、还没下单
+                // （消息 receiverId 为空、也无订单可查），也能定位出对方是谁。
+                var participants = {};
                 (db.messages || []).forEach(function(m) {
                     if (m.chatId === c.id) {
-                        if (m.senderId && m.senderId !== 'system') msgParticipants[m.senderId] = true;
-                        if (m.receiverId) msgParticipants[m.receiverId] = true;
+                        if (m.senderId && m.senderId !== 'system') participants[m.senderId] = true;
+                        if (m.receiverId) participants[m.receiverId] = true;
                     }
                 });
-                if (msgParticipants[currentUser.id]) {
-                    isParticipant = true;
-                    for (var pid in msgParticipants) {
-                        if (pid !== currentUser.id) {
-                            partnerId = pid;
+                (db.orders || []).forEach(function(o) {
+                    if (o.chatId === c.id) {
+                        if (o.payerId) participants[o.payerId] = true;
+                        if (o.earnerId) participants[o.earnerId] = true;
+                    }
+                });
+                if (c.taskId) {
+                    for (var ti = 0; ti < db.tasks.length; ti++) {
+                        if (db.tasks[ti].id === c.taskId) {
+                            if (db.tasks[ti].publisherId) participants[db.tasks[ti].publisherId] = true;
                             break;
                         }
                     }
                 }
 
-                // 方法2：通过订单关系确定参与者（已建交易但未发消息）
-                if (!partnerId) {
-                    var orders = db.orders || [];
-                    for (var i = 0; i < orders.length; i++) {
-                        if (orders[i].chatId === c.id) {
-                            if (currentUser.id === orders[i].payerId) {
-                                partnerId = orders[i].earnerId;
-                                isParticipant = true;
-                            } else if (currentUser.id === orders[i].earnerId) {
-                                partnerId = orders[i].payerId;
-                                isParticipant = true;
-                            }
-                            break;
-                        }
+                var isParticipant = !!participants[currentUser.id];
+                var partnerId = null;
+                if (isParticipant) {
+                    for (var pid in participants) {
+                        if (pid !== currentUser.id) { partnerId = pid; break; }
                     }
                 }
 
@@ -1124,7 +1119,7 @@ function mockGetMessages(chatId) {
     });
 }
 
-// 当前用户参与的会话 id 集合（发过/收过消息，或有订单关系）
+// 当前用户参与的会话 id 集合（发过/收过消息、有订单关系，或是会话所属帖子的发布者）
 function _userChatIds(db, userId) {
     var ids = {};
     (db.messages || []).forEach(function(m) {
@@ -1132,6 +1127,16 @@ function _userChatIds(db, userId) {
     });
     (db.orders || []).forEach(function(o) {
         if (o.payerId === userId || o.earnerId === userId) ids[o.chatId] = true;
+    });
+    // 帖子发布者也算参与其帖子的会话——响应者未下单前，发布者靠这条被纳入
+    (db.conversations || []).forEach(function(c) {
+        if (!c.taskId) return;
+        for (var ti = 0; ti < db.tasks.length; ti++) {
+            if (db.tasks[ti].id === c.taskId) {
+                if (db.tasks[ti].publisherId === userId) ids[c.id] = true;
+                break;
+            }
+        }
     });
     return ids;
 }
