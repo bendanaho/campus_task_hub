@@ -728,12 +728,15 @@ function initTaskDetail() {
 function describeOrderStatus(order, currentUserId, isPublisher) {
     var isPayer = currentUserId === order.payerId;
     if (order.status === 'pending') {
-        return { text: isPublisher ? '待我接受' : '待对方接受', className: 'status-pending' };
+        // 发布者一侧待接受 = 需我操作
+        return isPublisher
+            ? { text: '待我接受', className: 'status-pending', action: true }
+            : { text: '待对方接受', className: 'status-pending' };
     }
     if (order.status === 'in_progress') {
         var myConfirmed = isPayer ? order.payerConfirmed : order.earnerConfirmed;
         var otherConfirmed = isPayer ? order.earnerConfirmed : order.payerConfirmed;
-        if (otherConfirmed && !myConfirmed) return { text: '待我确认', className: 'status-pending' };
+        if (otherConfirmed && !myConfirmed) return { text: '待我确认', className: 'status-pending', action: true };
         if (myConfirmed && !otherConfirmed) return { text: '我已确认，待对方确认', className: 'status-in_progress' };
         return { text: '进行中', className: 'status-in_progress' };
     }
@@ -774,6 +777,13 @@ function initMessageCenter() {
             var task = c.taskId ? await fetchTaskById(c.taskId) : null;
             var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
 
+            // 完成但我还没评价 → 待我评价（待办）
+            var order = await getOrder(c.id);
+            if (order && order.status === 'completed' && currentUser) {
+                var reviewed = await hasReviewed(order.id);
+                if (!reviewed) statusInfo = { text: '待我评价', className: 'status-pending', action: true };
+            }
+
             if (task && currentUser) {
                 if (task.publisherSide === 'none') {
                     roleText = (currentUser.id === task.publisherId) ? '我是发起者' : '我是参与者';
@@ -803,17 +813,24 @@ function initMessageCenter() {
             return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview };
         }));
 
+        // 需我操作的会话（待我接受/确认/评价）排到最前
+        enriched.sort(function(a, b) {
+            return (b.statusInfo && b.statusInfo.action ? 1 : 0) - (a.statusInfo && a.statusInfo.action ? 1 : 0);
+        });
+
         list.innerHTML = enriched.map(function(item) {
             var c = item.c;
+            var needAction = item.statusInfo && item.statusInfo.action;
             var statusBadge = item.statusInfo.text
-                ? '<span class="status-badge ' + item.statusInfo.className + '">' + item.statusInfo.text + '</span>'
+                ? '<span class="status-badge ' + (needAction ? 'status-action' : item.statusInfo.className) + '">' +
+                    (needAction ? '● ' : '') + item.statusInfo.text + '</span>'
                 : '';
             var uc = unreadByChat[c.id] || 0;
             var unreadBadge = uc > 0
                 ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>'
                 : '';
 
-            return '<div class="message-item' + (uc > 0 ? ' has-unread' : '') + '">' +
+            return '<div class="message-item' + (uc > 0 ? ' has-unread' : '') + (needAction ? ' needs-action' : '') + '">' +
                 '<div class="msg-header">' +
                     '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
                     '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
