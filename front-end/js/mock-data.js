@@ -47,8 +47,8 @@ function createInitialData() {
         },
         {
             id: 'u3', username: '王同学', phone: '13800138003', email: 'wang@example.com', password: '123456',
-            avatar: '', creditScore: 3.5, authStatus: 'unverified', balance: 80,
-            realName: '', studentId: '', college: '', className: '',
+            avatar: '', creditScore: 3.5, authStatus: 'verified', balance: 80,
+            realName: '王同学', studentId: '2021030003', college: '外国语学院', className: '英语2103',
             bio: '新用户，正在探索平台功能。'
         },
         {

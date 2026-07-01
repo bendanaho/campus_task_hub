@@ -124,6 +124,25 @@ test('纯互助帖全流程：报名(金额0) → 接受不冻结 → 双方确�
     assert.ok(r.success, '纯互助订单可正常评价');
 });
 
+// ---------- 实名门禁 ----------
+
+test('实名门禁：未实名不能发布/下单；完成实名认证后放行', async function () {
+    const app = createApp();
+    // 新注册用户默认 unverified
+    await app.register({ username: '新同学', phone: '13900000000', password: '123456' });
+    await loginAs(app, '新同学');
+
+    await assert.rejects(app.publishPost({
+        title: '测试帖', publisherSide: 'payer', category: 'other', description: 'x', reward: '5元'
+    }), /实名认证/, '未实名不能发布');
+    await assert.rejects(app.createOrder('t18', 'chatVerify'), /实名认证/, '未实名不能下单');
+
+    // 完成实名认证后放行
+    await app.submitAuth({ realName: '新同学', studentId: '2021999999', college: '计算机学院' });
+    const created = await app.createOrder('t18', 'chatVerify');
+    assert.strictEqual(created.order.status, 'pending', '实名后可正常下单');
+});
+
 // ---------- 非法操作拦截 ----------
 
 test('不能对自己发布的帖子下单/接单', async function () {

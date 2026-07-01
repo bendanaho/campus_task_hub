@@ -71,6 +71,26 @@ function protectPage(pages) {
     return true;
 }
 
+// 写操作（发布/下单/接单/确认等）前置校验：必须已登录且已实名，否则引导去登录/认证。
+// 与 api.js 的 _isVerified 双重保险——UI 友好拦截 + 后端(mock)权威兜底。
+function requireVerified() {
+    if (!isLoggedIn()) {
+        var redirect = encodeURIComponent(window.location.pathname.split('/').pop() + window.location.search);
+        if (confirm('请先登录后再操作，是否前往登录？')) {
+            window.location.href = 'login.html?redirect=' + redirect;
+        }
+        return false;
+    }
+    var u = getCurrentUser();
+    if (!u || u.authStatus !== 'verified') {
+        if (confirm('该操作需要先完成实名认证，是否前往认证？')) {
+            window.location.href = 'auth.html';
+        }
+        return false;
+    }
+    return true;
+}
+
 // ==================== 登录/注册 ====================
 
 function handleRegisterForm() {
@@ -562,6 +582,7 @@ function initPublishForm() {
     if (!publishBtn) return;
 
     publishBtn.addEventListener('click', function() {
+        if (!requireVerified()) return;
         var side = getSide();
         var title = document.getElementById('postTitle').value.trim();
         var category = document.getElementById('postCategory').value;
@@ -1034,6 +1055,7 @@ function getOrderStatusText(status) {
 
 // 响应者发起订单（接单/下单）
 window.handleOrderCreate = function(postId, chatId) {
+    if (!requireVerified()) return;
     createOrder(postId, chatId).then(function() {
         alert('已发起订单，等待对方接受！');
         window.location.reload();
@@ -1044,6 +1066,7 @@ window.handleOrderCreate = function(postId, chatId) {
 
 // 发布者接受订单
 window.handleOrderAccept = function(orderId) {
+    if (!requireVerified()) return;
     acceptOrder(orderId).then(function() {
         alert('已接受订单，开始执行！');
         window.location.reload();
@@ -1054,6 +1077,7 @@ window.handleOrderAccept = function(orderId) {
 
 // 取消订单（pending 阶段：发布者拒绝 / 响应者撤回）
 window.handleOrderCancel = function(orderId) {
+    if (!requireVerified()) return;
     if (!confirm('确定取消该订单吗？')) return;
     cancelOrder(orderId).then(function() {
         alert('订单已取消。');
@@ -1065,6 +1089,7 @@ window.handleOrderCancel = function(orderId) {
 
 // 确认完成（任一方，双方都确认才结算）
 window.handleOrderConfirm = function(orderId) {
+    if (!requireVerified()) return;
     confirmOrder(orderId).then(function(res) {
         if (res.order && res.order.status === 'completed') {
             // 纯互助订单无金钱结算

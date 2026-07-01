@@ -640,6 +640,12 @@ function _findPostInDb(db, id) {
     return null;
 }
 
+// 是否已实名认证——发布/下单/接单/确认等写操作前置校验（未登录或未实名只能浏览）
+function _isVerified(db, userId) {
+    var u = _findUserInDb(db, userId);
+    return !!(u && u.authStatus === 'verified');
+}
+
 // ---------- 帖子 ----------
 
 function mockGetTasks(filters) {
@@ -728,6 +734,10 @@ function mockPublishPost(data) {
             }
             var side = (data.publisherSide === 'earner' || data.publisherSide === 'none') ? data.publisherSide : 'payer';
             var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) {
+                reject(new Error('请先完成实名认证后再发布'));
+                return;
+            }
             // 注：发布不再预付/冻结，冻结发生在「发布者接受订单」时
             var newPost = {
                 id: 't' + (db.tasks.length + 1) + '-' + Date.now(),
@@ -780,6 +790,10 @@ function mockCreateOrder(postId, chatId) {
                 return;
             }
             var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) {
+                reject(new Error('请先完成实名认证后再操作'));
+                return;
+            }
             var post = _mockGetTaskById(postId);
             if (!post) {
                 reject(new Error('帖子不存在'));
@@ -857,6 +871,10 @@ function mockAcceptOrder(orderId) {
                 return;
             }
             var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) {
+                reject(new Error('请先完成实名认证后再操作'));
+                return;
+            }
             var order = _findOrderById(db, orderId);
             if (!order) {
                 reject(new Error('订单不存在'));
@@ -899,6 +917,10 @@ function mockCancelOrder(orderId) {
                 return;
             }
             var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) {
+                reject(new Error('请先完成实名认证后再操作'));
+                return;
+            }
             var order = _findOrderById(db, orderId);
             if (!order) {
                 reject(new Error('订单不存在'));
@@ -929,6 +951,10 @@ function mockConfirmOrder(orderId) {
                 return;
             }
             var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) {
+                reject(new Error('请先完成实名认证后再操作'));
+                return;
+            }
             var order = _findOrderById(db, orderId);
             if (!order) {
                 reject(new Error('订单不存在'));
