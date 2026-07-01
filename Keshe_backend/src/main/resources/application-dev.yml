@@ -1,0 +1,20 @@
+# 本地开发配置 — 使用 H2 内存数据库，无需安装 MySQL
+# 使用方式: mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# 或在 IDEA 中设置 Active profiles 为 dev
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:campus_task_hub;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect

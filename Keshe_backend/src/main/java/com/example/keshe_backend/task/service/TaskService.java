@@ -2,9 +2,12 @@ package com.example.keshe_backend.task.service;
 
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
+import com.example.keshe_backend.common.security.SecurityUtils;
 import com.example.keshe_backend.task.dto.CreateTaskRequest;
 import com.example.keshe_backend.task.entity.Task;
 import com.example.keshe_backend.task.repository.TaskRepository;
+import com.example.keshe_backend.user.entity.User;
+import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ import java.util.List;
 public class TaskService {
 
     private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
 
     public List<Task> listTasks() {
         return taskRepository.findByDeletedAtIsNullOrderByPublishTimeDesc();
@@ -30,9 +34,9 @@ public class TaskService {
 
     @Transactional
     public Task createDemandTask(CreateTaskRequest request) {
-        // 最小版本暂时模拟当前登录用户
-        Long currentUserId = 1L;
-        String currentUsername = "demo-user";
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 
         Task task = new Task();
         task.setTitle(request.getTitle());
@@ -44,20 +48,21 @@ public class TaskService {
         task.setContact(request.getContact());
 
         task.setType(0);
-        task.setStatus(0);
+        task.setStatus("open");
         task.setPaymentStatus(0);
 
         task.setPublisherId(currentUserId);
-        task.setPublisherName(currentUsername);
-        task.setPublisherCredit(new BigDecimal("5.0"));
+        task.setPublisherName(currentUser.getUsername());
+        task.setPublisherCredit(currentUser.getCreditScore());
 
         return taskRepository.save(task);
     }
 
     @Transactional
     public Task createService(CreateTaskRequest request) {
-        Long currentUserId = 1L;
-        String currentUsername = "demo-user";
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 
         Task task = new Task();
         task.setTitle(request.getTitle());
@@ -69,12 +74,12 @@ public class TaskService {
         task.setContact(request.getContact());
 
         task.setType(1);
-        task.setStatus(3);
+        task.setStatus("open");
         task.setPaymentStatus(null);
 
         task.setPublisherId(currentUserId);
-        task.setPublisherName(currentUsername);
-        task.setPublisherCredit(new BigDecimal("5.0"));
+        task.setPublisherName(currentUser.getUsername());
+        task.setPublisherCredit(currentUser.getCreditScore());
 
         return taskRepository.save(task);
     }
@@ -83,14 +88,17 @@ public class TaskService {
     public Task takeTask(Long id) {
         Task task = getTask(id);
 
-        if (!Integer.valueOf(0).equals(task.getStatus())) {
+        if (!"open".equals(task.getStatus())) {
             throw new BusinessException(ErrorCode.TASK_TAKEN);
         }
 
-        // 最小版本暂时模拟当前接单用户
-        task.setTakerId(2L);
-        task.setTakerName("demo-taker");
-        task.setStatus(1);
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+
+        task.setTakerId(currentUserId);
+        task.setTakerName(currentUser.getUsername());
+        task.setStatus("open"); // 旧逻辑：接单不关闭帖子，由 Order 模块管理状态
 
         return taskRepository.save(task);
     }

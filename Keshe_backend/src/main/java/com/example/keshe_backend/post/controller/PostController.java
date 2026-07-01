@@ -1,0 +1,54 @@
+package com.example.keshe_backend.post.controller;
+
+import com.example.keshe_backend.common.api.ApiResponse;
+import com.example.keshe_backend.post.dto.*;
+import com.example.keshe_backend.post.service.PostService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/posts")
+@RequiredArgsConstructor
+public class PostController {
+
+    private final PostService postService;
+
+    /**
+     * 帖子列表（大厅）
+     */
+    @GetMapping
+    public ApiResponse<List<PostDTO>> listPosts(
+            @RequestParam(required = false) String side,
+            @RequestParam(required = false) String categories,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String sort) {
+        return ApiResponse.success(postService.listPosts(side, categories, keyword, sort));
+    }
+
+    /**
+     * 帖子详情
+     */
+    @GetMapping("/{id}")
+    public ApiResponse<PostDetailResponse> getPostDetail(@PathVariable Long id) {
+        return ApiResponse.success(postService.getPostDetail(id));
+    }
+
+    /**
+     * 发布帖子
+     */
+    @PostMapping
+    public ApiResponse<PublishPostResponse> createPost(@Valid @RequestBody CreatePostRequest request) {
+        return ApiResponse.success(postService.createPost(request));
+    }
+
+    /**
+     * 我的帖子
+     */
+    @GetMapping("/mine")
+    public ApiResponse<List<PostDTO>> getMyPosts() {
+        return ApiResponse.success(postService.getMyPosts());
+    }
+}

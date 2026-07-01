@@ -18,9 +18,11 @@ public class Task {
     @Column(nullable = false, length = 200)
     private String title;
 
+    // ===== 旧字段（保留兼容，Phase 3 后废弃） =====
     /**
-     * 0=demand, 1=service
+     * @deprecated 改用 publisherSide
      */
+    @Deprecated
     @Column(nullable = false)
     private Integer type;
 
@@ -39,9 +41,6 @@ public class Task {
     @Column(name = "publisher_credit", nullable = false)
     private BigDecimal publisherCredit;
 
-    /**
-     * 报酬文本，例如：5元、面议
-     */
     @Column(nullable = false, length = 50)
     private String reward;
 
@@ -54,36 +53,50 @@ public class Task {
     private LocalDateTime publishTime;
 
     /**
-     * 0=pending, 1=in_progress, 2=completed, 3=available
+     * 帖子状态: "open"(大厅可见) / "closed"(已关闭)
      */
-    @Column(nullable = false)
-    private Integer status;
+    @Column(nullable = false, length = 10)
+    private String status;
 
     private String contact;
 
-    /**
-     * 最小版本先用 TEXT 存 JSON 字符串
-     */
     @Column(columnDefinition = "TEXT")
     private String images;
 
+    // ===== 新字段 =====
+
+    /**
+     * 发布者身份: "payer"(我付钱-悬赏) / "earner"(我收钱-服务) / "none"(纯互助)
+     */
+    @Column(name = "publisher_side", nullable = false, length = 10)
+    private String publisherSide = "payer";
+
+    /**
+     * 服务时间描述（仅 earner 类型使用）
+     */
+    @Column(name = "service_time", length = 100)
+    private String serviceTime;
+
+    // ===== 废弃字段（保留以兼容旧 schema，不再使用） =====
+    @Deprecated
     @Column(name = "taker_id")
     private Long takerId;
 
+    @Deprecated
     @Column(name = "taker_name")
     private String takerName;
 
-    /**
-     * 0=frozen, 1=released
-     */
+    @Deprecated
     @Column(name = "payment_status")
     private Integer paymentStatus;
 
+    @Deprecated
     @Column(name = "publisher_confirmed")
-    private Integer publisherConfirmed = 0;
+    private Integer publisherConfirmed;
 
+    @Deprecated
     @Column(name = "taker_confirmed")
-    private Integer takerConfirmed = 0;
+    private Integer takerConfirmed;
 
     @Version
     private Integer version;
@@ -107,15 +120,15 @@ public class Task {
         if (this.rewardValue == null) {
             this.rewardValue = BigDecimal.ZERO;
         }
-
-        if (this.publisherConfirmed == null) {
-            this.publisherConfirmed = 0;
+        if (this.status == null) {
+            this.status = "open";
         }
-
-        if (this.takerConfirmed == null) {
-            this.takerConfirmed = 0;
+        if (this.publisherSide == null) {
+            this.publisherSide = "payer";
         }
-
+        if (this.publisherCredit == null) {
+            this.publisherCredit = BigDecimal.ZERO;
+        }
         if (this.contact == null) {
             this.contact = "站内联系";
         }
