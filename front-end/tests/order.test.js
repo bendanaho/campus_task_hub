@@ -132,12 +132,31 @@ test('不能对自己发布的帖子下单/接单', async function () {
     await assert.rejects(app.createOrder('t18', 'chatX'), /不能对自己发布的帖子/);
 });
 
-test('同一帖子已有进行中订单时，拦截重复下单', async function () {
+test('悬赏帖：已有进行中订单时，拦截重复下单', async function () {
     const app = createApp();
+    // t3：悬赏帖(payer)，发布者 u4
     await loginAs(app, '王同学');
-    await app.createOrder('t18', 'chatD');     // 第一单 pending
+    await app.createOrder('t3', 'chatD');     // 第一单 pending
     await loginAs(app, '张三');
-    await assert.rejects(app.createOrder('t18', 'chatE'), /已有进行中的订单/);
+    await assert.rejects(app.createOrder('t3', 'chatE'), /已有进行中的订单/);
+});
+
+test('服务帖/组队帖：允许同帖多个并发订单', async function () {
+    const app = createApp();
+    // 服务帖 t18(earner，发布者 u2)：两个不同用户可同时下单
+    await loginAs(app, '王同学');
+    const a = await app.createOrder('t18', 'chatMul1');
+    await loginAs(app, '张三');
+    const b = await app.createOrder('t18', 'chatMul2');
+    assert.strictEqual(a.order.status, 'pending');
+    assert.strictEqual(b.order.status, 'pending', '服务帖第二单不应被拦截');
+
+    // 组队帖 t12(none，发布者 u5)：同理可多人报名
+    const c = await app.createOrder('t12', 'chatMul3'); // 张三
+    await loginAs(app, '王同学');
+    const d = await app.createOrder('t12', 'chatMul4'); // 王同学
+    assert.strictEqual(c.order.status, 'pending');
+    assert.strictEqual(d.order.status, 'pending', '组队帖第二人报名不应被拦截');
 });
 
 test('接受时付款方余额不足 → 拦截，且不扣款', async function () {

@@ -641,15 +641,11 @@ function initTaskDetail() {
 // ==================== 消息中心 ====================
 
 // 统一按订单（payer/earner）给出会话状态文案
-async function getConversationStatusText(task, chatId, currentUserId) {
-    if (!currentUserId) return { text: '', className: '' };
-    var order = await getOrder(chatId);
-    if (!order || order.status === 'cancelled') {
-        return { text: '待下单', className: 'status-pending' };
-    }
+// 按「当前用户视角」描述订单状态（是否发布者、付款/收款方都影响文案）。
+// 消息中心与我的订单共用，保证两处状态文案一致。
+function describeOrderStatus(order, currentUserId, isPublisher) {
     var isPayer = currentUserId === order.payerId;
     if (order.status === 'pending') {
-        var isPublisher = task && currentUserId === task.publisherId;
         return { text: isPublisher ? '待我接受' : '待对方接受', className: 'status-pending' };
     }
     if (order.status === 'in_progress') {
@@ -660,7 +656,18 @@ async function getConversationStatusText(task, chatId, currentUserId) {
         return { text: '进行中', className: 'status-in_progress' };
     }
     if (order.status === 'completed') return { text: '已完成', className: 'status-completed' };
-    return { text: getOrderStatusText(order.status), className: 'status-pending' };
+    var fallbackClass = { cancelled: 'status-cancelled', disputed: 'status-pending', closed: 'status-completed' };
+    return { text: getOrderStatusText(order.status), className: fallbackClass[order.status] || 'status-pending' };
+}
+
+async function getConversationStatusText(task, chatId, currentUserId) {
+    if (!currentUserId) return { text: '', className: '' };
+    var order = await getOrder(chatId);
+    if (!order || order.status === 'cancelled') {
+        return { text: '待下单', className: 'status-pending' };
+    }
+    var isPublisher = task && currentUserId === task.publisherId;
+    return describeOrderStatus(order, currentUserId, isPublisher);
 }
 
 function initMessageCenter() {
@@ -1053,15 +1060,6 @@ function initOrderCenter() {
     var filterSelect = document.getElementById('orderFilter');
     if (!list) return;
 
-    function orderStatusClass(status) {
-        var map = {
-            pending: 'status-pending', in_progress: 'status-in_progress',
-            completed: 'status-completed', cancelled: 'status-cancelled',
-            disputed: 'status-pending', closed: 'status-completed'
-        };
-        return map[status] || '';
-    }
-
     async function renderAll() {
         var currentUser = getCurrentUser();
         if (!currentUser) {
@@ -1090,7 +1088,9 @@ function initOrderCenter() {
                 ? (r.post.publisherId === currentUser.id ? '发起者' : '参与者')
                 : (r.myRole === 'payer' ? '我付款' : '我收款');
             var amountText = isMutual ? '不涉及金钱' : ((r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元');
-            var statusBadge = '<span class="status-badge ' + orderStatusClass(o.status) + '">' + getOrderStatusText(o.status) + '</span>';
+            var isPublisher = r.post ? r.post.publisherId === currentUser.id : false;
+            var st = describeOrderStatus(o, currentUser.id, isPublisher);
+            var statusBadge = '<span class="status-badge ' + st.className + '">' + st.text + '</span>';
 
             var actionsHtml = '<a href="task-detail.html?id=' + o.postId + '" class="btn btn-secondary">查看详情</a>' +
                 '<a href="chat-detail.html?chatId=' + o.chatId + '&partner=' + r.partnerId + '&task=' + o.postId + '" class="btn btn-secondary">进入聊天</a>';

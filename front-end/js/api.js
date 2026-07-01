@@ -766,7 +766,9 @@ function mockCreateOrder(postId, chatId) {
                 reject(new Error('不能对自己发布的帖子下单/接单'));
                 return;
             }
-            if (_findActiveOrderByPost(db, postId)) {
+            // 悬赏帖(payer)一次性：同帖只允许一个未完成订单；
+            // 服务帖(earner)/组队帖(none)可复用：允许多人并发下单/报名
+            if (post.publisherSide === 'payer' && _findActiveOrderByPost(db, postId)) {
                 reject(new Error('该帖子已有进行中的订单'));
                 return;
             }
