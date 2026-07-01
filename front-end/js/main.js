@@ -816,10 +816,12 @@ function initMessageCenter() {
             return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview };
         }));
 
-        // 需我操作的会话（待我接受/确认/评价）排到最前
-        enriched.sort(function(a, b) {
-            return (b.statusInfo && b.statusInfo.action ? 1 : 0) - (a.statusInfo && a.statusInfo.action ? 1 : 0);
-        });
+        // 排序优先级：先未读、再待我操作。同级保持原有时间倒序（sort 稳定）
+        function convScore(item) {
+            var uc = unreadByChat[item.c.id] || 0;
+            return (uc > 0 ? 2 : 0) + (item.statusInfo && item.statusInfo.action ? 1 : 0);
+        }
+        enriched.sort(function(a, b) { return convScore(b) - convScore(a); });
 
         list.innerHTML = enriched.map(function(item) {
             var c = item.c;
@@ -1446,7 +1448,8 @@ function initReview() {
                 images: uploadedImages
             }).then(function() {
                 alert('评价提交成功！');
-                window.location.href = 'order-center.html';
+                // 返回来处（聊天页/我的订单），而不是固定跳到我的订单
+                goBack('order-center.html');
             }).catch(function(err) {
                 alert(err.message || '评价失败');
             });
