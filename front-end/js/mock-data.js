@@ -69,8 +69,8 @@ function createInitialData() {
         },
         {
             id: 'u6', username: '刘同学', phone: '13800138006', email: 'liu@example.com', password: '123456',
-            avatar: '', creditScore: 3.9, authStatus: 'unverified', balance: 100,
-            realName: '', studentId: '', college: '', className: '',
+            avatar: '', creditScore: 3.9, authStatus: 'verified', balance: 100,
+            realName: '刘志强', studentId: '2021060006', college: '理学院', className: '数学2101',
             bio: '数学系学生，乐于助人。'
         },
         {
@@ -83,8 +83,8 @@ function createInitialData() {
         },
         {
             id: 'u8', username: '周同学', phone: '13800138008', email: 'zhou@example.com', password: '123456',
-            avatar: '', creditScore: 2.5, authStatus: 'unverified', balance: 100,
-            realName: '', studentId: '', college: '', className: '',
+            avatar: '', creditScore: 2.5, authStatus: 'verified', balance: 100,
+            realName: '周佳', studentId: '2021080008', college: '文学院', className: '汉语言2101',
             bio: '校内打印店兼职，可以帮忙打印资料。'
         }
     ];
