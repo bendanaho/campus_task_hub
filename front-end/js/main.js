@@ -246,7 +246,7 @@ function initProfilePage() {
                 infoContainer.insertBefore(createRow('信用评分', (user.creditScore || '5.0') + ' / 5.0'), insertBefore);
                 // 账户余额（平台虚拟钱包）+ 充值入口
                 infoContainer.insertBefore(createRow('账户余额',
-                    '<span id="balanceValue">…</span> 元 <a href="javascript:void(0)" class="edit-link" id="rechargeBtn">充值</a>'), insertBefore);
+                    '<span id="balanceValue">…</span> 元 <a href="javascript:void(0)" class="edit-link" id="rechargeBtn">充值</a> <a href="bill.html" class="edit-link">查看账单</a>'), insertBefore);
                 if (user.bio) {
                     infoContainer.insertBefore(createRow('个人简介', user.bio), insertBefore);
                 }
@@ -1430,6 +1430,48 @@ function initReview() {
     }
 }
 
+// ==================== 我的账单 ====================
+
+function initBills() {
+    if (!window.location.pathname.includes('bill.html')) return;
+    if (!protectPage(['bill.html'])) return;
+
+    var summary = document.getElementById('billSummary');
+    var list = document.getElementById('billList');
+    if (!list) return;
+
+    var catMap = { recharge: '充值', order: '订单', payment: '收付款' };
+
+    getMyBills().then(function(res) {
+        var totalIn = res.totalIn || 0, totalOut = res.totalOut || 0, net = totalIn - totalOut;
+        if (summary) {
+            summary.innerHTML =
+                '<div class="bill-sum-item"><span class="bill-sum-label">总收入</span><span class="bill-in">+¥' + totalIn + '</span></div>' +
+                '<div class="bill-sum-item"><span class="bill-sum-label">总支出</span><span class="bill-out">-¥' + totalOut + '</span></div>' +
+                '<div class="bill-sum-item"><span class="bill-sum-label">净额</span><span>' + (net >= 0 ? '+' : '-') + '¥' + Math.abs(net) + '</span></div>';
+        }
+
+        var items = res.list || [];
+        if (items.length === 0) {
+            list.innerHTML = '<div class="card empty-state"><p>暂无账单记录</p></div>';
+            return;
+        }
+        list.innerHTML = items.map(function(t) {
+            var sign = t.direction === 'in' ? '+' : '-';
+            var cls = t.direction === 'in' ? 'bill-in' : 'bill-out';
+            return '<div class="bill-item">' +
+                '<div class="bill-item-main">' +
+                    '<div class="bill-note">' + (t.note || catMap[t.category] || '交易') + '</div>' +
+                    '<div class="bill-meta">' + (catMap[t.category] || t.category) + ' ｜ ' + formatDateTime(t.time) + '</div>' +
+                '</div>' +
+                '<div class="bill-amount ' + cls + '">' + sign + '¥' + t.amount + '</div>' +
+            '</div>';
+        }).join('');
+    }).catch(function(err) {
+        list.innerHTML = '<div class="card empty-state"><p>' + (err.message || '加载失败') + '</p></div>';
+    });
+}
+
 // ==================== 图片放大 ====================
 
 function initLightbox() {
@@ -1495,6 +1537,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initChatDetail();
     initOrderCenter();
     initReview();
+    initBills();
     initLightbox();
 
     var scrollKey = 'scroll_' + location.pathname;

@@ -518,7 +518,20 @@ function createInitialData() {
         }
     ];
 
-    return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews, orders: orders };
+    // 资金流水（账单）。direction: 'in'(收入) | 'out'(支出)。
+    // 与上面订单的资金流对齐：接受时冻结=付款方支出，完成结算=收款方收入。
+    var transactions = [
+        { id: 'tx1', userId: 'u1', direction: 'out', amount: 5, category: 'order', relatedId: 'o1', note: '订单支付：帮忙取快递', time: hourAgo(2.5) },
+        { id: 'tx2', userId: 'u1', direction: 'in', amount: 4, category: 'order', relatedId: 'o2', note: '订单收入：代拿外卖', time: hourAgo(8) },
+        { id: 'tx3', userId: 'u2', direction: 'out', amount: 4, category: 'order', relatedId: 'o2', note: '订单支付：代拿外卖', time: hourAgo(9) },
+        { id: 'tx4', userId: 'u1', direction: 'out', amount: 5, category: 'order', relatedId: 'o3', note: '订单支付：可长期代取快递', time: hourAgo(49) },
+        { id: 'tx5', userId: 'u7', direction: 'in', amount: 5, category: 'order', relatedId: 'o3', note: '订单收入：可长期代取快递', time: hourAgo(24) },
+        { id: 'tx6', userId: 'u1', direction: 'out', amount: 10, category: 'order', relatedId: 'o4', note: '订单支付：可代买早餐和日用品', time: hourAgo(11) },
+        { id: 'tx7', userId: 'u2', direction: 'out', amount: 15, category: 'order', relatedId: 'o6', note: '订单支付：高数一对一答疑辅导', time: hourAgo(35) },
+        { id: 'tx8', userId: 'u1', direction: 'in', amount: 50, category: 'recharge', relatedId: null, note: '账户充值', time: hourAgo(52) }
+    ];
+
+    return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews, orders: orders, transactions: transactions };
 }
 
 const DB_KEY = 'campus_mock_db';

@@ -206,6 +206,44 @@ test('聊天收付款需实名', async function () {
     await assert.rejects(app.sendPaymentCard('cX', 'u2', 'transfer', 5), /实名认证/);
 });
 
+// ---------- 账单 / 流水 ----------
+
+test('账单：充值与订单支出产生正确流水', async function () {
+    const app = createApp();
+    await loginAs(app, '王同学'); // u3
+    const before = await app.getMyBills();
+    assert.ok(before.list.every(function (t) { return t.userId === 'u3'; }), '只返回本人流水');
+    const inBefore = before.totalIn, outBefore = before.totalOut;
+
+    // 充值 100 → 记一笔收入
+    await app.recharge(100);
+    let bills = await app.getMyBills();
+    assert.strictEqual(bills.totalIn, inBefore + 100, '充值计入总收入');
+    const rc = bills.list.find(function (t) { return t.category === 'recharge' && t.amount === 100; });
+    assert.ok(rc && rc.direction === 'in', '充值是一笔收入');
+
+    // u3 对服务帖 t18(u2 发布) 下单 → u2 接受冻结 u3 余额 → u3 记一笔支出
+    const created = await app.createOrder('t18', 'cBill');
+    await loginAs(app, '李四');
+    await app.acceptOrder(created.order.id);
+    await loginAs(app, '王同学');
+    bills = await app.getMyBills();
+    const orderOut = bills.list.find(function (t) { return t.category === 'order' && t.relatedId === created.order.id; });
+    assert.ok(orderOut && orderOut.direction === 'out' && orderOut.amount === created.order.amount, '接受时付款方记一笔支出');
+    assert.strictEqual(bills.totalOut, outBefore + created.order.amount, '支出计入总支出');
+});
+
+test('账单：聊天转账双方各记一笔', async function () {
+    const app = createApp();
+    await loginAs(app, '李四'); // u2 转 10 给 u3
+    await app.sendPaymentCard('cB2', 'u3', 'transfer', 10);
+    const b2 = await app.getMyBills();
+    assert.ok(b2.list.some(function (t) { return t.category === 'payment' && t.direction === 'out' && t.amount === 10; }), '转出方记支出');
+    await loginAs(app, '王同学');
+    const b3 = await app.getMyBills();
+    assert.ok(b3.list.some(function (t) { return t.category === 'payment' && t.direction === 'in' && t.amount === 10; }), '收款方记收入');
+});
+
 // ---------- 非法操作拦截 ----------
 
 test('不能对自己发布的帖子下单/接单', async function () {

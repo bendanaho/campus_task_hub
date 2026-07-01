@@ -518,6 +518,40 @@ textarea.form-control {
     margin-top: 12px;
 }
 
+/* 我的账单 */
+.bill-summary {
+    display: flex;
+    gap: 40px;
+    margin-top: 16px;
+}
+.bill-sum-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.bill-sum-label { font-size: 13px; color: #888; }
+.bill-sum-item > span:last-child { font-size: 20px; font-weight: 700; }
+.bill-in { color: #16a34a; }
+.bill-out { color: #ef4444; }
+.bill-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.bill-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+.bill-note { font-weight: 500; color: #1f3b64; }
+.bill-meta { font-size: 12px; color: #999; margin-top: 4px; }
+.bill-amount { font-size: 18px; font-weight: 700; white-space: nowrap; }
+
 .chat-input-area {
     margin-top: 20px;
     display: flex;

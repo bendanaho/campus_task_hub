@@ -135,6 +135,17 @@ async function recharge(amount) {
     return res.json();
 }
 
+// 账单：当前用户的资金流水 → { list, totalIn, totalOut }
+async function getMyBills() {
+    if (USE_MOCK) {
+        return mockGetMyBills();
+    }
+    var res = await fetch(API_BASE + '/user/bills', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return res.json();
+}
+
 // ==================== 帖子（任务/服务统一为"帖子"）====================
 
 async function getTasks(filters) {
@@ -638,9 +649,43 @@ function mockRecharge(amount) {
             var u = _findUserInDb(db, currentUser.id);
             if (!u) { reject(new Error('用户不存在')); return; }
             u.balance = (u.balance || 0) + amt;
+            _addTx(db, u.id, 'in', amt, 'recharge', null, '账户充值');
             _mockSaveDB(db);
             resolve({ success: true, balance: u.balance });
         }, 100);
+    });
+}
+
+function mockGetMyBills() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var db = _mockGetDB();
+            _sweep(db); // 先跑惰性结算，保证自动确认的收入也计入账单
+            var list = (db.transactions || []).filter(function(t) { return t.userId === currentUser.id; });
+            list.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+            var totalIn = 0, totalOut = 0;
+            list.forEach(function(t) {
+                if (t.direction === 'in') totalIn += t.amount; else totalOut += t.amount;
+            });
+            resolve({ list: list, totalIn: totalIn, totalOut: totalOut });
+        }, 100);
+    });
+}
+
+// 记一笔资金流水（账单）。direction: 'in'(收入) | 'out'(支出)
+function _addTx(db, userId, direction, amount, category, relatedId, note) {
+    if (!db.transactions) db.transactions = [];
+    db.transactions.push({
+        id: 'tx-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+        userId: userId,
+        direction: direction,
+        amount: amount,
+        category: category,
+        relatedId: relatedId || null,
+        note: note || '',
+        time: new Date().toISOString()
     });
 }
 
@@ -659,6 +704,10 @@ function _autoConfirmSweep(db) {
             o.reviewDeadline = new Date(nowMs + AUTO_DAYS * 86400000).toISOString();
             var earner = _findUserInDb(db, o.earnerId);
             if (earner) earner.balance = (earner.balance || 0) + o.amount;
+            if (o.amount > 0) {
+                var swPost = _findPostInDb(db, o.postId);
+                _addTx(db, o.earnerId, 'in', o.amount, 'order', o.id, '订单收入：' + (swPost ? swPost.title : '') + '（自动确认）');
+            }
             changed = true;
         }
     });
@@ -991,6 +1040,9 @@ function mockAcceptOrder(orderId) {
                 return;
             }
             payer.balance -= order.amount;
+            if (order.amount > 0) {
+                _addTx(db, order.payerId, 'out', order.amount, 'order', order.id, '订单支付：' + post.title);
+            }
             order.status = 'in_progress';
             order.acceptedAt = new Date().toISOString();
             // 悬赏帖一次性：进行中即从大厅下架；服务帖可复用，保持 open
@@ -1074,6 +1126,10 @@ function mockConfirmOrder(orderId) {
                 order.reviewDeadline = new Date(Date.now() + AUTO_DAYS * 86400000).toISOString();
                 var earner = _findUserInDb(db, order.earnerId);
                 if (earner) earner.balance = (earner.balance || 0) + order.amount;
+                if (order.amount > 0) {
+                    var cfPost = _findPostInDb(db, order.postId);
+                    _addTx(db, order.earnerId, 'in', order.amount, 'order', order.id, '订单收入：' + (cfPost ? cfPost.title : ''));
+                }
             } else if (!order.autoConfirmAt) {
                 // 首个确认 → 挂上自动确认计时
                 order.autoConfirmAt = new Date(Date.now() + AUTO_DAYS * 86400000).toISOString();
@@ -1411,6 +1467,11 @@ function mockSendPaymentCard(chatId, partnerId, kind, amount) {
                     break;
                 }
             }
+            if (kind === 'transfer') {
+                var pName = (_findUserInDb(db, partnerId) || {}).username || '对方';
+                _addTx(db, payerId, 'out', amt, 'payment', msg.id, '转账给' + pName);
+                _addTx(db, receiverId, 'in', amt, 'payment', msg.id, '收到' + currentUser.username + '的转账');
+            }
             _mockSaveDB(db);
             resolve({ success: true, message: msg });
         }, 150);
@@ -1433,6 +1494,10 @@ function mockPayPaymentCard(messageId) {
             if (!r.ok) { reject(new Error(r.error)); return; }
             p.status = 'paid';
             p.paidAt = new Date().toISOString();
+            var payerName = (_findUserInDb(db, p.payerId) || {}).username || '对方';
+            var receiverName = (_findUserInDb(db, p.receiverId) || {}).username || '对方';
+            _addTx(db, p.payerId, 'out', p.amount, 'payment', msg.id, '支付给' + receiverName + '的收款');
+            _addTx(db, p.receiverId, 'in', p.amount, 'payment', msg.id, '收到' + payerName + '的付款');
             _mockSaveDB(db);
             resolve({ success: true, message: msg });
         }, 150);
