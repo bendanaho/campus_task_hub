@@ -1536,6 +1536,43 @@ function initLightbox() {
     }
 }
 
+// ==================== 【仅测试用】一键切换账号 ====================
+// 只在 mock 模式（USE_MOCK=true）出现；接入真实后端(USE_MOCK=false)时不渲染、代码不执行。
+// 自成一块，交付前可整段删除。免密切换：直接把当前用户设为所选种子账号并刷新本页。
+function initDevAccountSwitcher() {
+    if (typeof USE_MOCK === 'undefined' || !USE_MOCK) return;   // 接后端时直接退出
+    if (typeof getDB !== 'function') return;
+    var users = (getDB().users || []);
+    if (!users.length) return;
+
+    var cur = getCurrentUser();
+    var opts = '<option value="">（未登录）</option>';
+    for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        opts += '<option value="' + u.id + '"' + (cur && cur.id === u.id ? ' selected' : '') + '>' + u.username + '</option>';
+    }
+
+    var box = document.createElement('div');
+    box.className = 'dev-switcher';
+    box.innerHTML = '<span class="dev-switcher-label">🔧 测试账号</span>' +
+        '<select id="devUserSelect">' + opts + '</select>';
+    document.body.appendChild(box);
+
+    document.getElementById('devUserSelect').addEventListener('change', function() {
+        var id = this.value;
+        if (!id) { removeCurrentUser(); removeToken(); location.reload(); return; }
+        var list = getDB().users || [], picked = null;
+        for (var j = 0; j < list.length; j++) { if (list[j].id === id) { picked = list[j]; break; } }
+        if (!picked) return;
+        setCurrentUser({
+            id: picked.id, username: picked.username, phone: picked.phone, avatar: picked.avatar,
+            creditScore: picked.creditScore, authStatus: picked.authStatus, bio: picked.bio
+        });
+        setToken('mock-token-' + picked.id + '-' + Date.now());
+        location.reload();
+    });
+}
+
 // ==================== 初始化入口 ====================
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1556,6 +1593,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initReview();
     initBills();
     initLightbox();
+    initDevAccountSwitcher();
 
     var scrollKey = 'scroll_' + location.pathname;
     var savedScroll = sessionStorage.getItem(scrollKey);
