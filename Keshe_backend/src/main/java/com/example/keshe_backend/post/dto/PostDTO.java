@@ -59,28 +59,52 @@ public class PostDTO {
                 .build();
     }
 
+    // 解析 JSON 字符串数组 ["...","..."]。
+    // 逐字符扫描、识别引号包裹的元素，正确处理字符串内部的逗号与转义。
+    // 旧实现用 split(",") 会把 base64 的 data URL（形如 data:image/png;base64,XXXX，本身带一个逗号）
+    // 从中间劈成两半，导致上传图片读回后全部损坏——这是图片无法显示的根因。
     private static List<String> parseImages(String imagesJson) {
+        List<String> result = new ArrayList<>();
         if (imagesJson == null || imagesJson.isBlank()) {
-            return new ArrayList<>();
-        }
-        try {
-            // 简单 JSON 数组解析：["url1","url2"]
-            List<String> result = new ArrayList<>();
-            String content = imagesJson.trim();
-            if (content.startsWith("[")) content = content.substring(1);
-            if (content.endsWith("]")) content = content.substring(0, content.length() - 1);
-            if (content.isBlank()) return result;
-            for (String part : content.split(",")) {
-                String url = part.trim();
-                if (url.startsWith("\"") && url.endsWith("\"")) {
-                    url = url.substring(1, url.length() - 1);
-                    url = url.replace("\\\"", "\"");
-                }
-                if (!url.isBlank()) result.add(url);
-            }
             return result;
-        } catch (Exception e) {
-            return new ArrayList<>();
         }
+        boolean inString = false;
+        boolean escaped = false;
+        StringBuilder cur = new StringBuilder();
+        for (int i = 0; i < imagesJson.length(); i++) {
+            char c = imagesJson.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    switch (c) {
+                        case 'n': cur.append('\n'); break;
+                        case 'r': cur.append('\r'); break;
+                        case 't': cur.append('\t'); break;
+                        case 'b': cur.append('\b'); break;
+                        case 'f': cur.append('\f'); break;
+                        case 'u':
+                            if (i + 4 < imagesJson.length()) {
+                                try {
+                                    cur.append((char) Integer.parseInt(imagesJson.substring(i + 1, i + 5), 16));
+                                } catch (NumberFormatException ignore) { /* 非法转义则跳过 */ }
+                                i += 4;
+                            }
+                            break;
+                        default: cur.append(c); // 包括 \" \\ \/ 等，取字面量
+                    }
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    result.add(cur.toString()); // 一个完整字符串元素结束
+                    cur.setLength(0);
+                    inString = false;
+                } else {
+                    cur.append(c);
+                }
+            } else if (c == '"') {
+                inString = true; // 字符串外遇到引号 → 新元素开始；括号/逗号/空白忽略
+            }
+        }
+        return result;
     }
 }

@@ -163,6 +163,8 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
+    // 序列化为 JSON 数组。写入端本身是正确的：esc() 会转义引号/反斜杠/控制字符，
+    // 字符串内部的逗号原样保留——问题只在旧的读回端 PostDTO.parseImages 用 split(",") 切坏。
     private String toJsonArray(List<String> urls) {
         StringBuilder sb = new StringBuilder("[");
         boolean first = true;
