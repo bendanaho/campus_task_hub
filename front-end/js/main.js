@@ -646,6 +646,10 @@ function initPublishForm() {
             category: category,
             description: description,
             reward: reward,
+            // rewardValue：从 reward 文本解析出的数字金额，订单冻结/结算用它。
+            // 真后端只认这个字段（不会自己解析 reward 字符串），漏发会被当 0，导致冻结/付款显示 0。
+            // 纯互助(none)不涉及金钱，固定 0。mock 端会自行重算，传了也无副作用。
+            rewardValue: side === 'none' ? 0 : parseRewardValue(reward),
             contact: contact,
             images: uploadedImages,
             deadline: side === 'payer' ? document.getElementById('postDeadline').value : '',
