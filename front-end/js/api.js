@@ -1,4 +1,4 @@
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_BASE = 'http://localhost:8080/api';
 
 // 保存 mock-data.js 原始同步函数的引用（供 API Mock 分支内部使用，避免与异步包装函数同名冲突）
@@ -21,7 +21,11 @@ async function login(account, password) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ account: account, password: password })
     });
-    return res.json();
+    var json = await res.json();
+    var data = json.data;
+    setToken(data.token);
+    setCurrentUser(data.user);
+    return data;
 }
 
 async function register(data) {
@@ -33,7 +37,8 @@ async function register(data) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function logout() {
@@ -48,7 +53,8 @@ async function logout() {
     });
     removeToken();
     removeCurrentUser();
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 用户 ====================
@@ -60,7 +66,8 @@ async function getUserProfile(userId) {
     var res = await fetch(API_BASE + '/users/' + userId, {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function updatePhone(phone) {
@@ -75,7 +82,8 @@ async function updatePhone(phone) {
         },
         body: JSON.stringify({ phone: phone })
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function updateEmail(email) {
@@ -90,7 +98,8 @@ async function updateEmail(email) {
         },
         body: JSON.stringify({ email: email })
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function submitAuth(data) {
@@ -105,7 +114,8 @@ async function submitAuth(data) {
         },
         body: JSON.stringify(data)
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 查询当前登录用户余额（实时读后端，避免本地缓存过期）→ { balance }
@@ -116,7 +126,8 @@ async function getMyBalance() {
     var res = await fetch(API_BASE + '/user/balance', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 充值：课设采用平台虚拟余额，此处为 mock 加钱；真实资金通道非本项目范围 → { success, balance }
@@ -132,7 +143,8 @@ async function recharge(amount) {
         },
         body: JSON.stringify({ amount: amount })
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 账单：当前用户的资金流水 → { list, totalIn, totalOut }
@@ -143,7 +155,8 @@ async function getMyBills() {
     var res = await fetch(API_BASE + '/user/bills', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 帖子（任务/服务统一为"帖子"）====================
@@ -154,7 +167,8 @@ async function getTasks(filters) {
     }
     var query = new URLSearchParams(filters || {}).toString();
     var res = await fetch(API_BASE + '/posts?' + query);
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function getTaskDetail(id) {
@@ -162,7 +176,8 @@ async function getTaskDetail(id) {
         return mockGetTaskDetail(id);
     }
     var res = await fetch(API_BASE + '/posts/' + id);
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 发布帖子（取代旧 publishTask + publishService）。data.publisherSide: 'payer'|'earner'
@@ -178,7 +193,8 @@ async function publishPost(data) {
         },
         body: JSON.stringify(data)
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function getMyPosts() {
@@ -188,7 +204,8 @@ async function getMyPosts() {
     var res = await fetch(API_BASE + '/posts/mine', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 订单（统一：payer 付款方 / earner 收款方）====================
@@ -206,7 +223,8 @@ async function createOrder(postId, chatId) {
         },
         body: JSON.stringify({ postId: postId, chatId: chatId })
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 发布者接受订单 → in_progress，冻结付款方余额
@@ -218,7 +236,8 @@ async function acceptOrder(orderId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 取消订单（仅 pending 可取消：发布者拒绝 / 响应者撤回）
@@ -230,7 +249,8 @@ async function cancelOrder(orderId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 确认完成（payer/earner 任一方调用，无需传角色，由登录身份判断）。双方都确认 → completed 并结算
@@ -242,7 +262,8 @@ async function confirmOrder(orderId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 取某会话当前订单（优先返回进行中的；否则返回最近一条）。取代旧 getActiveOrder + getOrderByChatId
@@ -253,7 +274,8 @@ async function getOrder(chatId) {
     var res = await fetch(API_BASE + '/orders/by-chat?chatId=' + chatId, {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function getOrderHistory(chatId) {
@@ -263,7 +285,8 @@ async function getOrderHistory(chatId) {
     var res = await fetch(API_BASE + '/orders?chatId=' + chatId, {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 我的订单。moneyRole: 'payer'(我付款的) | 'earner'(我收款的) | 不传(全部)
@@ -275,7 +298,8 @@ async function getMyOrders(moneyRole) {
     var res = await fetch(API_BASE + '/orders/mine' + query, {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 消息 ====================
@@ -287,7 +311,8 @@ async function getConversations() {
     var res = await fetch(API_BASE + '/conversations', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function getMessages(chatId) {
@@ -297,7 +322,8 @@ async function getMessages(chatId) {
     var res = await fetch(API_BASE + '/conversations/' + chatId + '/messages', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function sendMessage(chatId, content) {
@@ -312,7 +338,8 @@ async function sendMessage(chatId, content) {
         },
         body: JSON.stringify({ content: content })
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function withdrawMessage(messageId) {
@@ -323,7 +350,8 @@ async function withdrawMessage(messageId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 在聊天里发起「收款(request)」或「转账(transfer)」卡片。直接支付（不走托管）：
@@ -337,7 +365,8 @@ async function sendPaymentCard(chatId, partnerId, kind, amount) {
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
         body: JSON.stringify({ partnerId: partnerId, kind: kind, amount: amount })
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 付款方支付一张待支付的收款卡片
@@ -349,7 +378,8 @@ async function payPaymentCard(messageId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 发起方取消一张待支付的收款卡片
@@ -361,7 +391,8 @@ async function cancelPaymentCard(messageId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 未读消息统计：{ total, byChat: { chatId: count } }
@@ -372,7 +403,8 @@ async function getUnreadCounts() {
     var res = await fetch(API_BASE + '/messages/unread', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 打开某会话后，把该会话中「别人发给我的」未读消息标记为已读
@@ -384,7 +416,8 @@ async function markMessagesRead(chatId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function ensureConversation(data) {
@@ -399,7 +432,8 @@ async function ensureConversation(data) {
         },
         body: JSON.stringify(data)
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 评价 ====================
@@ -417,7 +451,8 @@ async function submitReview(data) {
         },
         body: JSON.stringify(data)
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function getReviews(userId) {
@@ -425,7 +460,8 @@ async function getReviews(userId) {
         return mockGetReviews(userId);
     }
     var res = await fetch(API_BASE + '/reviews?userId=' + userId);
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // 当前用户是否已对某订单评价过
@@ -436,7 +472,8 @@ async function hasReviewed(orderId) {
     var res = await fetch(API_BASE + '/reviews/has-reviewed?orderId=' + orderId, {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 余额 ====================
@@ -448,7 +485,8 @@ async function getBalance() {
     var res = await fetch(API_BASE + '/user/balance', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== 辅助查询接口 ====================
@@ -462,7 +500,8 @@ async function fetchTaskById(id) {
         });
     }
     var res = await fetch(API_BASE + '/posts/' + id);
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 async function fetchUserById(id) {
@@ -474,7 +513,8 @@ async function fetchUserById(id) {
         });
     }
     var res = await fetch(API_BASE + '/users/' + id);
-    return res.json();
+    var json = await res.json();
+    return json.data;
 }
 
 // ==================== Mock 实现 ====================
