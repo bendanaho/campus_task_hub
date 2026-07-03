@@ -511,7 +511,10 @@ async function fetchUserById(id) {
             }, 50);
         });
     }
-    var res = await fetch(API_BASE + '/users/' + id);
+    // 带上 token：后端 /api/users/{id} 需要登录（不在 permitAll 名单），匿名请求会被 403 拒绝
+    var res = await fetch(API_BASE + '/users/' + id, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
     return _handleRes(res);
 }
 
