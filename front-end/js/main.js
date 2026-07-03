@@ -553,7 +553,9 @@ function goToOrderChat(postId, publisherId) {
 
 function initPublishForm() {
     if (!window.location.pathname.includes('publish-task.html')) return;
-    if (!protectPage(['publish-task.html'])) return;
+    // 一进发布页就校验：未登录/未实名立即弹提醒并引导去登录/认证
+    // （requireVerified 同时管这两种情况；不再用只查登录的 protectPage）
+    if (!requireVerified()) return;
 
     var form = document.querySelector('.form-container form');
     if (!form) return;

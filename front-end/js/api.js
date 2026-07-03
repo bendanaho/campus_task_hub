@@ -139,7 +139,15 @@ async function submitAuth(data) {
         },
         body: JSON.stringify(data)
     });
-    return _handleRes(res);
+    var profile = await _handleRes(res);
+    // 同 mockSubmitAuth：实名成功后更新本地登录用户的 authStatus，
+    // 否则本地缓存仍是 unverified，requireVerified 会继续拦刚实名的用户。
+    var cur = getCurrentUser();
+    if (cur) {
+        cur.authStatus = (profile && profile.authStatus) || 'verified';
+        setCurrentUser(cur);
+    }
+    return profile;
 }
 
 // 查询当前登录用户余额（实时读后端，避免本地缓存过期）→ { balance }
