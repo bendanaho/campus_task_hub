@@ -539,7 +539,8 @@ function goToOrderChat(postId, publisherId) {
         return;
     }
     var me = getCurrentUser();
-    if (me && me.id === publisherId) {
+    // String()：onclick 内联参数总是字符串，而真后端的 id 是数字（mock 是字符串），统一转字符串再比
+    if (me && String(me.id) === String(publisherId)) {
         alert('这是你自己发布的帖子。');
         return;
     }
@@ -948,7 +949,8 @@ function initChatDetail() {
                 return;
             }
             messageList.innerHTML = messages.map(function(m) {
-                var isSelf = m.senderId === (currentUser ? currentUser.id : '');
+                // String()：真后端 id 是数字、mock 是字符串，统一转字符串比较
+                var isSelf = !!currentUser && String(m.senderId) === String(currentUser.id);
                 if (m.withdrawn) {
                     var withdrawText = isSelf ? '你撤回了一条消息' : '对方撤回了一条消息';
                     return '<div class="chat-message withdrawn" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
@@ -958,7 +960,8 @@ function initChatDetail() {
                 if (m.type === 'payment') {
                     return paymentCardHTML(m, currentUser, isSelf);
                 }
-                if (m.senderId === 'system') {
+                // mock 用 senderId='system' 标记系统消息，真后端用 type='system'——两种都识别
+                if (m.senderId === 'system' || m.type === 'system') {
                     return '<div class="chat-message system">' + m.content + '</div>';
                 }
                 var cls = isSelf ? 'chat-right' : 'chat-left';
@@ -983,7 +986,8 @@ function initChatDetail() {
                 e.preventDefault();
                 if (msgEl.classList.contains('withdrawn')) return;
                 var senderId = msgEl.getAttribute('data-sender');
-                if (senderId !== currentUser.id) return;
+                // data-* 属性读出来永远是字符串，真后端的 id 是数字——转字符串比较，否则撤回菜单永远不出现
+                if (senderId !== String(currentUser.id)) return;
 
                 var existingMenu = document.querySelector('.context-menu');
                 if (existingMenu) existingMenu.remove();
@@ -1373,7 +1377,8 @@ function initReview() {
         var record = null;
         if (orderId) {
             var mine = await getMyOrders();
-            record = mine.find(function(x) { return x.order.id === orderId; });
+            // String()：orderId 来自 URL 参数（字符串），真后端订单 id 是数字
+            record = mine.find(function(x) { return String(x.order.id) === String(orderId); });
         }
         var taskNameInput = document.getElementById('taskName');
         var targetInput = document.getElementById('reviewTarget');

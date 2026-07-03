@@ -41,7 +41,12 @@ function createApp() {
     vm.createContext(sandbox);
 
     FILES.forEach(function (f) {
-        const code = fs.readFileSync(path.join(JS_DIR, f), 'utf8');
+        let code = fs.readFileSync(path.join(JS_DIR, f), 'utf8');
+        // 测试永远针对 mock 业务逻辑：无论 api.js 里的联调开关当前是 true 还是 false，
+        // 沙箱里强制 USE_MOCK=true（沙箱没有 fetch，真实分支本来也跑不了）。
+        if (f === 'api.js') {
+            code = code.replace(/^const USE_MOCK = (true|false);/m, 'const USE_MOCK = true;');
+        }
         vm.runInContext(code, sandbox, { filename: f });
     });
 
