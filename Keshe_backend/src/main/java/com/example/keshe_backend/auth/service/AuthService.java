@@ -38,7 +38,11 @@ public class AuthService {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPhone(request.getPhone());
-        user.setEmail(request.getEmail());
+        // 邮箱选填：空邮箱统一存 null 而非 ""。email 列有唯一约束，
+        // 多个 null 视为互不相同（允许），但多个 "" 会撞唯一约束——
+        // 否则第二个不填邮箱的用户注册就会失败（23505）。
+        String email = request.getEmail();
+        user.setEmail(email != null && !email.isBlank() ? email : null);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         userRepository.save(user);

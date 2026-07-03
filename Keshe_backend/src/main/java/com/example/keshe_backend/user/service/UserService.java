@@ -59,11 +59,13 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 
-        if (userRepository.existsByEmail(email)) {
+        // 空邮箱统一存 null 而非 ""，避免撞 email 唯一约束（同 register）
+        String normalized = (email != null && !email.isBlank()) ? email : null;
+        if (normalized != null && userRepository.existsByEmail(normalized)) {
             throw new BusinessException(ErrorCode.EMAIL_EXISTS);
         }
 
-        user.setEmail(email);
+        user.setEmail(normalized);
         userRepository.save(user);
         return UserProfileResponse.from(user);
     }
