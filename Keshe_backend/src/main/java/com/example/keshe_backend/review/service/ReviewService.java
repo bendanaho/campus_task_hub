@@ -25,6 +25,7 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+    private final com.example.keshe_backend.chat.service.ChatService chatService;
 
     /**
      * 提交评价
@@ -75,6 +76,10 @@ public class ReviewService {
         }
 
         review = reviewRepository.save(review);
+
+        // 系统消息：完成评价（挂到该订单所在会话）
+        chatService.addSystemMessage(order.getChatId(), currentUser.getUsername() + " 完成了评价", String.valueOf(order.getPostId()), "");
+
         return ReviewDTO.from(review);
     }
 

@@ -108,6 +108,48 @@ public class ChatService {
         return MessageDTO.from(msg);
     }
 
+    // 保证同一操作连发多条系统消息时时间严格递增，避免同刻并列导致顺序不定
+    private static final Object SYS_TIME_LOCK = new Object();
+    private static LocalDateTime lastSystemTime = LocalDateTime.MIN;
+
+    /**
+     * 供订单/评价等业务在状态变更时向会话插入一条系统消息：
+     * senderId=null、type="system"，前端居中显示；未读查询已用 senderId IS NOT NULL 排除，故不计未读。
+     * 同步更新会话预览（lastMessage/lastTime），使消息中心显示最新进展。
+     */
+    @Transactional
+    public void addSystemMessage(String chatId, String content, String taskId, String taskTitle) {
+        if (chatId == null || chatId.isBlank()) return;
+        LocalDateTime t;
+        synchronized (SYS_TIME_LOCK) {
+            t = LocalDateTime.now();
+            if (!t.isAfter(lastSystemTime)) t = lastSystemTime.plusNanos(1_000_000);
+            lastSystemTime = t;
+        }
+        final LocalDateTime now = t; // lambda 需要 final
+
+        Message msg = new Message();
+        msg.setChatId(chatId);
+        msg.setSenderId(null);
+        msg.setSenderName("系统");
+        msg.setReceiverId(null);
+        msg.setContent(content);
+        msg.setType("system");
+        msg.setTime(now);
+        msg.setTaskId(taskId != null ? taskId : "");
+        msg.setTaskTitle(taskTitle != null ? taskTitle : "");
+        msg.setWithdrawn(false);
+        msg.setRead(true);
+        messageRepository.save(msg);
+
+        conversationRepository.findById(chatId).ifPresent(conv -> {
+            conv.setLastMessage(content);
+            conv.setLastTime(now);
+            conv.setLastMessageSenderId(null);
+            conversationRepository.save(conv);
+        });
+    }
+
     @Transactional
     public int markMessagesRead(String chatId) {
         Long userId = SecurityUtils.getCurrentUserId();

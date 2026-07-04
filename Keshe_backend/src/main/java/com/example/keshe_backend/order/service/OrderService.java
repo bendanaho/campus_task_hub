@@ -38,6 +38,15 @@ public class OrderService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final com.example.keshe_backend.chat.service.ChatService chatService;
+
+    // 金额格式化：25.00 → "25"，避免系统消息里出现多余小数
+    private static String fmt(BigDecimal amount) {
+        return amount.stripTrailingZeros().toPlainString();
+    }
+    private String nameOf(Long userId) {
+        return userRepository.findById(userId).map(User::getUsername).orElse("对方");
+    }
 
     /**
      * 创建订单（响应帖子）
@@ -108,6 +117,12 @@ public class OrderService {
         order.setStatus("pending");
         order = orderRepository.save(order);
 
+        // 系统消息：响应方发起订单
+        String createText = "none".equals(side) ? (currentUser.getUsername() + " 申请参加，等待发起者接受")
+                : ("earner".equals(side) ? (currentUser.getUsername() + " 发起下单，等待对方接受")
+                : (currentUser.getUsername() + " 申请接单，等待对方接受"));
+        chatService.addSystemMessage(order.getChatId(), createText, String.valueOf(order.getPostId()), post.getTitle());
+
         return OrderDTO.from(order);
     }
 
@@ -168,6 +183,13 @@ public class OrderService {
         }
 
         orderRepository.save(order);
+
+        // 系统消息：接受订单（+ 预付冻结）。接受方即发布者
+        chatService.addSystemMessage(order.getChatId(), nameOf(userId) + " 接受了订单，任务开始执行", String.valueOf(order.getPostId()), post.getTitle());
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            chatService.addSystemMessage(order.getChatId(), nameOf(order.getPayerId()) + " 已预付报酬 " + fmt(amount) + " 元（已冻结）", String.valueOf(order.getPostId()), post.getTitle());
+        }
+
         return OrderDTO.from(order);
     }
 
@@ -193,6 +215,11 @@ public class OrderService {
 
         order.setStatus("cancelled");
         orderRepository.save(order);
+
+        // 系统消息：取消订单
+        String cancelTitle = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("");
+        chatService.addSystemMessage(order.getChatId(), nameOf(userId) + " 取消了订单", String.valueOf(order.getPostId()), cancelTitle);
+
         return OrderDTO.from(order);
     }
 
@@ -222,6 +249,10 @@ public class OrderService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
+        // 系统消息：确认方
+        String cfTitle = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("");
+        chatService.addSystemMessage(order.getChatId(), nameOf(userId) + " 已确认完成", String.valueOf(order.getPostId()), cfTitle);
+
         // 检查是否双方都已确认
         if (Boolean.TRUE.equals(order.getPayerConfirmed())
                 && Boolean.TRUE.equals(order.getEarnerConfirmed())) {
@@ -248,6 +279,10 @@ public class OrderService {
                 tx.setNote("订单收入：" + (post != null ? post.getTitle() : ""));
                 transactionRepository.save(tx);
             }
+            // 系统消息：双方确认，结算
+            chatService.addSystemMessage(order.getChatId(), order.getAmount().compareTo(BigDecimal.ZERO) > 0
+                    ? ("双方已确认，报酬 " + fmt(order.getAmount()) + " 元已结算给 " + nameOf(order.getEarnerId()))
+                    : "双方已确认，任务完成", String.valueOf(order.getPostId()), cfTitle);
         } else {
             // 单方确认：设置自动确认时间
             order.setAutoConfirmAt(now.plusDays(AUTO_DAYS));

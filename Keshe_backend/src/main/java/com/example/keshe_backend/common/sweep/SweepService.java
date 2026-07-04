@@ -36,6 +36,7 @@ public class SweepService {
     private final TransactionRepository transactionRepository;
     private final TaskRepository taskRepository;
     private final ReviewRepository reviewRepository;
+    private final com.example.keshe_backend.chat.service.ChatService chatService;
 
     /**
      * 业务方法在读取敏感数据前显式调用此方法进行清理。
@@ -64,25 +65,33 @@ public class SweepService {
 
             // 结算给收款方
             BigDecimal amount = order.getAmount();
+            Task swPost = taskRepository.findById(order.getPostId()).orElse(null);
+            String swTitle = swPost != null ? swPost.getTitle() : "";
+            String earnerName = "对方";
             if (amount.compareTo(BigDecimal.ZERO) > 0) {
                 User earner = userRepository.findById(order.getEarnerId()).orElse(null);
                 if (earner != null) {
+                    earnerName = earner.getUsername();
                     earner.setBalance(earner.getBalance().add(amount));
                     userRepository.save(earner);
 
-                    Task post = taskRepository.findById(order.getPostId()).orElse(null);
                     Transaction tx = new Transaction();
                     tx.setUserId(order.getEarnerId());
                     tx.setDirection("in");
                     tx.setAmount(amount);
                     tx.setCategory("order");
                     tx.setRelatedId(order.getId().toString());
-                    tx.setNote("订单收入：" + (post != null ? post.getTitle() : "") + "（自动确认）");
+                    tx.setNote("订单收入：" + swTitle + "（自动确认）");
                     transactionRepository.save(tx);
                 }
             }
 
             orderRepository.save(order);
+
+            // 系统消息：超时自动确认
+            chatService.addSystemMessage(order.getChatId(), amount.compareTo(BigDecimal.ZERO) > 0
+                    ? ("已超时自动确认，报酬 " + amount.stripTrailingZeros().toPlainString() + " 元已结算给 " + earnerName)
+                    : "已超时自动确认，任务完成", String.valueOf(order.getPostId()), swTitle);
         }
 
         if (!pending.isEmpty()) {
