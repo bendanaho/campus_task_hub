@@ -9,3 +9,8 @@ spring:
 logging:
   level:
     com.example.keshe_backend: debug
+
+# 🔒 补上缺少的 JWT 鉴权密钥配置（从 example 模板中提取）
+jwt:
+  secret: "YourJwtSecretKeyAtLeast32CharactersLong"
+  expiration: 86400000
