@@ -386,7 +386,7 @@ function initHomePage() {
                     '<div class="task-item-top">' +
                         '<h3>' + task.title + '</h3>' +
                     '</div>' +
-                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + task.reward + '</p>' +
+                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + formatReward(task.reward) + '</p>' +
                     '<div class="task-item-body">' +
                         '<p class="task-desc">' + task.description + '</p>' +
                         bodyImages +
@@ -456,7 +456,7 @@ function initTaskHall() {
                             '<h3>' + task.title + '</h3>' +
                             '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                         '</div>' +
-                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + task.reward) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
+                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
                         '<div class="task-item-body">' +
                             '<p class="task-desc">' + task.description + '</p>' +
                             bodyImages +
@@ -713,7 +713,7 @@ function initTaskDetail() {
                 '<p><strong>描述：</strong>' + task.description + '</p>' +
                 '<p><strong>发布者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
-                (task.publisherSide === 'none' ? '' : '<p><strong>报酬金额：</strong>' + task.reward + '</p>') +
+                (task.publisherSide === 'none' ? '' : '<p><strong>报酬金额：</strong>' + formatReward(task.reward) + '</p>') +
                 serviceTimeHtml +
                 '<p><strong>发布时间：</strong>' + formatDateTime(task.publishTime) + '</p>' +
                 (task.publisherSide === 'payer' && task.deadline ? '<p><strong>截止时间：</strong>' + formatDateTime(task.deadline) + '</p>' : '') +
@@ -1050,7 +1050,7 @@ function initChatDetail() {
         var html = '<div class="task-bar-info">' +
             '<span class="task-bar-title">' + task.title + '</span>' +
             // 纯互助不涉及金钱，不显示报酬
-            (task.publisherSide === 'none' ? '' : '<span class="task-bar-reward">' + task.reward + '</span>');
+            (task.publisherSide === 'none' ? '' : '<span class="task-bar-reward">' + formatReward(task.reward) + '</span>');
         if (order && order.status !== 'cancelled') {
             html += '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
         }

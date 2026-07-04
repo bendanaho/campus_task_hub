@@ -80,6 +80,14 @@ function parseRewardValue(reward) {
     return match ? parseInt(match[1], 10) : 0;
 }
 
+// 报酬展示：纯数字补「元」（"10"→"10元"）；已带单位或文字的原样返回
+// （"10元"/"面议"/"3-5元/单"/"无" 均不变，避免出现"10元元"）
+function formatReward(reward) {
+    if (reward === null || reward === undefined) return '';
+    const s = String(reward).trim();
+    return /^\d+(\.\d+)?$/.test(s) ? s + '元' : s;
+}
+
 function debounce(fn, delay) {
     delay = delay || 300;
     let timer;
