@@ -8,6 +8,21 @@ const API_BASE = 'http://localhost:8080/api';
 //   main.js 里现成的 .catch(err => alert(err.message)) 无需任何改动即可提示后端错误。
 // - HTTP 层失败（401/403/500 等，响应体可能非 JSON）→ 抛带状态码的 Error。
 async function _handleRes(res) {
+    // 登录态失效：Spring Security 对无效/过期 token 返回 401/403（空 body），
+    // 而业务层的"禁止"是 HTTP 200 + success:false，二者可据状态码区分。
+    // 常见于后端重启（内存库）后旧 token 失效——此时清掉过期登录态并引导重新登录，
+    // 避免"看似已登录、实则所有数据加载失败"的困惑状态。
+    if ((res.status === 401 || res.status === 403) && typeof getToken === 'function' && getToken()) {
+        removeToken();
+        removeCurrentUser();
+        if (typeof window !== 'undefined' && window.location &&
+            window.location.pathname.indexOf('login.html') < 0) {
+            var page = window.location.pathname.split('/').pop() + window.location.search;
+            alert('登录已失效，请重新登录。');
+            window.location.href = 'login.html?redirect=' + encodeURIComponent(page);
+        }
+        throw new Error('登录已失效，请重新登录');
+    }
     var json = null;
     try { json = await res.json(); } catch (e) { /* 空响应体或非 JSON（如 401） */ }
     if (json && json.success === false) {
