@@ -38,6 +38,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        //放行 WebSocket 握手协议路径
+                        .requestMatchers("/ws/**").permitAll()
                         // 其余全部需要认证
                         .anyRequest().authenticated()
                 )

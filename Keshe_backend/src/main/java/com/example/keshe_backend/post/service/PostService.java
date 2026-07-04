@@ -149,6 +149,7 @@ public class PostService {
         }
 
         task = taskRepository.save(task);
+        com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast("NEW_POST_PUBLISHED");
         return PublishPostResponse.of(PostDTO.from(task));
     }
 
