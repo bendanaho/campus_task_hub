@@ -738,6 +738,45 @@ function _addTx(db, userId, direction, amount, category, relatedId, note) {
     });
 }
 
+// ---------- 系统消息 ----------
+
+// 保证系统消息时间严格递增：同一操作连发多条（如接单+预付）也能按插入顺序显示
+var _lastSysTime = 0;
+function _sysNowIso() {
+    var t = Date.now();
+    if (t <= _lastSysTime) t = _lastSysTime + 1;
+    _lastSysTime = t;
+    return new Date(t).toISOString();
+}
+
+// 向某会话插入一条系统消息（senderId='system'，居中显示、不计未读），并同步会话预览。
+function _addSystemMessage(db, chatId, content, taskId, taskTitle) {
+    if (!chatId) return;
+    if (!db.messages) db.messages = [];
+    var now = _sysNowIso();
+    db.messages.push({
+        id: 'sys-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+        chatId: chatId,
+        senderId: 'system',
+        senderName: '系统',
+        receiverId: '',
+        content: content,
+        time: now,
+        taskId: taskId || '',
+        taskTitle: taskTitle || '',
+        withdrawn: false,
+        read: true
+    });
+    for (var i = 0; i < (db.conversations || []).length; i++) {
+        if (db.conversations[i].id === chatId) {
+            db.conversations[i].lastMessage = content;
+            db.conversations[i].lastTime = now;
+            db.conversations[i].lastMessageSenderId = 'system';
+            break;
+        }
+    }
+}
+
 // ---------- 订单系统内部工具：惰性结算 ----------
 
 // 自动确认：in_progress 且过了 autoConfirmAt 的订单自动完成并结算给收款方
@@ -753,10 +792,13 @@ function _autoConfirmSweep(db) {
             o.reviewDeadline = new Date(nowMs + AUTO_DAYS * 86400000).toISOString();
             var earner = _findUserInDb(db, o.earnerId);
             if (earner) earner.balance = (earner.balance || 0) + o.amount;
+            var swPost = _findPostInDb(db, o.postId);
             if (o.amount > 0) {
-                var swPost = _findPostInDb(db, o.postId);
                 _addTx(db, o.earnerId, 'in', o.amount, 'order', o.id, '订单收入：' + (swPost ? swPost.title : '') + '（自动确认）');
             }
+            _addSystemMessage(db, o.chatId, o.amount > 0
+                ? ('已超时自动确认，报酬 ' + o.amount + ' 元已结算给 ' + (earner ? earner.username : '收款方'))
+                : '已超时自动确认，任务完成', o.postId, swPost ? swPost.title : '');
             changed = true;
         }
     });
@@ -1063,6 +1105,13 @@ function mockCreateOrder(postId, chatId) {
                 });
             }
 
+            // 系统消息：响应方发起订单
+            var createActor = currentUser.username;
+            var createText = post.publisherSide === 'none' ? (createActor + ' 申请参加，等待发起者接受')
+                : (post.publisherSide === 'earner' ? (createActor + ' 发起下单，等待对方接受')
+                : (createActor + ' 申请接单，等待对方接受'));
+            _addSystemMessage(db, chatId, createText, postId, post.title);
+
             _mockSaveDB(db);
             resolve({ success: true, order: order });
         }, 200);
@@ -1112,6 +1161,11 @@ function mockAcceptOrder(orderId) {
             if (post.publisherSide === 'payer') {
                 post.status = 'closed';
             }
+            // 系统消息：接受订单（+ 预付冻结）
+            _addSystemMessage(db, order.chatId, currentUser.username + ' 接受了订单，任务开始执行', order.postId, post.title);
+            if (order.amount > 0) {
+                _addSystemMessage(db, order.chatId, (payer ? payer.username : '付款方') + ' 已预付报酬 ' + order.amount + ' 元（已冻结）', order.postId, post.title);
+            }
             _mockSaveDB(db);
             resolve({ success: true, order: order });
         }, 200);
@@ -1146,6 +1200,8 @@ function mockCancelOrder(orderId) {
             }
             order.status = 'cancelled';
             // pending 阶段未冻结资金，无需退款
+            var cancelPost = _findPostInDb(db, order.postId);
+            _addSystemMessage(db, order.chatId, currentUser.username + ' 取消了订单', order.postId, cancelPost ? cancelPost.title : '');
             _mockSaveDB(db);
             resolve({ success: true, order: order });
         }, 200);
@@ -1182,6 +1238,10 @@ function mockConfirmOrder(orderId) {
                 reject(new Error('你不是该订单的参与者'));
                 return;
             }
+            // 系统消息：确认方
+            var cfPost = _findPostInDb(db, order.postId);
+            var cfTitle = cfPost ? cfPost.title : '';
+            _addSystemMessage(db, order.chatId, currentUser.username + ' 已确认完成', order.postId, cfTitle);
             if (order.payerConfirmed && order.earnerConfirmed) {
                 // 双方都确认 → 完成并结算给收款方
                 order.status = 'completed';
@@ -1190,9 +1250,12 @@ function mockConfirmOrder(orderId) {
                 var earner = _findUserInDb(db, order.earnerId);
                 if (earner) earner.balance = (earner.balance || 0) + order.amount;
                 if (order.amount > 0) {
-                    var cfPost = _findPostInDb(db, order.postId);
-                    _addTx(db, order.earnerId, 'in', order.amount, 'order', order.id, '订单收入：' + (cfPost ? cfPost.title : ''));
+                    _addTx(db, order.earnerId, 'in', order.amount, 'order', order.id, '订单收入：' + cfTitle);
                 }
+                // 系统消息：双方确认，结算
+                _addSystemMessage(db, order.chatId, order.amount > 0
+                    ? ('双方已确认，报酬 ' + order.amount + ' 元已结算给 ' + (earner ? earner.username : '收款方'))
+                    : '双方已确认，任务完成', order.postId, cfTitle);
             } else if (!order.autoConfirmAt) {
                 // 首个确认 → 挂上自动确认计时
                 order.autoConfirmAt = new Date(Date.now() + AUTO_DAYS * 86400000).toISOString();
@@ -1688,6 +1751,12 @@ function mockSubmitReview(data) {
             };
             if (!db.reviews) db.reviews = [];
             db.reviews.push(newReview);
+            // 系统消息：完成评价（挂到该订单所在会话）
+            var revOrder = data.orderId ? _findOrderById(db, data.orderId) : null;
+            if (revOrder) {
+                var revPost = _findPostInDb(db, revOrder.postId);
+                _addSystemMessage(db, revOrder.chatId, currentUser.username + ' 完成了评价', revOrder.postId, revPost ? revPost.title : '');
+            }
             _mockSaveDB(db);
             resolve({ success: true, review: newReview });
         }, 200);
