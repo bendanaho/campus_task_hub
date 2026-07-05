@@ -37,6 +37,7 @@ public class SweepService {
     private final TaskRepository taskRepository;
     private final ReviewRepository reviewRepository;
     private final com.example.keshe_backend.chat.service.ChatService chatService;
+    private final com.example.keshe_backend.review.service.ReviewService reviewService;
 
     /**
      * 业务方法在读取敏感数据前显式调用此方法进行清理。
@@ -142,6 +143,7 @@ public class SweepService {
         review.setCreatedAt(LocalDateTime.now());
 
         reviewRepository.save(review);
+        reviewService.recalcCreditScore(toUserId);   // 默认好评也计入被评价者信用分
         log.info("生成默认好评: orderId={}, from={}, to={}", order.getId(), fromUserId, toUserId);
     }
 

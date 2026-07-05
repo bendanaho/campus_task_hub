@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -76,11 +78,33 @@ public class ReviewService {
         }
 
         review = reviewRepository.save(review);
+        recalcCreditScore(toUser.getId());   // 评价落地 → 重算被评价者信用分
 
         // 系统消息：完成评价（挂到该订单所在会话）
         chatService.addSystemMessage(order.getChatId(), currentUser.getUsername() + " 完成了评价", String.valueOf(order.getPostId()), "");
 
         return ReviewDTO.from(review);
+    }
+
+    /**
+     * 重算某用户信用分 = 其收到评价的贝叶斯平滑均值（预置 C=2 条 5★ 先验，无评价=5.0，
+     * 1 位小数、0–5）。与前端 utils.computeCreditScore 同一公式。每次新增评价后调用。
+     */
+    @Transactional
+    public void recalcCreditScore(Long userId) {
+        List<Review> reviews = reviewRepository.findByToUserIdOrderByCreatedAtDesc(userId);
+        final int C = 2;
+        final double PRIOR = 5.0;
+        int n = reviews.size();
+        int sum = reviews.stream().mapToInt(Review::getRating).sum();
+        double score = (PRIOR * C + sum) / (C + n);
+        if (score < 0) score = 0;
+        if (score > 5) score = 5;
+        BigDecimal cs = BigDecimal.valueOf(score).setScale(1, RoundingMode.HALF_UP);
+        userRepository.findById(userId).ifPresent(u -> {
+            u.setCreditScore(cs);
+            userRepository.save(u);
+        });
     }
 
     /**
