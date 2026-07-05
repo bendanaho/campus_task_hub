@@ -40,6 +40,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         //放行 WebSocket 握手协议路径
                         .requestMatchers("/ws/**").permitAll()
+                        // 管理后台：仅管理员（user.role=1，JwtAuthenticationFilter 授予 ROLE_ADMIN）
+                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         // 其余全部需要认证
                         .anyRequest().authenticated()
                 )

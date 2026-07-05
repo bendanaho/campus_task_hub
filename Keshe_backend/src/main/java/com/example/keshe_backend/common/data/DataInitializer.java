@@ -104,6 +104,15 @@ public class DataInitializer implements org.springframework.boot.CommandLineRunn
         uIds[7] = saveUser("周同学", "13800138008", "zhou@example.com", encodedPassword,
                 "", 2.5, "周佳",
                 "2021080008", "文学院", "汉语言2101", "校内打印店兼职，可以帮忙打印资料。", new BigDecimal("100"));
+
+        // 平台管理员（role=1）：不参与交易，负责争议订单仲裁与内容管理。账号 admin / 1
+        Long adminId = saveUser("admin", "13800138009", "admin@example.com", encodedPassword,
+                "https://picsum.photos/seed/avatarAdmin/200/200", 5.0, "平台管理员",
+                "ADMIN", "平台运营", "管理组", "平台管理员，负责争议订单仲裁与内容管理。", BigDecimal.ZERO);
+        userRepository.findById(adminId).ifPresent(u -> {
+            u.setRole(1);
+            userRepository.save(u);
+        });
     }
 
     private Long saveUser(String username, String phone, String email, String passwordHash,

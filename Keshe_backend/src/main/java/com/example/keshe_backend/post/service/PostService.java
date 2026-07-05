@@ -153,6 +153,28 @@ public class PostService {
         return PublishPostResponse.of(PostDTO.from(task));
     }
 
+    // ---------- 管理员（由 /api/admin/** 的 ROLE_ADMIN 规则鉴权）----------
+
+    /** 全部帖子（含已下架/关闭），按发布时间倒序 */
+    public List<PostDTO> adminListPosts() {
+        return taskRepository.findByDeletedAtIsNullOrderByPublishTimeDesc()
+                .stream().map(PostDTO::from).collect(Collectors.toList());
+    }
+
+    /** 管理员下架帖子：status → closed，大厅不再显示、不可再下单 */
+    @Transactional
+    public PostDTO adminClosePost(Long postId) {
+        Task task = taskRepository.findById(postId)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
+        if ("closed".equals(task.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该帖子已是下架/关闭状态");
+        }
+        task.setStatus("closed");
+        taskRepository.save(task);
+        return PostDTO.from(task);
+    }
+
     /**
      * 我的帖子
      */

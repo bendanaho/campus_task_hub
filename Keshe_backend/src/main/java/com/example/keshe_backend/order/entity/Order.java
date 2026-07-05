@@ -78,6 +78,34 @@ public class Order {
     @Column(name = "review_deadline")
     private LocalDateTime reviewDeadline;
 
+    // ---------- 争议/仲裁（disputed → closed）----------
+
+    /** 申诉理由 */
+    @Column(name = "dispute_reason", columnDefinition = "TEXT")
+    private String disputeReason;
+
+    /** 申诉发起人 userId */
+    @Column(name = "disputed_by")
+    private Long disputedBy;
+
+    @Column(name = "disputed_at")
+    private LocalDateTime disputedAt;
+
+    /** 裁决方式：refund 全额退款 / settle 全额结算 / partial 部分结算 */
+    @Column(length = 20)
+    private String resolution;
+
+    /** 结算给收款方的金额（refund=0，settle=全额，partial=管理员指定） */
+    @Column(name = "resolution_amount_to_earner")
+    private BigDecimal resolutionAmountToEarner;
+
+    /** 管理员处理说明 */
+    @Column(name = "resolution_note", columnDefinition = "TEXT")
+    private String resolutionNote;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
     @Version
     private Integer version;
 

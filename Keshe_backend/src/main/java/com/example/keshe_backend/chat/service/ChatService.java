@@ -75,7 +75,13 @@ public class ChatService {
 
     public List<MessageDTO> getMessages(String chatId) {
         Long userId = SecurityUtils.getCurrentUserId();
-        requireParticipant(chatId, userId);
+        // 管理员（role=1）可只读查看任意会话消息，作为争议仲裁的取证依据；普通用户仍须是参与者
+        boolean isAdmin = userRepository.findById(userId)
+                .map(u -> u.getRole() != null && u.getRole() == 1)
+                .orElse(false);
+        if (!isAdmin) {
+            requireParticipant(chatId, userId);
+        }
         return messageRepository.findByChatIdOrderByTimeAsc(chatId)
                 .stream().map(MessageDTO::from).collect(Collectors.toList());
     }
