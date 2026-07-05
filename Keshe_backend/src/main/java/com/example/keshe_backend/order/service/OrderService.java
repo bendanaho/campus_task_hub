@@ -56,6 +56,10 @@ public class OrderService {
     public OrderDTO createOrder(CreateOrderRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         User currentUser = requireVerified(userId);
+        // 管理员为纯管理角色，不参与交易（与仲裁权分离，避免利益冲突）
+        if (currentUser.getRole() != null && currentUser.getRole() == 1) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号不参与交易");
+        }
 
         Task post = taskRepository.findById(request.getPostId())
                 .filter(t -> t.getDeletedAt() == null)

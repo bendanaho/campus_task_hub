@@ -107,6 +107,11 @@ public class PostService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 
+        // 管理员为纯管理角色，不发布互助
+        if (user.getRole() != null && user.getRole() == 1) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号不参与交易");
+        }
+
         // 检查实名认证
         if (user.getAuthStatus() == null || user.getAuthStatus() != 1) {
             throw new BusinessException(ErrorCode.VERIFICATION_REQUIRED);

@@ -167,6 +167,10 @@ public class ChatService {
     public MessageDTO sendPaymentCard(String chatId, SendPaymentRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         User currentUser = requireVerified(userId);
+        // 管理员为纯管理角色，不参与交易/收付款
+        if (currentUser.getRole() != null && currentUser.getRole() == 1) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号不参与交易");
+        }
         requireParticipant(chatId, userId);
         User partner = userRepository.findById(request.getPartnerId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "对方不存在"));
