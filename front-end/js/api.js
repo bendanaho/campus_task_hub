@@ -1071,6 +1071,10 @@ function mockPublishPost(data) {
             }
             var side = (data.publisherSide === 'earner' || data.publisherSide === 'none') ? data.publisherSide : 'payer';
             var db = _mockGetDB();
+            if (_isAdminUser(db, currentUser.id)) {
+                reject(new Error('管理员账号不参与交易'));
+                return;
+            }
             if (!_isVerified(db, currentUser.id)) {
                 reject(new Error('请先完成实名认证后再发布'));
                 return;
@@ -1131,6 +1135,10 @@ function mockCreateOrder(postId, chatId) {
                 return;
             }
             var db = _mockGetDB();
+            if (_isAdminUser(db, currentUser.id)) {
+                reject(new Error('管理员账号不参与交易'));
+                return;
+            }
             if (!_isVerified(db, currentUser.id)) {
                 reject(new Error('请先完成实名认证后再操作'));
                 return;
@@ -1833,6 +1841,7 @@ function mockSendPaymentCard(chatId, partnerId, kind, amount) {
             if (amt > 100000) { reject(new Error('单笔金额不能超过 100000 元')); return; }
             if (!partnerId || partnerId === currentUser.id) { reject(new Error('无效的收付款对象')); return; }
             var db = _mockGetDB();
+            if (_isAdminUser(db, currentUser.id)) { reject(new Error('管理员账号不参与交易')); return; }
             if (!_isVerified(db, currentUser.id)) { reject(new Error('请先完成实名认证后再操作')); return; }
 
             var payerId, receiverId, status, paidAt = null;

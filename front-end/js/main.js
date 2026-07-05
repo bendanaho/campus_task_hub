@@ -33,8 +33,15 @@ function renderNav() {
     var currentPath = window.location.pathname;
     var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1) || 'index.html';
 
+    var loggedUser = isLoggedIn() ? getCurrentUser() : null;
+    var admin = !!(loggedUser && loggedUser.role === 1);
+
     var html = '';
     NAV_ITEMS.forEach(function(item) {
+        // 纯管理角色：只保留「互助大厅」供只读巡查，隐藏发布/消息中心/我的订单等消费者入口
+        if (admin && ['publish-task.html', 'message-center.html', 'order-center.html'].indexOf(item.href) >= 0) {
+            return;
+        }
         var isActive = currentPage === item.href ? 'active' : '';
         // 消息中心项预留未读红点占位，由 updateNavUnread 异步填充
         var badge = item.href === 'message-center.html'
@@ -43,9 +50,9 @@ function renderNav() {
     });
 
     if (isLoggedIn()) {
-        var navUser = getCurrentUser();
+        var navUser = loggedUser;
         // 管理员额外显示「管理后台」入口
-        if (navUser && navUser.role === 1) {
+        if (admin) {
             html += '<a href="admin.html" class="' + (currentPage === 'admin.html' ? 'active' : '') + '">管理后台</a>';
         }
         html += '<a href="profile.html">' + navUser.username + '</a>';
@@ -104,6 +111,22 @@ function requireVerified() {
         return false;
     }
     return true;
+}
+
+// 当前登录用户是否管理员
+function isAdminUser() {
+    var u = getCurrentUser();
+    return !!(u && u.role === 1);
+}
+
+// 交易类操作（发布/下单/接单/收付款/申诉）前置：管理员为纯管理角色，不参与交易。
+// 返回 true 表示"被拦下"（调用方应 return）。
+function blockIfAdmin() {
+    if (isAdminUser()) {
+        alert('管理员账号不参与交易，仅用于平台管理。');
+        return true;
+    }
+    return false;
 }
 
 // 管理后台门禁：必须已登录且 role=1（与后端 /api/admin/** 的鉴权双保险）
@@ -193,6 +216,11 @@ function handleLoginForm() {
         login(account, password)
             .then(function() {
                 alert('登录成功。');
+                // 管理员为纯管理角色 → 直接落地管理后台，忽略消费者页的 redirect
+                if (isAdminUser()) {
+                    window.location.href = 'admin.html';
+                    return;
+                }
                 var redirect = getUrlParam('redirect') || 'index.html';
                 window.location.href = redirect;
             })
@@ -466,7 +494,9 @@ function initTaskHall() {
 
                 var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
                 var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : (task.publisherSide === 'none' ? 'btn-mutual' : 'btn-service');
-                var actionBtn = '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
+                // 管理员为纯管理角色，大厅只读巡查：不显示接单/下单按钮
+                var actionBtn = isAdminUser() ? '' :
+                    '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
 
                 var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
                     return '<img src="' + img + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
@@ -559,6 +589,7 @@ function goToOrderChat(postId, publisherId) {
         window.location.href = 'login.html?redirect=' + redirectUrl;
         return;
     }
+    if (blockIfAdmin()) return;
     var me = getCurrentUser();
     // String()：onclick 内联参数总是字符串，而真后端的 id 是数字（mock 是字符串），统一转字符串再比
     if (me && String(me.id) === String(publisherId)) {
@@ -574,6 +605,12 @@ function goToOrderChat(postId, publisherId) {
 
 function initPublishForm() {
     if (!window.location.pathname.includes('publish-task.html')) return;
+    // 管理员为纯管理角色，不发布互助
+    if (isAdminUser()) {
+        alert('管理员账号不参与交易，仅用于平台管理。');
+        window.location.href = 'admin.html';
+        return;
+    }
     // 一进发布页就校验：未登录/未实名立即弹提醒并引导去登录/认证
     // （requireVerified 同时管这两种情况；不再用只查登录的 protectPage）
     if (!requireVerified()) return;
@@ -1338,6 +1375,7 @@ window.handleOrderCancel = function(orderId) {
 // 确认完成（任一方，双方都确认才结算）
 // 发起申诉：填写理由 → 订单转 disputed（资金保持冻结），聊天发系统消息
 window.handleDispute = function(orderId) {
+    if (blockIfAdmin()) return;
     if (!requireVerified()) return;
     var reason = prompt('请填写申诉理由（将提交给管理员仲裁）：');
     if (reason === null) return;

@@ -171,3 +171,17 @@ test('登录返回带 role：admin=1、普通用户=0', async function () {
     const usr = await loginAs(app, '张三');
     assert.strictEqual(usr.user.role, 0);
 });
+
+test('纯管理角色：管理员不能下单/发布/发起收付款', async function () {
+    const app = createApp();
+    await loginAs(app, 'admin');
+    // 下单（对任意帖子）被拒
+    await assert.rejects(app.createOrder('t18', 'chatZ'), /管理员账号不参与交易/);
+    // 发布被拒
+    await assert.rejects(app.publishPost({
+        title: '管理员想发帖', publisherSide: 'payer', category: 'errand',
+        description: 'x', reward: '5元', rewardValue: 5, contact: '', images: []
+    }), /管理员账号不参与交易/);
+    // 聊天发起收款卡被拒
+    await assert.rejects(app.sendPaymentCard('chatZ', 'u1', 'request', 10), /管理员账号不参与交易/);
+});
