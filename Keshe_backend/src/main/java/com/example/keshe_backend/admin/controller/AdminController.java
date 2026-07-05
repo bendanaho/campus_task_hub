@@ -5,6 +5,7 @@ import com.example.keshe_backend.order.dto.AdminOrderItemResponse;
 import com.example.keshe_backend.order.dto.OrderDTO;
 import com.example.keshe_backend.order.dto.ResolveDisputeRequest;
 import com.example.keshe_backend.order.service.OrderService;
+import com.example.keshe_backend.post.dto.AdminReasonRequest;
 import com.example.keshe_backend.post.dto.PostDTO;
 import com.example.keshe_backend.post.service.PostService;
 import com.example.keshe_backend.report.dto.AdminReportItemResponse;
@@ -63,19 +64,21 @@ public class AdminController {
     }
 
     /**
-     * 下架帖子
+     * 下架帖子（可带原因，随系统通知告知发布者）
      */
     @PostMapping("/posts/{id}/close")
-    public ApiResponse<PostDTO> closePost(@PathVariable Long id) {
-        return ApiResponse.success(postService.adminClosePost(id));
+    public ApiResponse<PostDTO> closePost(@PathVariable Long id,
+                                          @RequestBody(required = false) AdminReasonRequest request) {
+        return ApiResponse.success(postService.adminClosePost(id, request != null ? request.getReason() : null));
     }
 
     /**
-     * 删除帖子（软删）
+     * 删除帖子（软删，可带原因）
      */
     @PostMapping("/posts/{id}/delete")
-    public ApiResponse<PostDTO> deletePost(@PathVariable Long id) {
-        return ApiResponse.success(postService.adminDeletePost(id));
+    public ApiResponse<PostDTO> deletePost(@PathVariable Long id,
+                                           @RequestBody(required = false) AdminReasonRequest request) {
+        return ApiResponse.success(postService.adminDeletePost(id, request != null ? request.getReason() : null));
     }
 
     /**

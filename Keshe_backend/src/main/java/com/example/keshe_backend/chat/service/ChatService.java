@@ -43,6 +43,20 @@ public class ChatService {
     }
 
     private ConversationDTO toConversationDTO(Conversation c, Long currentUserId) {
+        // 系统通知会话：对方固定为「系统通知」，不去查真实用户
+        if (c.getId() != null && c.getId().startsWith("sys-notify-")) {
+            return ConversationDTO.builder()
+                    .id(c.getId())
+                    .partnerId(0L)
+                    .partnerName("系统通知")
+                    .partnerAvatar("")
+                    .taskId(null)
+                    .taskTitle("系统通知")
+                    .lastMessage(c.getLastMessage())
+                    .lastTime(c.getLastTime())
+                    .lastMessageSenderId(0L)
+                    .build();
+        }
         Long partnerId = c.getUser1Id().equals(currentUserId) ? c.getUser2Id() : c.getUser1Id();
         User partner = userRepository.findById(partnerId).orElse(null);
         return ConversationDTO.builder()
@@ -154,6 +168,51 @@ public class ChatService {
             conv.setLastMessageSenderId(null);
             conversationRepository.save(conv);
         });
+    }
+
+    /**
+     * 系统通知（平台 → 单个用户），挂在该用户专属会话 sys-notify-&lt;userId&gt;。
+     * 与订单里的系统消息(senderId=null)区别：这里 senderId=0（非 null → 计入未读；
+     * 无对应真实用户），type="system"（聊天里居中显示）。用于帖子下架/删除等平台通知。
+     */
+    @Transactional
+    public void addSystemNotify(Long userId, String content) {
+        if (userId == null) return;
+        String chatId = "sys-notify-" + userId;
+        LocalDateTime t;
+        synchronized (SYS_TIME_LOCK) {
+            t = LocalDateTime.now();
+            if (!t.isAfter(lastSystemTime)) t = lastSystemTime.plusNanos(1_000_000);
+            lastSystemTime = t;
+        }
+        final LocalDateTime now = t;
+
+        Conversation conv = conversationRepository.findById(chatId).orElse(null);
+        if (conv == null) {
+            conv = new Conversation();
+            conv.setId(chatId);
+            conv.setUser1Id(userId);
+            conv.setUser2Id(0L);        // 哨兵：系统通知无真实对方
+            conv.setTaskTitle("系统通知");
+        }
+        conv.setLastMessage(content);
+        conv.setLastTime(now);
+        conv.setLastMessageSenderId(0L);
+        conversationRepository.save(conv);
+
+        Message msg = new Message();
+        msg.setChatId(chatId);
+        msg.setSenderId(0L);            // 非 null → 计入未读；0 无对应真实用户
+        msg.setSenderName("系统通知");
+        msg.setReceiverId(userId);
+        msg.setContent(content);
+        msg.setType("system");
+        msg.setTime(now);
+        msg.setTaskId("");
+        msg.setTaskTitle("");
+        msg.setWithdrawn(false);
+        msg.setRead(false);
+        messageRepository.save(msg);
     }
 
     @Transactional

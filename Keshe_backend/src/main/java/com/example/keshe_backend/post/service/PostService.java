@@ -3,6 +3,7 @@ package com.example.keshe_backend.post.service;
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
+import com.example.keshe_backend.chat.service.ChatService;
 import com.example.keshe_backend.post.dto.*;
 import com.example.keshe_backend.report.service.ReportService;
 import com.example.keshe_backend.task.entity.Task;
@@ -25,6 +26,7 @@ public class PostService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final ReportService reportService;
+    private final ChatService chatService;
 
     /**
      * 帖子列表（支持筛选和排序）
@@ -168,9 +170,9 @@ public class PostService {
                 .stream().map(PostDTO::from).collect(Collectors.toList());
     }
 
-    /** 管理员下架帖子：status → closed，大厅不再显示、不可再下单；并清该帖 pending 举报 */
+    /** 管理员下架帖子：status → closed，大厅不再显示、不可再下单；清该帖 pending 举报；系统通知发布者 */
     @Transactional
-    public PostDTO adminClosePost(Long postId) {
+    public PostDTO adminClosePost(Long postId, String reason) {
         Task task = taskRepository.findById(postId)
                 .filter(t -> t.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
@@ -180,18 +182,26 @@ public class PostService {
         task.setStatus("closed");
         taskRepository.save(task);
         reportService.markReportsHandled(postId);
+        String r = reason == null ? "" : reason.trim();
+        chatService.addSystemNotify(task.getPublisherId(),
+                "你发布的「" + task.getTitle() + "」已被管理员下架，大厅将不再展示。"
+                        + (!r.isEmpty() ? "原因：" + r : "如有疑问请联系平台。"));
         return PostDTO.from(task);
     }
 
-    /** 管理员删除帖子（软删）：设 deletedAt，全站不可见/不可查/不可下单，记录保留；并清该帖 pending 举报 */
+    /** 管理员删除帖子（软删）：设 deletedAt，全站不可见/不可查/不可下单，记录保留；清该帖 pending 举报；系统通知发布者 */
     @Transactional
-    public PostDTO adminDeletePost(Long postId) {
+    public PostDTO adminDeletePost(Long postId, String reason) {
         Task task = taskRepository.findById(postId)
                 .filter(t -> t.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
         task.setDeletedAt(LocalDateTime.now());
         taskRepository.save(task);
         reportService.markReportsHandled(postId);
+        String r = reason == null ? "" : reason.trim();
+        chatService.addSystemNotify(task.getPublisherId(),
+                "你发布的「" + task.getTitle() + "」已被管理员删除。"
+                        + (!r.isEmpty() ? "原因：" + r : "如有疑问请联系平台。"));
         return PostDTO.from(task);
     }
 
