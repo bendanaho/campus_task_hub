@@ -43,7 +43,12 @@ function renderNav() {
     });
 
     if (isLoggedIn()) {
-        html += '<a href="profile.html">' + getCurrentUser().username + '</a>';
+        var navUser = getCurrentUser();
+        // 管理员额外显示「管理后台」入口
+        if (navUser && navUser.role === 1) {
+            html += '<a href="admin.html" class="' + (currentPage === 'admin.html' ? 'active' : '') + '">管理后台</a>';
+        }
+        html += '<a href="profile.html">' + navUser.username + '</a>';
     } else {
         var redirectUrl = encodeURIComponent(currentPage);
         html += '<a href="login.html?redirect=' + redirectUrl + '">登录/注册</a>';
@@ -96,6 +101,22 @@ function requireVerified() {
         if (confirm('该操作需要先完成实名认证，是否前往认证？')) {
             window.location.href = 'auth.html';
         }
+        return false;
+    }
+    return true;
+}
+
+// 管理后台门禁：必须已登录且 role=1（与后端 /api/admin/** 的鉴权双保险）
+function requireAdmin() {
+    if (!isLoggedIn()) {
+        alert('请先登录。');
+        window.location.href = 'login.html?redirect=' + encodeURIComponent('admin.html');
+        return false;
+    }
+    var u = getCurrentUser();
+    if (!u || u.role !== 1) {
+        alert('无管理员权限。');
+        window.location.href = 'index.html';
         return false;
     }
     return true;
@@ -867,9 +888,19 @@ function initChatDetail() {
     var partnerId = getUrlParam('partner');
     var taskId = getUrlParam('task');
 
+    // 管理员只读查看模式（?admin=1 且当前登录用户是管理员）：
+    // 仲裁取证用——只看聊天记录，隐藏输入/付款/订单操作，不标记已读、不创建会话
+    var meForAdmin = getCurrentUser();
+    var adminView = getUrlParam('admin') === '1' && !!(meForAdmin && meForAdmin.role === 1);
+
     if (!chatId) {
         document.querySelector('.chat-box').innerHTML = '<p>聊天不存在</p>';
         return;
+    }
+
+    if (adminView) {
+        var inputArea = document.querySelector('.chat-input-area');
+        if (inputArea) inputArea.style.display = 'none';
     }
 
     var chatBox = document.querySelector('.chat-box');
@@ -1038,6 +1069,13 @@ function initChatDetail() {
     }
 
     async function renderTaskBar() {
+        // 管理员只读：不查订单（后端订单接口仅参与者可查），只显示提示与返回入口
+        if (adminView) {
+            taskBar.innerHTML = '<div class="task-bar-info"><span class="task-bar-status">管理员只读查看模式</span></div>' +
+                '<div class="task-bar-actions"><a href="admin.html" class="btn btn-small btn-secondary">返回管理后台</a></div>';
+            taskBar.style.display = 'flex';
+            return;
+        }
         if (!taskId) { taskBar.style.display = 'none'; return; }
         var result = await getTaskDetail(taskId);
         var task = result && result.task;
@@ -1130,7 +1168,20 @@ function initChatDetail() {
             } else {
                 actions += '<span class="task-bar-waiting">等待对方确认...</span>';
             }
+            // 双方任一方可申诉：订单转入争议、资金冻结，等待管理员裁决
+            actions += '<button type="button" class="btn btn-small btn-secondary" onclick="handleDispute(\'' + order.id + '\')">申诉</button>';
             return actions;
+        }
+
+        if (order.status === 'disputed') {
+            return '<span class="task-bar-status">争议处理中，资金已冻结，等待管理员裁决</span>';
+        }
+
+        if (order.status === 'closed') {
+            var resMap = { refund: '全额退款', settle: '全额结算', partial: '部分结算' };
+            var resText = resMap[order.resolution] || '';
+            return '<span class="task-bar-waiting">已结案' + (resText ? ' · ' + resText : '') +
+                (order.resolutionNote ? '（' + order.resolutionNote + '）' : '') + '</span>';
         }
 
         if (order.status === 'completed') {
@@ -1149,11 +1200,13 @@ function initChatDetail() {
     renderMessages();
     renderTaskBar();
 
-    // 打开聊天即把对方发来的未读消息标记为已读，并刷新导航栏红点
-    markMessagesRead(chatId).then(function() { updateNavUnread(); });
+    // 打开聊天即把对方发来的未读消息标记为已读，并刷新导航栏红点（管理员只读不标已读）
+    if (!adminView) {
+        markMessagesRead(chatId).then(function() { updateNavUnread(); });
+    }
 
-    // 确保 conversation 存在，使消息中心能显示该会话
-    if (partnerId && taskId) {
+    // 确保 conversation 存在，使消息中心能显示该会话（管理员只读不创建会话）
+    if (!adminView && partnerId && taskId) {
         Promise.all([fetchUserById(partnerId), getTaskDetail(taskId)]).then(function(arr) {
             var partner = arr[0];
             var result = arr[1];
@@ -1283,6 +1336,19 @@ window.handleOrderCancel = function(orderId) {
 };
 
 // 确认完成（任一方，双方都确认才结算）
+// 发起申诉：填写理由 → 订单转 disputed（资金保持冻结），聊天发系统消息
+window.handleDispute = function(orderId) {
+    if (!requireVerified()) return;
+    var reason = prompt('请填写申诉理由（将提交给管理员仲裁）：');
+    if (reason === null) return;
+    disputeOrder(orderId, reason).then(function() {
+        alert('申诉已提交，订单已冻结，等待管理员处理。');
+        window.location.reload();
+    }).catch(function(err) {
+        alert(err.message || '申诉失败');
+    });
+};
+
 window.handleOrderConfirm = function(orderId) {
     if (!requireVerified()) return;
     confirmOrder(orderId).then(function(res) {
@@ -1594,6 +1660,152 @@ function initDevAccountSwitcher() {
     });
 }
 
+// ==================== 管理后台 ====================
+
+function initAdminPage() {
+    if (!window.location.pathname.includes('admin.html')) return;
+    if (!requireAdmin()) return;
+
+    var content = document.getElementById('adminContent');
+    var tabs = document.querySelectorAll('.admin-tab');
+    if (!content) return;
+    var currentTab = 'disputes';
+
+    tabs.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            currentTab = btn.getAttribute('data-tab');
+            tabs.forEach(function(b) { b.classList.toggle('active', b === btn); });
+            render();
+        });
+    });
+
+    function statusBadge(status) {
+        var clsMap = {
+            pending: 'status-pending', in_progress: 'status-in_progress', completed: 'status-completed',
+            cancelled: 'status-cancelled', disputed: 'status-action', closed: 'status-completed'
+        };
+        return '<span class="status-badge ' + (clsMap[status] || 'status-pending') + '">' + getOrderStatusText(status) + '</span>';
+    }
+
+    async function render() {
+        content.innerHTML = '<div class="card empty-state"><p>加载中…</p></div>';
+        try {
+            if (currentTab === 'disputes') {
+                renderDisputes(await getAdminDisputes());
+            } else if (currentTab === 'orders') {
+                renderOrders(await getAdminOrders());
+            } else {
+                renderPosts(await getAdminPosts());
+            }
+        } catch (e) {
+            content.innerHTML = '<div class="card empty-state"><p>' + (e.message || '加载失败') + '</p></div>';
+        }
+    }
+
+    function renderDisputes(list) {
+        if (!list || list.length === 0) {
+            content.innerHTML = '<div class="card empty-state"><p>暂无待处理申诉</p></div>';
+            return;
+        }
+        content.innerHTML = list.map(function(item) {
+            var o = item.order;
+            return '<div class="card dispute-card">' +
+                '<div class="msg-header"><h3>' + item.postTitle + '</h3>' +
+                    '<span class="msg-time">' + formatDateTime(o.disputedAt) + '</span></div>' +
+                '<p class="meta">订单号：' + o.id + ' ｜ 金额：' + (o.amount || 0) + ' 元（冻结中） ｜ 付款方：' + item.payerName + ' ｜ 收款方：' + item.earnerName + '</p>' +
+                '<p class="meta">申诉人：' + item.disputedByName + ' ｜ 理由：' + (o.disputeReason || '') + '</p>' +
+                '<div class="form-group"><textarea id="note-' + o.id + '" class="form-control" rows="2" placeholder="处理说明（必填，将随结案系统消息展示给双方）"></textarea></div>' +
+                '<div class="actions">' +
+                    '<a class="btn btn-small btn-secondary" href="chat-detail.html?chatId=' + encodeURIComponent(o.chatId) + '&admin=1">查看聊天记录</a>' +
+                    '<button type="button" class="btn btn-small" onclick="handleAdminResolve(\'' + o.id + '\', \'refund\')">全额退款给' + item.payerName + '</button>' +
+                    '<button type="button" class="btn btn-small" onclick="handleAdminResolve(\'' + o.id + '\', \'settle\')">全额结算给' + item.earnerName + '</button>' +
+                    (o.amount > 0 ? '<button type="button" class="btn btn-small btn-secondary" onclick="handleAdminResolve(\'' + o.id + '\', \'partial\')">部分结算…</button>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderOrders(list) {
+        if (!list || list.length === 0) {
+            content.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
+            return;
+        }
+        content.innerHTML = list.map(function(item) {
+            var o = item.order;
+            var resMap = { refund: '全额退款', settle: '全额结算', partial: '部分结算' };
+            var extra = o.status === 'closed' && o.resolution
+                ? '<p class="meta">结案：' + (resMap[o.resolution] || o.resolution) + (o.resolutionNote ? '（' + o.resolutionNote + '）' : '') + '</p>'
+                : '';
+            return '<div class="card">' +
+                '<div class="msg-header"><h3>' + item.postTitle + ' ' + statusBadge(o.status) + '</h3>' +
+                    '<span class="msg-time">' + formatDateTime(o.createdAt) + '</span></div>' +
+                '<p class="meta">订单号：' + o.id + ' ｜ 金额：' + (o.amount || 0) + ' 元 ｜ 付款方：' + item.payerName + ' ｜ 收款方：' + item.earnerName + '</p>' +
+                extra +
+                '<div class="actions"><a class="btn btn-small btn-secondary" href="chat-detail.html?chatId=' + encodeURIComponent(o.chatId) + '&admin=1">查看聊天记录</a></div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderPosts(list) {
+        if (!list || list.length === 0) {
+            content.innerHTML = '<div class="card empty-state"><p>暂无帖子</p></div>';
+            return;
+        }
+        content.innerHTML = list.map(function(t) {
+            var typeLabel = t.publisherSide === 'payer' ? '悬赏求助' : (t.publisherSide === 'none' ? '组队互助' : '提供服务');
+            var stBadge = t.status === 'open'
+                ? '<span class="status-badge status-in_progress">上架中</span>'
+                : '<span class="status-badge status-cancelled">已下架/关闭</span>';
+            return '<div class="card">' +
+                '<div class="msg-header"><h3>' + t.title + ' ' + stBadge + '</h3>' +
+                    '<span class="msg-time">' + formatDateTime(t.publishTime) + '</span></div>' +
+                '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName + ' ｜ 报酬：' + formatReward(t.reward) + '</p>' +
+                '<div class="actions">' +
+                    '<a href="task-detail.html?id=' + t.id + '" class="btn btn-small btn-secondary">查看详情</a>' +
+                    (t.status === 'open' ? '<button type="button" class="btn btn-small btn-danger" onclick="handleAdminClosePost(\'' + t.id + '\')">下架</button>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // 裁决：读卡片上的处理说明；partial 再询问结算金额
+    window.handleAdminResolve = function(orderId, decision) {
+        var noteEl = document.getElementById('note-' + orderId);
+        var note = noteEl ? noteEl.value.trim() : '';
+        if (!note) { alert('请先填写处理说明。'); return; }
+        var amountToEarner = null;
+        if (decision === 'partial') {
+            var input = prompt('请输入结算给收款方的金额（元），其余将退回付款方：');
+            if (input === null) return;
+            amountToEarner = Number(input);
+        }
+        var confirmText = {
+            refund: '确认全额退款给付款方并结案？',
+            settle: '确认全额结算给收款方并结案？',
+            partial: '确认按该金额部分结算并结案？'
+        }[decision];
+        if (!confirm(confirmText)) return;
+        resolveDispute(orderId, decision, amountToEarner, note).then(function() {
+            alert('已结案，双方将在聊天中收到结案系统消息。');
+            render();
+        }).catch(function(err) {
+            alert(err.message || '处理失败');
+        });
+    };
+
+    window.handleAdminClosePost = function(postId) {
+        if (!confirm('确认下架该帖子？下架后大厅不再显示、不可再下单。')) return;
+        adminClosePost(postId).then(function() {
+            alert('已下架。');
+            render();
+        }).catch(function(err) {
+            alert(err.message || '操作失败');
+        });
+    };
+
+    render();
+}
+
 // ==================== 初始化入口 ====================
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1613,6 +1825,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initOrderCenter();
     initReview();
     initBills();
+    initAdminPage();
     initLightbox();
     initDevAccountSwitcher();
 

@@ -1247,3 +1247,24 @@ html {
     margin: 0;
     font-weight: 500;
 }
+
+/* ==================== 管理后台 ==================== */
+.admin-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.admin-tabs .admin-tab {
+    background-color: #eef2f7;
+    color: #334155;
+}
+.admin-tabs .admin-tab.active {
+    background-color: #2e75b6;
+    color: #fff;
+}
+.dispute-card {
+    border-left: 3px solid #f97316; /* 与消息中心「待我操作」同色，示意需管理员处理 */
+}
+.dispute-card textarea {
+    resize: vertical;
+}

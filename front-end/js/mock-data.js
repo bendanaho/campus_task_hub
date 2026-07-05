@@ -86,6 +86,15 @@ function createInitialData() {
             avatar: '', creditScore: 2.5, authStatus: 'verified', balance: 100,
             realName: '周佳', studentId: '2021080008', college: '文学院', className: '汉语言2101',
             bio: '校内打印店兼职，可以帮忙打印资料。'
+        },
+        {
+            // 平台管理员（role: 1，普通用户 role 缺省视为 0）。
+            // 不参与交易，负责争议订单仲裁与内容管理；登录后导航栏出现「管理后台」。
+            id: 'u9', username: 'admin', phone: '13800138009', email: 'admin@example.com', password: '1',
+            avatar: 'https://picsum.photos/seed/avatarAdmin/200/200',
+            creditScore: 5.0, authStatus: 'verified', balance: 0, role: 1,
+            realName: '平台管理员', studentId: 'ADMIN', college: '平台运营', className: '管理组',
+            bio: '平台管理员，负责争议订单仲裁与内容管理。'
         }
     ];
 

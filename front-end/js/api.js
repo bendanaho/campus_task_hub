@@ -302,6 +302,85 @@ async function confirmOrder(orderId) {
     return _handleRes(res);
 }
 
+// 发起申诉（付款方/收款方任一方，仅 in_progress）→ disputed，资金保持冻结，等待管理员裁决
+async function disputeOrder(orderId, reason) {
+    if (USE_MOCK) {
+        return mockDisputeOrder(orderId, reason);
+    }
+    var res = await fetch(API_BASE + '/orders/' + orderId + '/dispute', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ reason: reason })
+    });
+    return _handleRes(res);
+}
+
+// ==================== 管理员（role=1）====================
+
+// 待处理争议订单列表 → [{ order, postTitle, payerName, earnerName, disputedByName }]
+async function getAdminDisputes() {
+    if (USE_MOCK) {
+        return mockGetAdminDisputes();
+    }
+    var res = await fetch(API_BASE + '/admin/disputes', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
+// 管理员裁决争议订单。decision: 'refund'(全额退款) | 'settle'(全额结算) | 'partial'(部分结算，amountToEarner 给收款方，其余退付款方)
+async function resolveDispute(orderId, decision, amountToEarner, note) {
+    if (USE_MOCK) {
+        return mockResolveDispute(orderId, decision, amountToEarner, note);
+    }
+    var res = await fetch(API_BASE + '/admin/orders/' + orderId + '/resolve', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ decision: decision, amountToEarner: amountToEarner, note: note })
+    });
+    return _handleRes(res);
+}
+
+// 全部订单总览（管理员）→ 结构同 getAdminDisputes
+async function getAdminOrders() {
+    if (USE_MOCK) {
+        return mockGetAdminOrders();
+    }
+    var res = await fetch(API_BASE + '/admin/orders', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
+// 全部帖子（管理员，含已下架）
+async function getAdminPosts() {
+    if (USE_MOCK) {
+        return mockGetAdminPosts();
+    }
+    var res = await fetch(API_BASE + '/admin/posts', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
+// 管理员下架帖子（status → closed，大厅不再显示、不可再下单）
+async function adminClosePost(postId) {
+    if (USE_MOCK) {
+        return mockAdminClosePost(postId);
+    }
+    var res = await fetch(API_BASE + '/admin/posts/' + postId + '/close', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
 // 取某会话当前订单（优先返回进行中的；否则返回最近一条）。取代旧 getActiveOrder + getOrderByChatId
 async function getOrder(chatId) {
     if (USE_MOCK) {
@@ -560,6 +639,7 @@ function mockLogin(account, password) {
                 avatar: user.avatar,
                 creditScore: user.creditScore,
                 authStatus: user.authStatus,
+                role: user.role || 0,
                 bio: user.bio
             };
             setCurrentUser(safeUser);
@@ -681,6 +761,7 @@ function mockSubmitAuth(data) {
                 avatar: user.avatar,
                 creditScore: user.creditScore,
                 authStatus: user.authStatus,
+                role: user.role || 0,
                 bio: user.bio
             };
             setCurrentUser(safeUser);
@@ -1067,6 +1148,11 @@ function mockCreateOrder(postId, chatId) {
                 reject(new Error('该悬赏已过截止时间，无法接单'));
                 return;
             }
+            // 与后端一致：已关闭的帖子（含管理员下架）不可再下单
+            if (post.status === 'closed') {
+                reject(new Error('该帖子已关闭，无法下单'));
+                return;
+            }
             // 悬赏帖(payer)一次性：同帖只允许一个未完成订单；
             // 服务帖(earner)/组队帖(none)可复用：允许多人并发下单/报名
             if (post.publisherSide === 'payer' && _findActiveOrderByPost(db, postId)) {
@@ -1277,6 +1363,184 @@ function mockConfirmOrder(orderId) {
             }
             _mockSaveDB(db);
             resolve({ success: true, order: order });
+        }, 200);
+    });
+}
+
+// ---------- 争议与管理员 ----------
+
+function _isAdminUser(db, userId) {
+    var u = _findUserInDb(db, userId);
+    return !!(u && u.role === 1);
+}
+
+// 发起申诉：参与者、仅 in_progress。资金保持冻结（不退不结），等待管理员裁决。
+function mockDisputeOrder(orderId, reason) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var db = _mockGetDB();
+            if (!_isVerified(db, currentUser.id)) { reject(new Error('请先完成实名认证后再操作')); return; }
+            var order = _findOrderById(db, orderId);
+            if (!order) { reject(new Error('订单不存在')); return; }
+            if (currentUser.id !== order.payerId && currentUser.id !== order.earnerId) {
+                reject(new Error('你不是该订单的参与者')); return;
+            }
+            if (order.status !== 'in_progress') { reject(new Error('仅进行中的订单可以申诉')); return; }
+            var r = String(reason || '').trim();
+            if (!r) { reject(new Error('请填写申诉理由')); return; }
+
+            order.status = 'disputed';
+            order.disputeReason = r;
+            order.disputedBy = currentUser.id;
+            order.disputedAt = new Date().toISOString();
+
+            var post = _findPostInDb(db, order.postId);
+            _addSystemMessage(db, order.chatId,
+                currentUser.username + ' 发起了申诉：' + r + '。订单已冻结，等待管理员处理',
+                order.postId, post ? post.title : '');
+            _mockSaveDB(db);
+            resolve({ success: true, order: order });
+        }, 200);
+    });
+}
+
+// 管理员订单列表公共装配：{ order, postTitle, payerName, earnerName, disputedByName }
+function _adminOrderItem(db, o) {
+    var post = _findPostInDb(db, o.postId);
+    var payer = _findUserInDb(db, o.payerId);
+    var earner = _findUserInDb(db, o.earnerId);
+    var by = o.disputedBy ? _findUserInDb(db, o.disputedBy) : null;
+    return {
+        order: o,
+        postTitle: post ? post.title : '',
+        payerName: payer ? payer.username : '',
+        earnerName: earner ? earner.username : '',
+        disputedByName: by ? by.username : ''
+    };
+}
+
+function mockGetAdminDisputes() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var list = (db.orders || []).filter(function(o) { return o.status === 'disputed'; })
+                .map(function(o) { return _adminOrderItem(db, o); });
+            list.sort(function(a, b) { return new Date(b.order.disputedAt || 0) - new Date(a.order.disputedAt || 0); });
+            resolve(list);
+        }, 100);
+    });
+}
+
+// 管理员裁决：refund 全额退付款方 / settle 全额结算收款方 / partial 部分给收款方、其余退付款方。
+// 结案 → closed，按裁决转账并记账单流水，聊天发系统消息。closed 订单不进入评价流程。
+function mockResolveDispute(orderId, decision, amountToEarner, note) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var order = _findOrderById(db, orderId);
+            if (!order) { reject(new Error('订单不存在')); return; }
+            if (order.status !== 'disputed') { reject(new Error('该订单不在争议处理中')); return; }
+            var noteText = String(note || '').trim();
+            if (!noteText) { reject(new Error('请填写处理说明')); return; }
+
+            var amount = order.amount || 0;
+            var earnerGets;
+            if (decision === 'refund') {
+                earnerGets = 0;
+            } else if (decision === 'settle') {
+                earnerGets = amount;
+            } else if (decision === 'partial') {
+                earnerGets = Number(amountToEarner);
+                if (!isFinite(earnerGets) || earnerGets <= 0 || earnerGets >= amount) {
+                    reject(new Error('部分结算金额需大于 0 且小于订单金额 ' + amount + ' 元')); return;
+                }
+            } else {
+                reject(new Error('无效的处理方式')); return;
+            }
+            var payerGets = amount - earnerGets;
+
+            var post = _findPostInDb(db, order.postId);
+            var title = post ? post.title : '';
+            var payer = _findUserInDb(db, order.payerId);
+            var earner = _findUserInDb(db, order.earnerId);
+            if (payerGets > 0 && payer) {
+                payer.balance = (payer.balance || 0) + payerGets;
+                _addTx(db, order.payerId, 'in', payerGets, 'order', order.id, '仲裁退款：' + title);
+            }
+            if (earnerGets > 0 && earner) {
+                earner.balance = (earner.balance || 0) + earnerGets;
+                _addTx(db, order.earnerId, 'in', earnerGets, 'order', order.id, '订单收入（仲裁）：' + title);
+            }
+
+            order.status = 'closed';
+            order.resolution = decision;
+            order.resolutionAmountToEarner = earnerGets;
+            order.resolutionNote = noteText;
+            order.resolvedAt = new Date().toISOString();
+
+            var text;
+            if (amount <= 0) {
+                text = '管理员已结案（说明：' + noteText + '）';
+            } else if (decision === 'refund') {
+                text = '管理员已结案：全额退款，' + amount + ' 元已退还 ' + (payer ? payer.username : '付款方') + '（说明：' + noteText + '）';
+            } else if (decision === 'settle') {
+                text = '管理员已结案：全额结算，' + amount + ' 元已支付给 ' + (earner ? earner.username : '收款方') + '（说明：' + noteText + '）';
+            } else {
+                text = '管理员已结案：部分结算，' + (earner ? earner.username : '收款方') + ' 获得 ' + earnerGets + ' 元，' +
+                    (payer ? payer.username : '付款方') + ' 获退 ' + payerGets + ' 元（说明：' + noteText + '）';
+            }
+            _addSystemMessage(db, order.chatId, text, order.postId, title);
+            _mockSaveDB(db);
+            resolve({ success: true, order: order });
+        }, 200);
+    });
+}
+
+function mockGetAdminOrders() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            _sweep(db);
+            var list = (db.orders || []).map(function(o) { return _adminOrderItem(db, o); });
+            list.sort(function(a, b) { return new Date(b.order.createdAt || 0) - new Date(a.order.createdAt || 0); });
+            resolve(list);
+        }, 100);
+    });
+}
+
+function mockGetAdminPosts() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var list = (db.tasks || []).slice();
+            list.sort(function(a, b) { return new Date(b.publishTime || 0) - new Date(a.publishTime || 0); });
+            resolve(list);
+        }, 100);
+    });
+}
+
+function mockAdminClosePost(postId) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var post = _findPostInDb(db, postId);
+            if (!post) { reject(new Error('帖子不存在')); return; }
+            if (post.status === 'closed') { reject(new Error('该帖子已是下架/关闭状态')); return; }
+            post.status = 'closed';
+            _mockSaveDB(db);
+            resolve({ success: true, post: post });
         }, 200);
     });
 }
