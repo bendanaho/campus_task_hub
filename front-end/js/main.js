@@ -515,6 +515,8 @@ function initTaskHall() {
                         '<div class="actions">' +
                             '<a href="task-detail.html?id=' + task.id + '" class="btn btn-secondary">查看详情</a>' +
                             actionBtn +
+                            // 登录的普通用户可举报；管理员/未登录不显示
+                            (isLoggedIn() && !isAdminUser() ? '<button type="button" class="btn btn-small btn-link-report" onclick="handleReport(\'' + task.id + '\')">举报</button>' : '') +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -1373,6 +1375,22 @@ window.handleOrderCancel = function(orderId) {
 };
 
 // 确认完成（任一方，双方都确认才结算）
+// 普通用户举报帖子：填理由 → 提交给管理员处理
+window.handleReport = function(postId) {
+    if (!isLoggedIn()) {
+        alert('请先登录后再举报。');
+        window.location.href = 'login.html?redirect=' + encodeURIComponent('task-hall.html');
+        return;
+    }
+    var reason = prompt('请填写举报理由（如：虚假信息、诈骗、垃圾广告、内容违规等）：');
+    if (reason === null) return;
+    reportPost(postId, reason).then(function() {
+        alert('举报已提交，感谢反馈，管理员会尽快处理。');
+    }).catch(function(err) {
+        alert(err.message || '举报失败');
+    });
+};
+
 // 发起申诉：填写理由 → 订单转 disputed（资金保持冻结），聊天发系统消息
 window.handleDispute = function(orderId) {
     if (blockIfAdmin()) return;
@@ -1730,6 +1748,8 @@ function initAdminPage() {
         try {
             if (currentTab === 'disputes') {
                 renderDisputes(await getAdminDisputes());
+            } else if (currentTab === 'reports') {
+                renderReports(await getAdminReports());
             } else if (currentTab === 'orders') {
                 renderOrders(await getAdminOrders());
             } else {
@@ -1738,6 +1758,31 @@ function initAdminPage() {
         } catch (e) {
             content.innerHTML = '<div class="card empty-state"><p>' + (e.message || '加载失败') + '</p></div>';
         }
+    }
+
+    function renderReports(list) {
+        if (!list || list.length === 0) {
+            content.innerHTML = '<div class="card empty-state"><p>暂无待处理举报</p></div>';
+            return;
+        }
+        content.innerHTML = list.map(function(item) {
+            var t = item.post;
+            var typeLabel = t.publisherSide === 'payer' ? '悬赏求助' : (t.publisherSide === 'none' ? '组队互助' : '提供服务');
+            var reasons = item.reasons.map(function(r) {
+                return '<li>' + r.reporterName + '：' + r.reason + '<span class="msg-time"> （' + formatDateTime(r.createdAt) + '）</span></li>';
+            }).join('');
+            return '<div class="card dispute-card">' +
+                '<div class="msg-header"><h3>' + t.title +
+                    ' <span class="status-badge status-action">被举报 ' + item.reportCount + ' 次</span></h3></div>' +
+                '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName + ' ｜ 报酬：' + formatReward(t.reward) + '</p>' +
+                '<ul class="report-reasons">' + reasons + '</ul>' +
+                '<div class="actions">' +
+                    '<a href="task-detail.html?id=' + t.id + '" class="btn btn-small btn-secondary">查看详情</a>' +
+                    '<button type="button" class="btn btn-small" onclick="handleAdminClosePost(\'' + t.id + '\')">下架</button>' +
+                    '<button type="button" class="btn btn-small btn-danger" onclick="handleAdminDeletePost(\'' + t.id + '\')">删除</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
     }
 
     function renderDisputes(list) {
@@ -1800,7 +1845,8 @@ function initAdminPage() {
                 '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName + ' ｜ 报酬：' + formatReward(t.reward) + '</p>' +
                 '<div class="actions">' +
                     '<a href="task-detail.html?id=' + t.id + '" class="btn btn-small btn-secondary">查看详情</a>' +
-                    (t.status === 'open' ? '<button type="button" class="btn btn-small btn-danger" onclick="handleAdminClosePost(\'' + t.id + '\')">下架</button>' : '') +
+                    (t.status === 'open' ? '<button type="button" class="btn btn-small" onclick="handleAdminClosePost(\'' + t.id + '\')">下架</button>' : '') +
+                    '<button type="button" class="btn btn-small btn-danger" onclick="handleAdminDeletePost(\'' + t.id + '\')">删除</button>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -1832,9 +1878,19 @@ function initAdminPage() {
     };
 
     window.handleAdminClosePost = function(postId) {
-        if (!confirm('确认下架该帖子？下架后大厅不再显示、不可再下单。')) return;
+        if (!confirm('确认下架该帖子？下架后大厅不再显示、不可再下单，但记录仍保留。')) return;
         adminClosePost(postId).then(function() {
             alert('已下架。');
+            render();
+        }).catch(function(err) {
+            alert(err.message || '操作失败');
+        });
+    };
+
+    window.handleAdminDeletePost = function(postId) {
+        if (!confirm('确认删除该帖子？删除后全站不可见、不可查（软删除，记录保留供审计），并清除其待处理举报。')) return;
+        adminDeletePost(postId).then(function() {
+            alert('已删除。');
             render();
         }).catch(function(err) {
             alert(err.message || '操作失败');

@@ -540,7 +540,7 @@ function createInitialData() {
         { id: 'tx8', userId: 'u1', direction: 'in', amount: 50, category: 'recharge', relatedId: null, note: '账户充值', time: hourAgo(52) }
     ];
 
-    return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews, orders: orders, transactions: transactions };
+    return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews, orders: orders, transactions: transactions, reports: [] };
 }
 
 const DB_KEY = 'campus_mock_db';

@@ -185,3 +185,74 @@ test('纯管理角色：管理员不能下单/发布/发起收付款', async fun
     // 聊天发起收款卡被拒
     await assert.rejects(app.sendPaymentCard('chatZ', 'u1', 'request', 10), /管理员账号不参与交易/);
 });
+
+test('举报：非本人帖可举报、去重、不能举报自己的帖', async function () {
+    const app = createApp();
+    // t18 发布者是 u2(李四)。王同学 u3 举报
+    await loginAs(app, '王同学');
+    const r1 = await app.reportPost('t18', '疑似虚假信息');
+    assert.strictEqual(r1.success, true);
+    // 同一人重复举报被拒
+    await assert.rejects(app.reportPost('t18', '再举报一次'), /已举报过/);
+    // 空理由被拒
+    await assert.rejects(app.reportPost('t18', '  '), /举报理由/);
+    // 发布者本人不能举报自己的帖
+    await loginAs(app, '李四');
+    await assert.rejects(app.reportPost('t18', '自举'), /不能举报自己/);
+    // 另一个用户举报同一帖 → 计入
+    await loginAs(app, '张三');
+    await app.reportPost('t18', '内容不实');
+
+    const db = app.getDB();
+    assert.strictEqual(db.reports.filter(r => r.postId === 't18').length, 2);
+});
+
+test('管理员看举报：按帖子聚合、显示次数与理由', async function () {
+    const app = createApp();
+    await loginAs(app, '王同学'); await app.reportPost('t18', '理由A');
+    await loginAs(app, '张三'); await app.reportPost('t18', '理由B');
+
+    await loginAs(app, 'admin');
+    const reports = await app.getAdminReports();
+    const item = reports.find(x => x.post.id === 't18');
+    assert.ok(item, '举报列表应含 t18');
+    assert.strictEqual(item.reportCount, 2);
+    assert.strictEqual(item.reasons.length, 2);
+    // 普通用户无权查看举报
+    await loginAs(app, '张三');
+    await assert.rejects(app.getAdminReports(), /无管理员权限/);
+});
+
+test('管理员删除帖子（软删）：全站不可见、不可下单、清空该帖举报', async function () {
+    const app = createApp();
+    await loginAs(app, '王同学'); await app.reportPost('t18', '违规');
+
+    await loginAs(app, 'admin');
+    // 删除前大厅可见
+    let hall = await app.getTasks({});
+    assert.ok(hall.some(t => t.id === 't18'));
+
+    await app.adminDeletePost('t18');
+
+    // 大厅、详情、帖子管理均不可见
+    hall = await app.getTasks({});
+    assert.ok(!hall.some(t => t.id === 't18'), '大厅不可见');
+    const detail = await app.getTaskDetail('t18');
+    assert.strictEqual(detail, null, '详情视为不存在');
+    const adminPosts = await app.getAdminPosts();
+    assert.ok(!adminPosts.some(t => t.id === 't18'), '帖子管理不可见');
+    // 举报被标记 handled → 举报列表不再显示
+    const reports = await app.getAdminReports();
+    assert.ok(!reports.some(x => x.post.id === 't18'), '删帖后其举报清出列表');
+
+    // 普通用户不能对已删帖下单
+    await loginAs(app, '王同学');
+    await assert.rejects(app.createOrder('t18', 'chatDel'), /帖子不存在/);
+
+    // 重复删除被拒
+    await loginAs(app, 'admin');
+    await assert.rejects(app.adminDeletePost('t18'), /帖子不存在/);
+    // 举报也不能再举报已删帖
+    await loginAs(app, '张三');
+    await assert.rejects(app.reportPost('t18', 'x'), /帖子不存在/);
+});

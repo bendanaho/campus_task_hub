@@ -381,6 +381,42 @@ async function adminClosePost(postId) {
     return _handleRes(res);
 }
 
+// 普通用户举报帖子
+async function reportPost(postId, reason) {
+    if (USE_MOCK) {
+        return mockReportPost(postId, reason);
+    }
+    var res = await fetch(API_BASE + '/posts/' + postId + '/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ reason: reason })
+    });
+    return _handleRes(res);
+}
+
+// 管理员查看举报（按帖子聚合）
+async function getAdminReports() {
+    if (USE_MOCK) {
+        return mockGetAdminReports();
+    }
+    var res = await fetch(API_BASE + '/admin/reports', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
+// 管理员删除帖子（软删，全站不可见/不可查）
+async function adminDeletePost(postId) {
+    if (USE_MOCK) {
+        return mockAdminDeletePost(postId);
+    }
+    var res = await fetch(API_BASE + '/admin/posts/' + postId + '/delete', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
 // 取某会话当前订单（优先返回进行中的；否则返回最近一条）。取代旧 getActiveOrder + getOrderByChatId
 async function getOrder(chatId) {
     if (USE_MOCK) {
@@ -989,8 +1025,8 @@ function mockGetTasks(filters) {
     return new Promise(function(resolve) {
         setTimeout(function() {
             var db = _mockGetDB();
-            // 大厅只展示挂出来、且未过截止时间的帖子
-            var result = db.tasks.filter(function(t) { return t.status === 'open' && !_isExpired(t); });
+            // 大厅只展示挂出来、未过截止时间、且未被管理员删除的帖子
+            var result = db.tasks.filter(function(t) { return t.status === 'open' && !t.deletedAt && !_isExpired(t); });
 
             if (filters) {
                 // side: 'payer'(别人出钱,我能赚) | 'earner'(别人收钱,我要花钱) | 'none'(纯互助) | 'all'
@@ -1043,6 +1079,8 @@ function mockGetTaskDetail(id) {
     return new Promise(function(resolve) {
         setTimeout(function() {
             var task = _mockGetTaskById(id);
+            // 已被管理员删除（软删）的帖子视为不存在
+            if (task && task.deletedAt) task = null;
             if (task) {
                 var publisher = _mockGetUserById(task.publisherId);
                 resolve({
@@ -1144,7 +1182,7 @@ function mockCreateOrder(postId, chatId) {
                 return;
             }
             var post = _mockGetTaskById(postId);
-            if (!post) {
+            if (!post || post.deletedAt) {
                 reject(new Error('帖子不存在'));
                 return;
             }
@@ -1530,7 +1568,8 @@ function mockGetAdminPosts() {
             var currentUser = getCurrentUser();
             var db = _mockGetDB();
             if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
-            var list = (db.tasks || []).slice();
+            // 已软删的帖子不再出现在帖子管理里
+            var list = (db.tasks || []).filter(function(t) { return !t.deletedAt; });
             list.sort(function(a, b) { return new Date(b.publishTime || 0) - new Date(a.publishTime || 0); });
             resolve(list);
         }, 100);
@@ -1544,9 +1583,84 @@ function mockAdminClosePost(postId) {
             var db = _mockGetDB();
             if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
             var post = _findPostInDb(db, postId);
-            if (!post) { reject(new Error('帖子不存在')); return; }
+            if (!post || post.deletedAt) { reject(new Error('帖子不存在')); return; }
             if (post.status === 'closed') { reject(new Error('该帖子已是下架/关闭状态')); return; }
             post.status = 'closed';
+            _mockSaveDB(db);
+            resolve({ success: true, post: post });
+        }, 200);
+    });
+}
+
+// ---------- 举报与删除 ----------
+
+// 普通用户举报帖子：登录、非本人帖、(postId,reporterId) 去重
+function mockReportPost(postId, reason) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            if (!currentUser) { reject(new Error('请先登录')); return; }
+            var db = _mockGetDB();
+            if (_isAdminUser(db, currentUser.id)) { reject(new Error('管理员账号无需举报')); return; }
+            var post = _findPostInDb(db, postId);
+            if (!post || post.deletedAt) { reject(new Error('帖子不存在')); return; }
+            if (post.publisherId === currentUser.id) { reject(new Error('不能举报自己发布的帖子')); return; }
+            var r = String(reason || '').trim();
+            if (!r) { reject(new Error('请填写举报理由')); return; }
+            if (!db.reports) db.reports = [];
+            var dup = db.reports.some(function(x) { return x.postId === postId && x.reporterId === currentUser.id && x.status === 'pending'; });
+            if (dup) { reject(new Error('你已举报过该帖子，管理员会尽快处理')); return; }
+            db.reports.push({
+                id: 'rep-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+                postId: postId,
+                reporterId: currentUser.id,
+                reporterName: currentUser.username,
+                reason: r,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            });
+            _mockSaveDB(db);
+            resolve({ success: true });
+        }, 200);
+    });
+}
+
+// 管理员查看举报：按帖子聚合 → [{ post, reportCount, reasons:[{reporterName,reason,createdAt}] }]，仅未删除帖、pending 举报
+function mockGetAdminReports() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var byPost = {};
+            (db.reports || []).forEach(function(rep) {
+                if (rep.status !== 'pending') return;
+                var post = _findPostInDb(db, rep.postId);
+                if (!post || post.deletedAt) return; // 帖子已删则不再展示其举报
+                if (!byPost[rep.postId]) byPost[rep.postId] = { post: post, reportCount: 0, reasons: [] };
+                byPost[rep.postId].reportCount++;
+                byPost[rep.postId].reasons.push({ reporterName: rep.reporterName, reason: rep.reason, createdAt: rep.createdAt });
+            });
+            var list = Object.keys(byPost).map(function(k) { return byPost[k]; });
+            list.sort(function(a, b) { return b.reportCount - a.reportCount; });
+            resolve(list);
+        }, 100);
+    });
+}
+
+// 管理员删除帖子（软删）：设 deletedAt，并把该帖 pending 举报标记 handled
+function mockAdminDeletePost(postId) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var post = _findPostInDb(db, postId);
+            if (!post || post.deletedAt) { reject(new Error('帖子不存在')); return; }
+            post.deletedAt = new Date().toISOString();
+            (db.reports || []).forEach(function(rep) {
+                if (rep.postId === postId && rep.status === 'pending') rep.status = 'handled';
+            });
             _mockSaveDB(db);
             resolve({ success: true, post: post });
         }, 200);

@@ -1268,3 +1268,24 @@ html {
 .dispute-card textarea {
     resize: vertical;
 }
+
+/* 举报按钮（大厅卡片，弱化为文字链风格） */
+.btn-link-report {
+    background: transparent;
+    color: #94a3b8;
+    padding: 4px 8px;
+}
+.btn-link-report:hover {
+    color: #ef4444;
+    background: #fef2f2;
+}
+/* 举报处理：理由列表 */
+.report-reasons {
+    margin: 6px 0 10px;
+    padding-left: 20px;
+    color: #475569;
+    font-size: 14px;
+}
+.report-reasons li {
+    margin: 2px 0;
+}
