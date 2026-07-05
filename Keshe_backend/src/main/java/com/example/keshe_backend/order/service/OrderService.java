@@ -128,6 +128,13 @@ public class OrderService {
                 : (currentUser.getUsername() + " 申请接单，等待对方接受"));
         chatService.addSystemMessage(order.getChatId(), createText, String.valueOf(order.getPostId()), post.getTitle());
 
+        try {
+                    String noticeMsg = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"有人向您的帖子『%s』发起了订单申请，请及时前往消息中心处理！\"}", post.getTitle());
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(post.getPublisherId(), noticeMsg);
+                } catch (Exception e) {
+                    log.error("WebSocket实时通知发送失败", e);
+                }
+
         return OrderDTO.from(order);
     }
 
@@ -189,6 +196,17 @@ public class OrderService {
 
         orderRepository.save(order);
 
+        try {
+                    String takenMsg = String.format("{\"type\":\"TASK_TAKEN\",\"postId\":%d}", post.getId());
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(takenMsg);
+
+                    Long applicantId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
+                    String pNotice = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"您对任务『%s』的订单申请已被对方接受，任务正式开始执行！\"}", post.getTitle());
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(applicantId, pNotice);
+                } catch (Exception e) {
+                    log.error("WebSocket实时通知发送失败", e);
+                }
+
         // 系统消息：接受订单（+ 预付冻结）。接受方即发布者
         chatService.addSystemMessage(order.getChatId(), nameOf(userId) + " 接受了订单，任务开始执行", String.valueOf(order.getPostId()), post.getTitle());
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
@@ -221,6 +239,14 @@ public class OrderService {
         order.setStatus("cancelled");
         orderRepository.save(order);
 
+        try {
+                    Long partnerId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
+                    String title = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("未知任务");
+                    String cancelMsg = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"对方取消了关于任务『%s』的待接受订单。\"}", title);
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(partnerId, cancelMsg);
+                } catch (Exception e) {
+                    log.error("WebSocket取消订单通知失败", e);
+                }
         // 系统消息：取消订单
         String cancelTitle = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("");
         chatService.addSystemMessage(order.getChatId(), nameOf(userId) + " 取消了订单", String.valueOf(order.getPostId()), cancelTitle);
@@ -294,6 +320,20 @@ public class OrderService {
         }
 
         orderRepository.save(order);
+
+        try {
+            if (Boolean.TRUE.equals(order.getPayerConfirmed()) && Boolean.TRUE.equals(order.getEarnerConfirmed())) {
+                String finishMsg = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"订单『%s』已双方确认完成，报酬已成功结算！\"}", cfTitle);
+                com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(order.getPayerId(), finishMsg);
+                com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(order.getEarnerId(), finishMsg);
+            } else {
+                Long partnerId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
+                String remindMsg = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"对方已确认完成任务『%s』，请您及时前往核对并确认完成。\"}", cfTitle);
+                com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(partnerId, remindMsg);
+            }
+        } catch (Exception e) {
+            log.error("WebSocket确认订单通知失败", e);
+        }
         return OrderDTO.from(order);
     }
 
@@ -325,10 +365,21 @@ public class OrderService {
         order.setDisputedAt(LocalDateTime.now());
         orderRepository.save(order);
 
+        // 1. 这里先定义并获取了 title 变量
         String title = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("");
         chatService.addSystemMessage(order.getChatId(),
                 nameOf(userId) + " 发起了申诉：" + r + "。订单已冻结，等待管理员处理",
                 String.valueOf(order.getPostId()), title);
+
+        // ======= 2. 新增的 WebSocket 通知代码（移到此处，此时 title 变量就已经存在了） =======
+        try {
+            Long partnerId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
+            String disputeMsg = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"对方针对订单『%s』发起了争议申诉，资金已被冻结，请等待管理员处理。\"}", title);
+            com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(partnerId, disputeMsg);
+        } catch (Exception e) {
+            log.error("WebSocket争议通知失败", e);
+        }
+        // ==============================================================================
 
         return OrderDTO.from(order);
     }
@@ -433,6 +484,13 @@ public class OrderService {
         order.setResolvedAt(LocalDateTime.now());
         orderRepository.save(order);
 
+        try {
+                    String resolveMsg = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"管理员已对您的争议订单『%s』做出最终裁决结案，请查看聊天记录详情。\"}", title);
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(order.getPayerId(), resolveMsg);
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(order.getEarnerId(), resolveMsg);
+                } catch (Exception e) {
+                    log.error("WebSocket仲裁通知失败", e);
+                }
         String text;
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             text = "管理员已结案（说明：" + noteText + "）";

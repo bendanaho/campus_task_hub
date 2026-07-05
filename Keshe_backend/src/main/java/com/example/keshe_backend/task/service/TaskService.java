@@ -11,9 +11,11 @@ import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.example.keshe_backend.common.websocket.NotificationWSServer;
 import java.math.BigDecimal;
 import java.util.List;
+
+import com.example.keshe_backend.common.websocket.NotificationWSServer;
 
 @Service
 @RequiredArgsConstructor
@@ -54,8 +56,15 @@ public class TaskService {
         task.setPublisherId(currentUserId);
         task.setPublisherName(currentUser.getUsername());
         task.setPublisherCredit(currentUser.getCreditScore());
-
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+                try {
+                    // 新任务发布：向全站广播
+                    String msg = String.format("{\"type\":\"NEW_TASK\",\"postId\":%d,\"title\":\"%s\"}", savedTask.getId(), savedTask.getTitle());
+                    NotificationWSServer.broadcast(msg);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return savedTask;
     }
 
     @Transactional
@@ -81,7 +90,15 @@ public class TaskService {
         task.setPublisherName(currentUser.getUsername());
         task.setPublisherCredit(currentUser.getCreditScore());
 
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+        try {
+            // 新服务发布：向全站广播
+            String msg = String.format("{\"type\":\"NEW_TASK\",\"postId\":%d,\"title\":\"%s\"}", savedTask.getId(), savedTask.getTitle());
+            NotificationWSServer.broadcast(msg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return savedTask;
     }
 
     @Transactional
