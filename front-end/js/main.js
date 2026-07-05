@@ -917,7 +917,7 @@ function initMessageCenter() {
                 '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
                 '<p class="msg-preview">' + item.msgPreview + '</p>' +
                 '<div class="actions">' +
-                    '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + c.taskId + '" class="btn">进入聊天</a>' +
+                    '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -933,6 +933,8 @@ function initChatDetail() {
     var chatId = getUrlParam('chatId');
     var partnerId = getUrlParam('partner');
     var taskId = getUrlParam('task');
+    // 归一化：历史链接可能出现字符串 "undefined"/"null"，视为无 taskId
+    if (taskId === 'undefined' || taskId === 'null') taskId = '';
 
     // 管理员只读查看模式（?admin=1 且当前登录用户是管理员）：
     // 仲裁取证用——只看聊天记录，隐藏输入/付款/订单操作，不标记已读、不创建会话
