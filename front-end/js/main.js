@@ -844,6 +844,13 @@ function initMessageCenter() {
         var enriched = await Promise.all(conversations.map(async function(c) {
             var currentUser = getCurrentUser();
             var roleText = '';
+
+            // 系统通知会话：无订单/角色，只做未读 + 预览
+            if (c.id.indexOf('sys-notify-') === 0) {
+                var np = c.lastMessage ? ('[系统] ' + c.lastMessage) : '';
+                return { c: c, roleText: '', statusInfo: { text: '', className: '' }, msgPreview: np };
+            }
+
             var task = c.taskId ? await fetchTaskById(c.taskId) : null;
             var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
 
@@ -932,14 +939,22 @@ function initChatDetail() {
     var meForAdmin = getCurrentUser();
     var adminView = getUrlParam('admin') === '1' && !!(meForAdmin && meForAdmin.role === 1);
 
+    // 系统通知会话（平台 → 用户，单向、不可回复）
+    var sysNotifyView = !!chatId && chatId.indexOf('sys-notify-') === 0;
+
     if (!chatId) {
         document.querySelector('.chat-box').innerHTML = '<p>聊天不存在</p>';
         return;
     }
 
-    if (adminView) {
+    if (adminView || sysNotifyView) {
         var inputArea = document.querySelector('.chat-input-area');
         if (inputArea) inputArea.style.display = 'none';
+    }
+    if (sysNotifyView) {
+        var metaEls0 = document.querySelectorAll('.chat-header .meta');
+        if (metaEls0.length >= 1) metaEls0[0].textContent = '聊天对象：系统通知';
+        if (metaEls0.length >= 2) metaEls0[1].textContent = '平台通知，不可回复';
     }
 
     var chatBox = document.querySelector('.chat-box');
@@ -1878,9 +1893,10 @@ function initAdminPage() {
     };
 
     window.handleAdminClosePost = function(postId) {
-        if (!confirm('确认下架该帖子？下架后大厅不再显示、不可再下单，但记录仍保留。')) return;
-        adminClosePost(postId).then(function() {
-            alert('已下架。');
+        var reason = prompt('下架原因（将通过系统通知告知发布者；可留空）：');
+        if (reason === null) return; // 取消
+        adminClosePost(postId, reason).then(function() {
+            alert('已下架，已通知发布者。');
             render();
         }).catch(function(err) {
             alert(err.message || '操作失败');
@@ -1888,9 +1904,10 @@ function initAdminPage() {
     };
 
     window.handleAdminDeletePost = function(postId) {
-        if (!confirm('确认删除该帖子？删除后全站不可见、不可查（软删除，记录保留供审计），并清除其待处理举报。')) return;
-        adminDeletePost(postId).then(function() {
-            alert('已删除。');
+        var reason = prompt('删除原因（将通过系统通知告知发布者；可留空）。删除为软删除，全站不可见但记录保留：');
+        if (reason === null) return;
+        adminDeletePost(postId, reason).then(function() {
+            alert('已删除，已通知发布者。');
             render();
         }).catch(function(err) {
             alert(err.message || '操作失败');

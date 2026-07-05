@@ -370,13 +370,14 @@ async function getAdminPosts() {
 }
 
 // 管理员下架帖子（status → closed，大厅不再显示、不可再下单）
-async function adminClosePost(postId) {
+async function adminClosePost(postId, reason) {
     if (USE_MOCK) {
-        return mockAdminClosePost(postId);
+        return mockAdminClosePost(postId, reason);
     }
     var res = await fetch(API_BASE + '/admin/posts/' + postId + '/close', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + getToken() }
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ reason: reason || '' })
     });
     return _handleRes(res);
 }
@@ -406,13 +407,14 @@ async function getAdminReports() {
 }
 
 // 管理员删除帖子（软删，全站不可见/不可查）
-async function adminDeletePost(postId) {
+async function adminDeletePost(postId, reason) {
     if (USE_MOCK) {
-        return mockAdminDeletePost(postId);
+        return mockAdminDeletePost(postId, reason);
     }
     var res = await fetch(API_BASE + '/admin/posts/' + postId + '/delete', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + getToken() }
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ reason: reason || '' })
     });
     return _handleRes(res);
 }
@@ -907,6 +909,41 @@ function _addSystemMessage(db, chatId, content, taskId, taskTitle) {
             break;
         }
     }
+}
+
+// 系统通知（平台 → 单个用户）。挂在该用户专属的「系统通知」会话 sys-notify-<userId> 上。
+// 与订单里的系统消息(senderId='system')区别：这里 senderId='sys-notify' 以便【计入未读】，
+// 同时带 type='system' 让聊天里居中显示。用于帖子下架/删除等无订单会话可挂的平台通知。
+function _addSystemNotify(db, userId, content) {
+    if (!userId) return;
+    var chatId = 'sys-notify-' + userId;
+    var now = _sysNowIso();
+    if (!db.conversations) db.conversations = [];
+    var conv = null;
+    for (var i = 0; i < db.conversations.length; i++) {
+        if (db.conversations[i].id === chatId) { conv = db.conversations[i]; break; }
+    }
+    if (!conv) {
+        conv = { id: chatId, partnerId: 'sys-notify', partnerName: '系统通知', partnerAvatar: '',
+            taskId: '', taskTitle: '系统通知', lastMessage: content, lastTime: now, lastMessageSenderId: 'sys-notify' };
+        db.conversations.push(conv);
+    } else {
+        conv.lastMessage = content; conv.lastTime = now; conv.lastMessageSenderId = 'sys-notify';
+    }
+    if (!db.messages) db.messages = [];
+    db.messages.push({
+        id: 'sysn-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+        chatId: chatId,
+        senderId: 'sys-notify',   // 非 'system' → 计入未读
+        senderName: '系统通知',
+        receiverId: userId,
+        content: content,
+        time: now,
+        taskId: '', taskTitle: '',
+        type: 'system',           // 聊天里按系统消息居中显示
+        withdrawn: false,
+        read: false
+    });
 }
 
 // ---------- 订单系统内部工具：惰性结算 ----------
@@ -1576,7 +1613,7 @@ function mockGetAdminPosts() {
     });
 }
 
-function mockAdminClosePost(postId) {
+function mockAdminClosePost(postId, reason) {
     return new Promise(function(resolve, reject) {
         setTimeout(function() {
             var currentUser = getCurrentUser();
@@ -1586,6 +1623,10 @@ function mockAdminClosePost(postId) {
             if (!post || post.deletedAt) { reject(new Error('帖子不存在')); return; }
             if (post.status === 'closed') { reject(new Error('该帖子已是下架/关闭状态')); return; }
             post.status = 'closed';
+            var reasonTxt = String(reason || '').trim();
+            _addSystemNotify(db, post.publisherId,
+                '你发布的「' + post.title + '」已被管理员下架，大厅将不再展示。' +
+                (reasonTxt ? '原因：' + reasonTxt : '如有疑问请联系平台。'));
             _mockSaveDB(db);
             resolve({ success: true, post: post });
         }, 200);
@@ -1649,7 +1690,7 @@ function mockGetAdminReports() {
 }
 
 // 管理员删除帖子（软删）：设 deletedAt，并把该帖 pending 举报标记 handled
-function mockAdminDeletePost(postId) {
+function mockAdminDeletePost(postId, reason) {
     return new Promise(function(resolve, reject) {
         setTimeout(function() {
             var currentUser = getCurrentUser();
@@ -1661,6 +1702,10 @@ function mockAdminDeletePost(postId) {
             (db.reports || []).forEach(function(rep) {
                 if (rep.postId === postId && rep.status === 'pending') rep.status = 'handled';
             });
+            var reasonTxt = String(reason || '').trim();
+            _addSystemNotify(db, post.publisherId,
+                '你发布的「' + post.title + '」已被管理员删除。' +
+                (reasonTxt ? '原因：' + reasonTxt : '如有疑问请联系平台。'));
             _mockSaveDB(db);
             resolve({ success: true, post: post });
         }, 200);
@@ -1748,6 +1793,23 @@ function mockGetConversations() {
             var result = [];
 
             (db.conversations || []).forEach(function(c) {
+                // 系统通知会话：只发给本人，对方固定为「系统通知」，跳过"找真实对方"的逻辑
+                if (c.id.indexOf('sys-notify-') === 0) {
+                    if (c.id !== 'sys-notify-' + currentUser.id) return;
+                    var nMsgs = (db.messages || []).filter(function(m) { return m.chatId === c.id; });
+                    var nLast = null;
+                    for (var nk = 0; nk < nMsgs.length; nk++) {
+                        if (!nLast || new Date(nMsgs[nk].time) > new Date(nLast.time)) nLast = nMsgs[nk];
+                    }
+                    result.push({
+                        id: c.id, partnerId: 'sys-notify', partnerName: '系统通知', partnerAvatar: '',
+                        taskId: '', taskTitle: '系统通知',
+                        lastMessage: nLast ? nLast.content : c.lastMessage,
+                        lastTime: nLast ? nLast.time : c.lastTime,
+                        lastMessageSenderId: 'sys-notify'
+                    });
+                    return;
+                }
                 // 汇总该会话的参与者：消息发送/接收方 + 订单双方 + 帖子发布者。
                 // 帖子发布者一定是会话的一方，这样即便响应者只发了消息、还没下单
                 // （消息 receiverId 为空、也无订单可查），也能定位出对方是谁。

@@ -256,3 +256,54 @@ test('管理员删除帖子（软删）：全站不可见、不可下单、清�
     await loginAs(app, '张三');
     await assert.rejects(app.reportPost('t18', 'x'), /帖子不存在/);
 });
+
+test('下架/删除通知发布者：系统通知计入未读、会话显示为系统通知、带原因', async function () {
+    const app = createApp();
+    // t18 发布者是李四(u2)。管理员下架并填原因
+    await loginAs(app, 'admin');
+    await app.adminClosePost('t18', '含违规联系方式');
+
+    // 发布者李四：收到系统通知会话，且未读+1
+    await loginAs(app, '李四');
+    const unread = await app.getUnreadCounts();
+    assert.ok(unread.total >= 1, '系统通知应计入未读');
+    assert.strictEqual(unread.byChat['sys-notify-u2'], 1, '通知落在 sys-notify-u2');
+
+    const convs = await app.getConversations();
+    const sysConv = convs.find(c => c.id === 'sys-notify-u2');
+    assert.ok(sysConv, '消息中心应出现系统通知会话');
+    assert.strictEqual(sysConv.partnerName, '系统通知');
+    assert.ok(/已被管理员下架/.test(sysConv.lastMessage));
+    assert.ok(/含违规联系方式/.test(sysConv.lastMessage), '通知应带管理员原因');
+
+    // 消息内容：senderId=sys-notify、type=system（居中）、receiverId=发布者
+    const msgs = await app.getMessages('sys-notify-u2');
+    const last = msgs[msgs.length - 1];
+    assert.strictEqual(last.senderId, 'sys-notify');
+    assert.strictEqual(last.type, 'system');
+    assert.strictEqual(last.receiverId, 'u2');
+
+    // 打开会话后标记已读 → 未读清零
+    await app.markMessagesRead('sys-notify-u2');
+    const unread2 = await app.getUnreadCounts();
+    assert.ok(!unread2.byChat['sys-notify-u2'], '打开后未读清零');
+});
+
+test('删除也发通知；无原因用默认话术；非发布者收不到该通知', async function () {
+    const app = createApp();
+    // t1 发布者张三(u1)
+    await loginAs(app, 'admin');
+    await app.adminDeletePost('t1', '');   // 不填原因
+
+    await loginAs(app, '张三');
+    const convs = await app.getConversations();
+    const sysConv = convs.find(c => c.id === 'sys-notify-u1');
+    assert.ok(sysConv, '发布者应收到删除通知');
+    assert.ok(/已被管理员删除/.test(sysConv.lastMessage));
+    assert.ok(/联系平台/.test(sysConv.lastMessage), '无原因用默认话术');
+
+    // 李四不应看到张三的系统通知会话
+    await loginAs(app, '李四');
+    const convs2 = await app.getConversations();
+    assert.ok(!convs2.some(c => c.id === 'sys-notify-u1'), '系统通知仅本人可见');
+});
