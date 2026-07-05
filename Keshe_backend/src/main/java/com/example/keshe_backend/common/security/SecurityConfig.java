@@ -60,7 +60,10 @@ public class SecurityConfig {
         configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
+        
+        // 🛠️ 核心修改：将原来的 "/api/**" 修改为 "/**"，确保全站路径（包括 WebSocket 的 /ws/**）都能畅通无阻地跨域
+        source.registerCorsConfiguration("/**", configuration);
+        
         return source;
     }
 
