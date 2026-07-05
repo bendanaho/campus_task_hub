@@ -7,6 +7,8 @@ import com.example.keshe_backend.order.dto.ResolveDisputeRequest;
 import com.example.keshe_backend.order.service.OrderService;
 import com.example.keshe_backend.post.dto.PostDTO;
 import com.example.keshe_backend.post.service.PostService;
+import com.example.keshe_backend.report.dto.AdminReportItemResponse;
+import com.example.keshe_backend.report.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +26,7 @@ public class AdminController {
 
     private final OrderService orderService;
     private final PostService postService;
+    private final ReportService reportService;
 
     /**
      * 待处理争议订单列表
@@ -65,5 +68,21 @@ public class AdminController {
     @PostMapping("/posts/{id}/close")
     public ApiResponse<PostDTO> closePost(@PathVariable Long id) {
         return ApiResponse.success(postService.adminClosePost(id));
+    }
+
+    /**
+     * 删除帖子（软删）
+     */
+    @PostMapping("/posts/{id}/delete")
+    public ApiResponse<PostDTO> deletePost(@PathVariable Long id) {
+        return ApiResponse.success(postService.adminDeletePost(id));
+    }
+
+    /**
+     * 举报列表（按帖子聚合）
+     */
+    @GetMapping("/reports")
+    public ApiResponse<List<AdminReportItemResponse>> listReports() {
+        return ApiResponse.success(reportService.adminListReports());
     }
 }

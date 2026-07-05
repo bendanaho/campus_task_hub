@@ -4,6 +4,7 @@ import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
 import com.example.keshe_backend.post.dto.*;
+import com.example.keshe_backend.report.service.ReportService;
 import com.example.keshe_backend.task.entity.Task;
 import com.example.keshe_backend.task.repository.TaskRepository;
 import com.example.keshe_backend.user.entity.User;
@@ -23,6 +24,7 @@ public class PostService {
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final ReportService reportService;
 
     /**
      * 帖子列表（支持筛选和排序）
@@ -166,7 +168,7 @@ public class PostService {
                 .stream().map(PostDTO::from).collect(Collectors.toList());
     }
 
-    /** 管理员下架帖子：status → closed，大厅不再显示、不可再下单 */
+    /** 管理员下架帖子：status → closed，大厅不再显示、不可再下单；并清该帖 pending 举报 */
     @Transactional
     public PostDTO adminClosePost(Long postId) {
         Task task = taskRepository.findById(postId)
@@ -177,6 +179,19 @@ public class PostService {
         }
         task.setStatus("closed");
         taskRepository.save(task);
+        reportService.markReportsHandled(postId);
+        return PostDTO.from(task);
+    }
+
+    /** 管理员删除帖子（软删）：设 deletedAt，全站不可见/不可查/不可下单，记录保留；并清该帖 pending 举报 */
+    @Transactional
+    public PostDTO adminDeletePost(Long postId) {
+        Task task = taskRepository.findById(postId)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
+        task.setDeletedAt(LocalDateTime.now());
+        taskRepository.save(task);
+        reportService.markReportsHandled(postId);
         return PostDTO.from(task);
     }
 
