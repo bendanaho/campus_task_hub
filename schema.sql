@@ -1,207 +1,211 @@
 -- ============================================
 -- Campus Task Hub 建表脚本
--- 数据库: campus_task_hub
--- 字符集: utf8mb4
+-- 数据库: campus_task_hub  字符集: utf8mb4
+--
+-- 本脚本与后端 JPA 实体严格对齐（H2 用 ddl-auto=create 自动建表，
+-- MySQL 生产用 ddl-auto=validate，故列名/类型须一致）。
+--
+-- 说明：
+--  1) 实体使用裸 Long 外键（无 @ManyToOne），Hibernate 不生成外键约束；
+--     且「系统通知」会话使用 user2_id=0 / sender_id=0 作为哨兵（无对应用户行），
+--     因此本脚本【不声明 FOREIGN KEY】，与后端实际行为一致。
+--  2) conversations.id 为字符串（如 c-1-2、sys-notify-8），非自增。
 -- ============================================
--- 设置客户端字符集
 SET NAMES utf8mb4;
-SET CHARACTER SET utf8mb4;
--- 建库时强制指定字符集
-CREATE DATABASE IF NOT EXISTS campus_task_hub
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-USE campus_task_hub;
+
 CREATE DATABASE IF NOT EXISTS campus_task_hub
     DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_general_ci;
-
+    DEFAULT COLLATE utf8mb4_unicode_ci;
 USE campus_task_hub;
 
 -- -------------------------------------------
--- 1. 用户表
+-- 1. 用户表  (entity: User)
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
     phone VARCHAR(20) NOT NULL UNIQUE COMMENT '手机号',
-    email VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '邮箱',
+    email VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '邮箱（可空；空邮箱存 NULL 以避免唯一约束冲突）',
     password_hash VARCHAR(255) NOT NULL COMMENT '加密后的密码',
-    wechat_openid VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '微信OpenID（NFR6预留）',
-    wechat_unionid VARCHAR(100) DEFAULT NULL COMMENT '微信UnionID（NFR6预留）',
-    avatar VARCHAR(500) DEFAULT NULL COMMENT '头像地址',
+    wechat_openid VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '微信OpenID（预留）',
+    wechat_unionid VARCHAR(100) DEFAULT NULL COMMENT '微信UnionID（预留）',
+    avatar VARCHAR(255) DEFAULT NULL COMMENT '头像地址',
+    credit_score DECIMAL(10,2) NOT NULL DEFAULT 5.00 COMMENT '信用分',
+    auth_status INT NOT NULL DEFAULT 0 COMMENT '实名认证 0=未认证 1=已认证',
     real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
     student_id VARCHAR(50) DEFAULT NULL COMMENT '学号',
-    school VARCHAR(100) DEFAULT NULL COMMENT '学校',
-    college VARCHAR(100) DEFAULT NULL COMMENT '学院',
-    class_name VARCHAR(100) DEFAULT NULL COMMENT '班级',
-    bio VARCHAR(500) DEFAULT NULL COMMENT '个人简介',
-    balance DECIMAL(10,2) DEFAULT 0.00 COMMENT '账户余额',
-    credit_score DECIMAL(10,2) DEFAULT 5.00 COMMENT '信用分',
-    auth_status TINYINT DEFAULT 0 COMMENT '实名认证状态 0=未认证 1=已认证',
-    role INT DEFAULT 0 COMMENT '角色 0=普通用户 1=管理员',
-    version INT DEFAULT 0 COMMENT '乐观锁版本号',
+    college VARCHAR(255) DEFAULT NULL COMMENT '学院',
+    class_name VARCHAR(255) DEFAULT NULL COMMENT '班级',
+    bio VARCHAR(255) DEFAULT NULL COMMENT '个人简介',
+    balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '账户余额',
+    role INT NOT NULL DEFAULT 0 COMMENT '角色 0=普通用户 1=管理员',
+    version INT DEFAULT NULL COMMENT '乐观锁版本号',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT NULL,
     deleted_at DATETIME DEFAULT NULL COMMENT '软删除时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- -------------------------------------------
--- 2. 任务分类表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS task_categories (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(50) NOT NULL UNIQUE COMMENT '分类名称',
-    icon VARCHAR(255) DEFAULT NULL COMMENT '图标',
-    sort_order INT DEFAULT 0 COMMENT '排序',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务分类表';
-
--- -------------------------------------------
--- 3. 任务表
+-- 2. 帖子/任务表  (entity: Task)
+--    publisher_side: payer 悬赏求助 / earner 提供服务 / none 组队互助
+--    status: open 上架 / closed 下架关闭；deleted_at 非空=已删除
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS tasks (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    title VARCHAR(200) NOT NULL COMMENT '任务标题',
-    type INT NOT NULL DEFAULT 0 COMMENT '任务类型 0=需求方 1=服务方',
-    category VARCHAR(50) NOT NULL COMMENT '任务分类',
-    description TEXT COMMENT '任务描述',
+    title VARCHAR(200) NOT NULL COMMENT '标题',
+    type INT NOT NULL DEFAULT 0 COMMENT '旧字段兼容',
+    category VARCHAR(50) NOT NULL COMMENT '分类',
+    description TEXT NOT NULL COMMENT '描述',
     publisher_id BIGINT NOT NULL COMMENT '发布者ID',
-    publisher_name VARCHAR(50) NOT NULL COMMENT '发布者用户名（冗余，减少JOIN）',
+    publisher_name VARCHAR(50) NOT NULL COMMENT '发布者用户名（冗余）',
     publisher_credit DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '发布时信用分快照',
-    reward VARCHAR(50) NOT NULL COMMENT '报酬描述（例如：5元、面议）',
-    reward_value DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '报酬数值',
-    deadline DATETIME DEFAULT NULL COMMENT '截止时间',
+    reward VARCHAR(50) NOT NULL COMMENT '报酬描述（如：10元、面议）',
+    reward_value DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '报酬数值（冻结/结算用）',
+    deadline DATETIME DEFAULT NULL COMMENT '截止时间（悬赏帖）',
     publish_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
-    status INT NOT NULL DEFAULT 0 COMMENT '任务状态 0=待接单 1=进行中 2=已完成 3=可接单(服务)',
-    contact VARCHAR(100) DEFAULT '站内联系' COMMENT '联系方式',
+    status VARCHAR(10) NOT NULL COMMENT '状态 open/closed',
+    contact VARCHAR(255) DEFAULT '站内联系' COMMENT '联系方式',
     images TEXT DEFAULT NULL COMMENT '图片列表(JSON字符串)',
-    taker_id BIGINT DEFAULT NULL COMMENT '接单者ID',
-    taker_name VARCHAR(50) DEFAULT NULL COMMENT '接单者用户名（冗余）',
-    payment_status INT DEFAULT NULL COMMENT '支付状态 0=冻结 1=已释放',
-    publisher_confirmed INT DEFAULT 0 COMMENT '发布者确认完成 0=未确认 1=已确认',
-    taker_confirmed INT DEFAULT 0 COMMENT '接单者确认完成 0=未确认 1=已确认',
-    version INT DEFAULT 0 COMMENT '乐观锁版本号',
+    publisher_side VARCHAR(10) NOT NULL DEFAULT 'payer' COMMENT 'payer/earner/none',
+    service_time VARCHAR(100) DEFAULT NULL COMMENT '服务时间（服务帖）',
+    taker_id BIGINT DEFAULT NULL COMMENT '旧字段兼容',
+    taker_name VARCHAR(255) DEFAULT NULL COMMENT '旧字段兼容',
+    payment_status INT DEFAULT NULL COMMENT '旧字段兼容',
+    publisher_confirmed INT DEFAULT NULL COMMENT '旧字段兼容',
+    taker_confirmed INT DEFAULT NULL COMMENT '旧字段兼容',
+    version INT DEFAULT NULL COMMENT '乐观锁版本号',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at DATETIME DEFAULT NULL COMMENT '软删除时间',
-    FOREIGN KEY (publisher_id) REFERENCES users(id),
-    FOREIGN KEY (taker_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务表';
+    updated_at DATETIME DEFAULT NULL,
+    deleted_at DATETIME DEFAULT NULL COMMENT '软删除时间（管理员删除）',
+    KEY idx_tasks_publisher (publisher_id),
+    KEY idx_tasks_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='帖子/任务表';
 
 -- -------------------------------------------
--- 4. 任务申请表
+-- 3. 订单表  (entity: Order)
+--    status: pending 待接受 / in_progress 进行中 / completed 已完成 /
+--            cancelled 已取消 / disputed 争议中 / closed 已结案
 -- -------------------------------------------
-CREATE TABLE IF NOT EXISTS task_applications (
+CREATE TABLE IF NOT EXISTS orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    task_id BIGINT NOT NULL COMMENT '任务ID',
-    applicant_id BIGINT NOT NULL COMMENT '申请者ID',
-    message VARCHAR(500) DEFAULT NULL COMMENT '申请留言',
-    status ENUM('pending','accepted','rejected') DEFAULT 'pending' COMMENT '申请状态',
+    chat_id VARCHAR(100) NOT NULL COMMENT '所属会话ID',
+    post_id BIGINT NOT NULL COMMENT '帖子ID',
+    payer_id BIGINT NOT NULL COMMENT '付款方ID',
+    earner_id BIGINT NOT NULL COMMENT '收款方ID',
+    amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '金额',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '订单状态',
+    payer_confirmed TINYINT(1) NOT NULL DEFAULT 0 COMMENT '付款方已确认',
+    earner_confirmed TINYINT(1) NOT NULL DEFAULT 0 COMMENT '收款方已确认',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES tasks(id),
-    FOREIGN KEY (applicant_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务申请表';
+    accepted_at DATETIME DEFAULT NULL COMMENT '接受时间',
+    completed_at DATETIME DEFAULT NULL COMMENT '完成时间',
+    auto_confirm_at DATETIME DEFAULT NULL COMMENT '自动确认时间',
+    review_deadline DATETIME DEFAULT NULL COMMENT '评价截止时间',
+    dispute_reason TEXT DEFAULT NULL COMMENT '申诉理由',
+    disputed_by BIGINT DEFAULT NULL COMMENT '申诉发起人ID',
+    disputed_at DATETIME DEFAULT NULL COMMENT '申诉时间',
+    resolution VARCHAR(20) DEFAULT NULL COMMENT '裁决 refund/settle/partial',
+    resolution_amount_to_earner DECIMAL(10,2) DEFAULT NULL COMMENT '结算给收款方金额',
+    resolution_note TEXT DEFAULT NULL COMMENT '管理员处理说明',
+    resolved_at DATETIME DEFAULT NULL COMMENT '结案时间',
+    version INT DEFAULT NULL COMMENT '乐观锁版本号',
+    updated_at DATETIME DEFAULT NULL,
+    KEY idx_orders_chat (chat_id),
+    KEY idx_orders_post (post_id),
+    KEY idx_orders_payer (payer_id),
+    KEY idx_orders_earner (earner_id),
+    KEY idx_orders_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
 -- -------------------------------------------
--- 5. 评价表
+-- 4. 评价表  (entity: Review)
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS reviews (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    task_id BIGINT NOT NULL COMMENT '任务ID',
-    reviewer_id BIGINT NOT NULL COMMENT '评价者ID',
-    reviewee_id BIGINT NOT NULL COMMENT '被评价者ID',
-    rating TINYINT NOT NULL COMMENT '评分1-5',
+    order_id BIGINT DEFAULT NULL COMMENT '订单ID',
+    task_id BIGINT DEFAULT NULL COMMENT '帖子ID',
+    from_user_id BIGINT NOT NULL COMMENT '评价者ID',
+    from_user_name VARCHAR(50) NOT NULL COMMENT '评价者用户名',
+    to_user_id BIGINT NOT NULL COMMENT '被评价者ID',
+    to_user_name VARCHAR(50) NOT NULL COMMENT '被评价者用户名',
+    rating INT NOT NULL COMMENT '评分 1-5',
     content VARCHAR(500) DEFAULT NULL COMMENT '评价内容',
+    images TEXT DEFAULT NULL COMMENT '图片(JSON字符串)',
+    auto_review TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统默认好评',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES tasks(id),
-    FOREIGN KEY (reviewer_id) REFERENCES users(id),
-    FOREIGN KEY (reviewee_id) REFERENCES users(id)
+    KEY idx_reviews_to_user (to_user_id),
+    KEY idx_reviews_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评价表';
 
 -- -------------------------------------------
--- 6. 消息通知表
+-- 5. 交易流水表  (entity: Transaction)
 -- -------------------------------------------
-CREATE TABLE IF NOT EXISTS notifications (
+CREATE TABLE IF NOT EXISTS transactions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL COMMENT '接收者ID',
-    type ENUM('system','task','chat') DEFAULT 'system' COMMENT '消息类型',
-    title VARCHAR(200) NOT NULL COMMENT '标题',
-    content TEXT COMMENT '内容',
-    is_read TINYINT DEFAULT 0 COMMENT '是否已读',
-    related_id BIGINT DEFAULT NULL COMMENT '关联ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    direction VARCHAR(10) NOT NULL COMMENT '方向 in 收入 / out 支出',
+    amount DECIMAL(10,2) NOT NULL COMMENT '金额',
+    category VARCHAR(20) NOT NULL COMMENT '类别 recharge/order 等',
+    related_id VARCHAR(100) DEFAULT NULL COMMENT '关联ID（如订单ID）',
+    note VARCHAR(500) DEFAULT '' COMMENT '备注',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息通知表';
+    KEY idx_tx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易流水表';
 
 -- -------------------------------------------
--- 7. 聊天消息表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    sender_id BIGINT NOT NULL COMMENT '发送者ID',
-    receiver_id BIGINT NOT NULL COMMENT '接收者ID',
-    content TEXT NOT NULL COMMENT '消息内容',
-    msg_type ENUM('text','image','file') DEFAULT 'text' COMMENT '消息类型',
-    is_read TINYINT DEFAULT 0 COMMENT '是否已读',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sender_id) REFERENCES users(id),
-    FOREIGN KEY (receiver_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
-
--- -------------------------------------------
--- 7.1 会话表
+-- 6. 会话表  (entity: Conversation)
+--    id 为字符串：普通会话 c-<postId>-<userId>；系统通知 sys-notify-<userId>
+--    系统通知会话 user2_id=0（哨兵，无对应用户）
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS conversations (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    id VARCHAR(100) PRIMARY KEY COMMENT '会话ID（字符串）',
     user1_id BIGINT NOT NULL COMMENT '用户1 ID',
-    user2_id BIGINT NOT NULL COMMENT '用户2 ID',
-    task_id BIGINT DEFAULT NULL COMMENT '关联任务ID',
+    user2_id BIGINT NOT NULL COMMENT '用户2 ID（系统通知为 0）',
+    task_id BIGINT DEFAULT NULL COMMENT '关联帖子ID',
+    task_title VARCHAR(200) DEFAULT NULL COMMENT '帖子标题（冗余）',
     last_message TEXT DEFAULT NULL COMMENT '最后一条消息内容',
     last_time DATETIME DEFAULT NULL COMMENT '最后消息时间',
+    last_message_sender_id BIGINT DEFAULT NULL COMMENT '最后消息发送者ID',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user1_id) REFERENCES users(id),
-    FOREIGN KEY (user2_id) REFERENCES users(id),
-    FOREIGN KEY (task_id) REFERENCES tasks(id)
+    updated_at DATETIME DEFAULT NULL,
+    KEY idx_conv_user1 (user1_id),
+    KEY idx_conv_user2 (user2_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话表';
 
 -- -------------------------------------------
--- 8. 举报表
+-- 7. 聊天/系统消息表  (entity: Message，表名 chat_messages)
+--    type: text 普通 / system 系统消息（含系统通知，居中显示）/ payment 付款卡片
+--    sender_id 可空：订单系统消息为 NULL；系统通知为 0（哨兵）
+-- -------------------------------------------
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chat_id VARCHAR(100) NOT NULL COMMENT '所属会话ID',
+    sender_id BIGINT DEFAULT NULL COMMENT '发送者ID（系统消息NULL / 系统通知0）',
+    sender_name VARCHAR(50) DEFAULT NULL COMMENT '发送者名（冗余）',
+    receiver_id BIGINT DEFAULT NULL COMMENT '接收者ID',
+    content TEXT NOT NULL COMMENT '消息内容',
+    type VARCHAR(20) NOT NULL DEFAULT 'text' COMMENT '类型 text/system/payment',
+    time DATETIME NOT NULL COMMENT '发送时间',
+    task_id VARCHAR(50) DEFAULT NULL COMMENT '关联帖子ID',
+    task_title VARCHAR(200) DEFAULT NULL COMMENT '帖子标题',
+    withdrawn TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已撤回',
+    is_read TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已读',
+    payment TEXT DEFAULT NULL COMMENT '付款卡片信息(JSON，type=payment 时)',
+    KEY idx_msg_chat (chat_id),
+    KEY idx_msg_receiver (receiver_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天/系统消息表';
+
+-- -------------------------------------------
+-- 8. 举报表  (entity: Report)
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS reports (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    post_id BIGINT NOT NULL COMMENT '被举报帖子ID',
     reporter_id BIGINT NOT NULL COMMENT '举报者ID',
-    target_type ENUM('task','user','message') NOT NULL COMMENT '举报对象类型',
-    target_id BIGINT NOT NULL COMMENT '举报对象ID',
-    reason VARCHAR(500) NOT NULL COMMENT '举报原因',
-    status ENUM('pending','resolved','dismissed') DEFAULT 'pending' COMMENT '处理状态',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (reporter_id) REFERENCES users(id)
+    reporter_name VARCHAR(50) DEFAULT NULL COMMENT '举报者用户名（快照）',
+    reason TEXT NOT NULL COMMENT '举报理由',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending 待处理 / handled 已处理',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_reports_post (post_id),
+    KEY idx_reports_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='举报表';
-
--- -------------------------------------------
--- 9. 收藏表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS favorites (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL COMMENT '用户ID',
-    task_id BIGINT NOT NULL COMMENT '任务ID',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_user_task (user_id, task_id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (task_id) REFERENCES tasks(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收藏表';
-
--- -------------------------------------------
--- 初始数据：任务分类
--- -------------------------------------------
-INSERT INTO task_categories (name, icon, sort_order) VALUES
-    ('快递代取', 'package', 1),
-    ('外卖代拿', 'food', 2),
-    ('学习辅导', 'book', 3),
-    ('跑腿代办', 'run', 4),
-    ('二手交易', 'trade', 5),
-    ('其他', 'other', 99)
-ON DUPLICATE KEY UPDATE name = VALUES(name);
