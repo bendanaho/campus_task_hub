@@ -995,6 +995,7 @@ function _ensureDefaultReviews(db) {
                 rating: 5, content: '（用户未评价，默认好评）',
                 images: [], time: new Date().toISOString(), auto: true
             });
+            _recalcCredit(db, toId);   // 默认好评也计入被评价者信用分
             changed = true;
         });
     });
@@ -1034,6 +1035,14 @@ function _findUserInDb(db, id) {
         if (db.users[i].id === id) return db.users[i];
     }
     return null;
+}
+
+// 重算某用户信用分 = 其收到评价的贝叶斯均值（与种子/后端同一公式）。每次新增评价后调用。
+function _recalcCredit(db, userId) {
+    var user = _findUserInDb(db, userId);
+    if (!user) return;
+    var ratings = (db.reviews || []).filter(function(r) { return r.toUserId === userId; }).map(function(r) { return r.rating; });
+    user.creditScore = computeCreditScore(ratings);
 }
 
 // 同理：要写帖子（如改 status）必须在同一个 db 里取，不能用 _mockGetTaskById
@@ -2215,6 +2224,7 @@ function mockSubmitReview(data) {
             };
             if (!db.reviews) db.reviews = [];
             db.reviews.push(newReview);
+            _recalcCredit(db, data.toUserId);   // 评价落地 → 重算被评价者信用分
             // 系统消息：完成评价（挂到该订单所在会话）
             var revOrder = data.orderId ? _findOrderById(db, data.orderId) : null;
             if (revOrder) {

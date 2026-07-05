@@ -80,6 +80,19 @@ function parseRewardValue(reward) {
     return match ? parseInt(match[1], 10) : 0;
 }
 
+// 信用分：收到评价 rating 的贝叶斯平滑均值。预置 C=2 条 5★ 先验，
+// 避免少量评价时剧烈波动（一条差评不会把新用户砸到底）。无评价 → 5.0。
+// 结果保留 1 位小数、范围 0–5。前端 mock 与后端共用同一公式。
+function computeCreditScore(ratings) {
+    const C = 2, PRIOR = 5.0;
+    let sum = 0;
+    for (let i = 0; i < ratings.length; i++) sum += ratings[i];
+    let score = (PRIOR * C + sum) / (C + ratings.length);
+    if (score < 0) score = 0;
+    if (score > 5) score = 5;
+    return Math.round(score * 10) / 10;
+}
+
 // 报酬展示：纯数字补「元」（"10"→"10元"）；已带单位或文字的原样返回
 // （"10元"/"面议"/"3-5元/单"/"无" 均不变，避免出现"10元元"）
 function formatReward(reward) {

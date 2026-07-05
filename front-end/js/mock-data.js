@@ -451,17 +451,39 @@ function createInitialData() {
         }
     ];
 
+    // 种子评价：信用分由这些评价按贝叶斯公式算出（见本函数结尾），不再硬编码。
+    // fromUserId 仅为来源，评分只影响 toUserId 的信用分。
+    function rev(id, from, fromName, to, toName, rating, content, h) {
+        return { id: id, taskId: 't1', fromUserId: from, fromUserName: fromName,
+            toUserId: to, toUserName: toName, rating: rating, content: content, time: hourAgo(h), auto: false };
+    }
     var reviews = [
-        {
-            id: 'r1', taskId: 't1', fromUserId: 'u1', fromUserName: '张三',
-            toUserId: 'u2', toUserName: '李四', rating: 5,
-            content: '非常准时，服务态度很好！', time: hourAgo(24), auto: false
-        },
-        {
-            id: 'r2', taskId: 't15', fromUserId: 'u1', fromUserName: '张三',
-            toUserId: 'u7', toUserName: '孙同学', rating: 5,
-            content: '取快递很及时，下次还会找他！', time: hourAgo(23), auto: false
-        }
+        rev('r1', 'u1', '张三', 'u2', '李四', 5, '非常准时，服务态度很好！', 24),
+        rev('r2', 'u1', '张三', 'u7', '孙同学', 5, '取快递很及时，下次还会找他！', 23),
+        // u1 张三（高分）
+        rev('r3', 'u2', '李四', 'u1', '张三', 5, '沟通顺畅，靠谱', 40),
+        rev('r4', 'u3', '王同学', 'u1', '张三', 4, '整体不错', 39),
+        // u2 李四（较高）
+        rev('r5', 'u3', '王同学', 'u2', '李四', 4, '还行', 38),
+        rev('r6', 'u4', '陈同学', 'u2', '李四', 4, '可以', 37),
+        // u3 王同学（中）
+        rev('r7', 'u1', '张三', 'u3', '王同学', 3, '一般般', 36),
+        rev('r8', 'u5', '赵同学', 'u3', '王同学', 3, '有点慢', 35),
+        // u4 陈同学（偏低）
+        rev('r9', 'u1', '张三', 'u4', '陈同学', 2, '响应较慢', 34),
+        rev('r10', 'u2', '李四', 'u4', '陈同学', 2, '体验一般', 33),
+        // u5 赵同学（高）
+        rev('r11', 'u6', '刘同学', 'u5', '赵同学', 5, '很专业', 32),
+        rev('r12', 'u7', '孙同学', 'u5', '赵同学', 5, '好评', 31),
+        // u6 刘同学（中上）
+        rev('r13', 'u5', '赵同学', 'u6', '刘同学', 4, '不错', 30),
+        rev('r14', 'u8', '周同学', 'u6', '刘同学', 4, '满意', 29),
+        // u7 孙同学（高）：已有 r2(5) 再加一条
+        rev('r15', 'u3', '王同学', 'u7', '孙同学', 4, '挺好', 28),
+        // u8 周同学（低）
+        rev('r16', 'u1', '张三', 'u8', '周同学', 1, '爽约了', 27),
+        rev('r17', 'u2', '李四', 'u8', '周同学', 2, '不太靠谱', 26),
+        rev('r18', 'u5', '赵同学', 'u8', '周同学', 2, '拖延', 25)
     ];
 
     // 统一订单表：取代旧 serviceOrders + 旧 task 上的订单字段。
@@ -539,6 +561,13 @@ function createInitialData() {
         { id: 'tx7', userId: 'u2', direction: 'out', amount: 15, category: 'order', relatedId: 'o6', note: '订单支付：高数一对一答疑辅导', time: hourAgo(35) },
         { id: 'tx8', userId: 'u1', direction: 'in', amount: 50, category: 'recharge', relatedId: null, note: '账户充值', time: hourAgo(52) }
     ];
+
+    // 信用分改为「由评价驱动」：种子阶段即按种子评价重算，覆盖用户对象上的初始硬编码值，
+    // 使「信用分 = 评价平均(贝叶斯)」从一开始就自洽。无评价者 → 5.0。
+    users.forEach(function(u) {
+        var ratings = reviews.filter(function(r) { return r.toUserId === u.id; }).map(function(r) { return r.rating; });
+        u.creditScore = computeCreditScore(ratings);
+    });
 
     return { users: users, tasks: tasks, messages: messages, conversations: conversations, reviews: reviews, orders: orders, transactions: transactions, reports: [] };
 }
