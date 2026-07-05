@@ -1941,6 +1941,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminPage();
     initLightbox();
     initDevAccountSwitcher();
+    // 启动 WebSocket 通信保护机制
+    initWebSocket();
 
     var scrollKey = 'scroll_' + location.pathname;
     var savedScroll = sessionStorage.getItem(scrollKey);
@@ -1975,3 +1977,133 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+
+// ==================== WebSocket 实时通知广播系统 ====================
+var ws = null;
+
+function initWebSocket() {
+    if (!isLoggedIn()) return;
+    var currentUser = getCurrentUser();
+    if (!currentUser || !currentUser.id) return;
+
+    // 避免网络波动引发的重复连接
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+    // 建立与后端的 WebSocket 连接
+    ws = new WebSocket('ws://localhost:8080/ws/notification/' + currentUser.id);
+
+    ws.onopen = function() {
+        console.log('【WebSocket】校园实时通知系统连接成功');
+    };
+
+    ws.onmessage = function(event) {
+        console.log('【WebSocket】收到实时数据包:', event.data);
+        try {
+            var data = JSON.parse(event.data);
+            
+            // 场景一：有新任务发布（广播给所有正在浏览大厅的用户）
+            if (data.type === 'NEW_TASK') {
+                if (window.location.pathname.includes('task-hall.html')) {
+                    showRealtimeBanner('📢 有新互助任务发布：《' + data.title + '》，点击可刷新列表！', function() {
+                        window.location.reload();
+                    });
+                }
+            }
+            
+            // 场景二：任务已被抢单/正式接取（通知详情页的竞争者快速退出）
+            if (data.type === 'TASK_TAKEN') {
+                var currentTaskId = getUrlParam('id');
+                if (window.location.pathname.includes('task-detail.html') && String(currentTaskId) === String(data.postId)) {
+                    // 禁用按钮区域防止误触操作
+                    var actionsDiv = document.querySelector('.detail-box .actions');
+                    if (actionsDiv) {
+                        actionsDiv.innerHTML = '<span class="note" style="color:#cf222e; font-weight:bold; font-size:16px;">⚠️ 该任务刚刚已被其他同学抢先接取！</span>';
+                    }
+                    alert('告知：该任务已被接取，3秒后系统将自动返回互助大厅。');
+                    setTimeout(function() {
+                        window.location.href = 'task-hall.html';
+                    }, 3000);
+                }
+            }
+            
+            // 场景三：点对点精准精准核心业务流单推（收到订单申请、被接单通知、确认提醒、争议等）
+            if (data.type === 'PERSONAL_NOTICE') {
+                alert('🔔 平台实时通知：\n' + data.message);
+                
+                // 自动联动刷新导航栏的消息未读红点
+                if (typeof updateNavUnread === 'function') updateNavUnread();
+                
+                // 如果用户当前停留在订单中心、消息中心或聊天室，则自动刷新呈现最新状态
+                if (window.location.pathname.includes('message-center.html') || 
+                    window.location.pathname.includes('order-center.html') || 
+                    window.location.pathname.includes('chat-detail.html')) {
+                    window.location.reload();
+                }
+            }
+        } catch (e) {
+            console.error('【WebSocket】消息包解析异常:', e);
+        }
+    };
+
+    ws.onclose = function() {
+        console.log('【WebSocket】连接已断开，5秒后启动惰性重连机制...');
+        setTimeout(initWebSocket, 5000);
+    };
+
+    ws.onerror = function(err) {
+        console.error('【WebSocket】通信链路异常:', err);
+    };
+}
+
+/**
+ * 局部非阻塞顶部浮动条提示组件（支持手动关闭、无操作8秒自销毁、点击触发reload）
+ */
+function showRealtimeBanner(text, onClickAction) {
+    var banner = document.createElement('div');
+    banner.className = 'realtime-banner';
+    banner.style.position = 'fixed';
+    banner.style.top = '25px';
+    banner.style.right = '25px';
+    banner.style.backgroundColor = '#1f6feb';
+    banner.style.color = '#fff';
+    banner.style.padding = '14px 22px';
+    banner.style.borderRadius = '8px';
+    banner.style.boxShadow = '0 6px 16px rgba(0,0,0,0.18)';
+    banner.style.zIndex = '99999';
+    banner.style.cursor = 'pointer';
+    banner.style.fontSize = '14px';
+    banner.style.display = 'flex';
+    banner.style.alignItems = 'center';
+    banner.style.gap = '12px';
+    banner.style.animation = 'fadeInRight 0.3s ease-out';
+    
+    var textNode = document.createElement('span');
+    textNode.textContent = text;
+    banner.appendChild(textNode);
+    
+    var closeBtn = document.createElement('span');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.fontWeight = 'bold';
+    closeBtn.style.fontSize = '20px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.color = 'rgba(255,255,255,0.7)';
+    closeBtn.onmouseover = function() { this.style.color = '#fff'; };
+    closeBtn.onmouseout = function() { this.style.color = 'rgba(255,255,255,0.7)'; };
+    closeBtn.onclick = function(e) {
+        e.stopPropagation();
+        banner.remove();
+    };
+    banner.appendChild(closeBtn);
+    
+    banner.onclick = function() {
+        if (typeof onClickAction === 'function') onClickAction();
+        banner.remove();
+    };
+    
+    document.body.appendChild(banner);
+    
+    setTimeout(function() {
+        if (banner.parentNode) banner.remove();
+    }, 8000);
+}
