@@ -607,6 +607,9 @@ function goToOrderChat(postId, publisherId) {
 
 function initPublishForm() {
     if (!window.location.pathname.includes('publish-task.html')) return;
+    // 未登录直接拦截跳登录页（参照消息中心/我的订单），
+    // 避免非法进入发布界面后还能点“取消”留在页面看到表单
+    if (!protectPage(['publish-task.html'])) return;
     // 管理员为纯管理角色，不发布互助
     if (isAdminUser()) {
         alert('管理员账号不参与交易，仅用于平台管理。');
@@ -2089,17 +2092,19 @@ function initWebSocket() {
             
             // 场景三：点对点精准精准核心业务流单推（收到订单申请、被接单通知、确认提醒、争议等）
             if (data.type === 'PERSONAL_NOTICE') {
-                alert('🔔 平台实时通知：\n' + data.message);
-                
-                // 自动联动刷新导航栏的消息未读红点
+                // 非阻塞横幅提示（不再用 alert 阻塞页面）；点击横幅才跳转/刷新，不再自动 reload 打断操作
+                showRealtimeBanner('🔔 ' + data.message, function() {
+                    if (window.location.pathname.includes('message-center.html') ||
+                        window.location.pathname.includes('order-center.html') ||
+                        window.location.pathname.includes('chat-detail.html')) {
+                        window.location.reload();
+                    } else {
+                        window.location.href = 'message-center.html';
+                    }
+                });
+
+                // 自动联动刷新导航栏的消息未读红点（非阻塞）
                 if (typeof updateNavUnread === 'function') updateNavUnread();
-                
-                // 如果用户当前停留在订单中心、消息中心或聊天室，则自动刷新呈现最新状态
-                if (window.location.pathname.includes('message-center.html') || 
-                    window.location.pathname.includes('order-center.html') || 
-                    window.location.pathname.includes('chat-detail.html')) {
-                    window.location.reload();
-                }
             }
         } catch (e) {
             console.error('【WebSocket】消息包解析异常:', e);
