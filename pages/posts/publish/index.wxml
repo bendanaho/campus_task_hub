@@ -68,6 +68,6 @@
       </view>
     </view>
 
-    <button class="btn publish-btn" bindtap="submit">发布帖子</button>
+    <button class="btn publish-btn" bindtap="submit" disabled="{{submitting}}" loading="{{submitting}}">发布帖子</button>
   </view>
 </view>

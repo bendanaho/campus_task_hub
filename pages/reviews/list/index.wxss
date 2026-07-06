@@ -1,0 +1,147 @@
+/* 汇总卡 */
+.summary-card {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.summary-avg-box {
+  flex: 0 0 auto;
+  text-align: center;
+  min-width: 140rpx;
+}
+
+.summary-avg {
+  font-size: 56rpx;
+  line-height: 1.2;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.summary-divider {
+  flex: 0 0 auto;
+  width: 1rpx;
+  height: 64rpx;
+  background: var(--line);
+  margin: 0 28rpx;
+}
+
+.summary-item {
+  flex: 1;
+  text-align: center;
+}
+
+.summary-num {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.summary-sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--faint);
+}
+
+/* 筛选 chips（参考大厅） */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14rpx;
+  padding: 4rpx 0 20rpx;
+}
+
+.chip {
+  flex: 0 0 auto;
+  font-size: 25rpx;
+  padding: 12rpx 26rpx;
+  border-radius: 999rpx;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1rpx solid var(--line);
+}
+
+.chip.on {
+  background: var(--ink);
+  color: #ffffff;
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+/* 评价卡片 */
+.review-card {
+  margin-bottom: 20rpx;
+}
+
+.review-top {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.ava {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.review-user {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-time {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: var(--faint);
+}
+
+.review-stars {
+  flex: 0 0 auto;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--amber);
+  letter-spacing: 2rpx;
+}
+
+.review-content {
+  margin-top: 18rpx;
+  font-size: 27rpx;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.review-content.placeholder {
+  color: var(--faint);
+}
+
+.review-imgs {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.review-img {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: var(--radius-field);
+  background: var(--field);
+}

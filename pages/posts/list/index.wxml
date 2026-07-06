@@ -56,24 +56,16 @@
       <view class="login-banner-btn" hover-class="btn-hover" bindtap="goLogin">去登录</view>
     </view>
 
-    <block wx:if="{{loading && posts.length === 0}}">
-      <view wx:for="{{skeletons}}" wx:key="*this" class="skeleton">
-        <view class="sk-row">
-          <view class="sk-block sk-tag"></view>
-          <view class="sk-block sk-price"></view>
-        </view>
-        <view class="sk-block sk-title"></view>
-        <view class="sk-block sk-desc"></view>
-        <view class="sk-block sk-meta"></view>
-      </view>
-    </block>
+    <skeleton wx:if="{{loading && posts.length === 0}}" count="3" />
 
-    <view wx:elif="{{posts.length === 0}}" class="empty-state">
-      <view class="empty-emoji">📭</view>
-      <view class="empty-title">还没有符合条件的任务</view>
-      <view class="empty-sub">换个筛选条件，或者发布第一条互助任务</view>
-      <view class="btn small empty-btn" hover-class="btn-hover" bindtap="goPublish">去发布</view>
-    </view>
+    <empty-state
+      wx:elif="{{posts.length === 0}}"
+      emoji="📭"
+      title="还没有符合条件的任务"
+      sub="换个筛选条件，或者发布第一条互助任务"
+      btn-text="去发布"
+      bind:action="goPublish"
+    />
 
     <view
       wx:for="{{posts}}"
@@ -104,6 +96,7 @@
       </view>
     </view>
 
-    <view wx:if="{{posts.length > 0}}" class="list-end">— 到底啦 —</view>
+    <view wx:if="{{hasMore}}" class="list-end">加载中…</view>
+    <view wx:elif="{{posts.length > 0}}" class="list-end">— 到底啦 —</view>
   </view>
 </view>

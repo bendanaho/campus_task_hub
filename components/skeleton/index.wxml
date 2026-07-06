@@ -1,0 +1,9 @@
+<view wx:for="{{list}}" wx:key="*this" class="sk-card">
+  <view class="sk-row">
+    <view class="sk-block sk-tag"></view>
+    <view class="sk-block sk-price"></view>
+  </view>
+  <view class="sk-block sk-title"></view>
+  <view class="sk-block sk-desc"></view>
+  <view class="sk-block sk-meta"></view>
+</view>

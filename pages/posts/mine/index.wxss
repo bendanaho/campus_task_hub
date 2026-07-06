@@ -1,0 +1,118 @@
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-radius: var(--radius-field);
+  padding: 6rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  padding: 14rpx 0;
+  border-radius: 12rpx;
+  color: var(--muted);
+}
+
+.tab.on {
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.mine-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 28rpx 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.mine-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* side 标签三色写法参考大厅页 */
+.side-tag {
+  font-size: 22rpx;
+  font-weight: 700;
+  border-radius: 12rpx;
+  padding: 8rpx 18rpx;
+}
+
+.side-tag.reward {
+  background: var(--reward-soft);
+  color: #E14D0B;
+}
+
+.side-tag.service {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.side-tag.mutual {
+  background: var(--green-soft);
+  color: #0A9463;
+}
+
+.status-badge {
+  font-size: 22rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  padding: 8rpx 18rpx;
+}
+
+.status-badge.open {
+  background: var(--green-soft);
+  color: #0A9463;
+}
+
+.status-badge.closed {
+  background: var(--field);
+  color: var(--faint);
+}
+
+.mine-title {
+  margin-top: 18rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mine-foot {
+  margin-top: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.price {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--reward);
+}
+
+.price-yuan {
+  font-size: 22rpx;
+  font-weight: 700;
+  margin-right: 2rpx;
+}
+
+.price-alt {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #0A9463;
+}
+
+.mine-time {
+  font-size: 23rpx;
+  color: var(--faint);
+}

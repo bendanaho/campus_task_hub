@@ -5,15 +5,18 @@
     <view wx:if="{{activeOrder}}" class="order-line">
       订单：{{activeOrder.statusText}} / ¥{{activeOrder.amountText}}
     </view>
+    <view class="order-entry" bindtap="openOrderDetail">{{activeOrder ? '订单详情 ›' : '历史订单 ›'}}</view>
   </view>
 
-  <scroll-view class="messages section" scroll-y scroll-into-view="{{bottomId}}" enhanced show-scrollbar="{{false}}">
-    <view wx:if="{{messages.length == 0}}" class="empty">暂无消息</view>
-    <view wx:for="{{messages}}" wx:key="id" class="msg {{item.withdrawn ? 'withdrawn-msg' : item.bubbleClass}}">
+  <scroll-view class="messages section" scroll-y scroll-into-view="{{intoView}}" enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{loading}}" class="empty">正在加载消息...</view>
+    <view wx:elif="{{messages.length == 0}}" class="empty">暂无消息</view>
+    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.withdrawn ? 'withdrawn-msg' : item.bubbleClass}}">
       <view class="msg-time">{{item.timeText}}</view>
       <view wx:if="{{item.withdrawn}}" class="withdrawn-tip">消息已撤回</view>
-      <block wx:else>
-        <view class="bubble">
+      <view wx:else class="bubble-row">
+        <view wx:if="{{item.failed}}" class="failed-badge" data-id="{{item.id}}" bindtap="resendLocal">!</view>
+        <view class="bubble {{item.pending ? 'pending' : ''}}" data-id="{{item.id}}" bindlongpress="onBubbleLongpress">
           <block wx:if="{{item.type == 'payment'}}">
             <view class="payment-title">{{item.paymentTitle}}</view>
             <view class="payment-money">¥{{item.paymentAmountText}}</view>
@@ -27,10 +30,8 @@
             <view>{{item.content}}</view>
           </block>
         </view>
-        <button wx:if="{{item.isMine}}" class="withdraw" data-id="{{item.id}}" bindtap="withdraw">撤回</button>
-      </block>
+      </view>
     </view>
-    <view id="bottom"></view>
   </scroll-view>
 
   <view class="card section pay-box">

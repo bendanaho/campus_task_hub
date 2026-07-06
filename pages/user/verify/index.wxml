@@ -22,6 +22,6 @@
       <text class="label">班级</text>
       <input class="input" placeholder="选填" value="{{className}}" data-key="className" bindinput="onInput" />
     </view>
-    <button class="btn" bindtap="submit">提交认证</button>
+    <button class="btn" disabled="{{submitting}}" loading="{{submitting}}" bindtap="submit">提交认证</button>
   </view>
 </view>

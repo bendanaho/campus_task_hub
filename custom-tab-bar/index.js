@@ -1,6 +1,7 @@
 Component({
   data: {
     selected: 0,
+    unreadTotal: 0,
     list: [
       {
         pagePath: '/pages/posts/list/index',

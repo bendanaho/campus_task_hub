@@ -1,0 +1,59 @@
+<view class="page reviews-page">
+  <skeleton wx:if="{{loading && !hasAny}}" count="3" />
+
+  <block wx:else>
+    <view wx:if="{{summary}}" class="card summary-card">
+      <view class="summary-avg-box">
+        <view class="summary-avg">{{summary.avg}}</view>
+        <view class="summary-sub">平均分</view>
+      </view>
+      <view class="summary-divider"></view>
+      <view class="summary-item">
+        <view class="summary-num">{{summary.count}}</view>
+        <view class="summary-sub">共 {{summary.count}} 条</view>
+      </view>
+      <view class="summary-item">
+        <view class="summary-num">{{summary.goodRate}}%</view>
+        <view class="summary-sub">好评率</view>
+      </view>
+    </view>
+
+    <view wx:if="{{hasAny}}" class="chips">
+      <view
+        wx:for="{{filters}}"
+        wx:key="value"
+        class="chip {{filter === item.value ? 'on' : ''}}"
+        bindtap="onFilterTap"
+        data-value="{{item.value}}"
+      >{{item.label}}</view>
+    </view>
+
+    <empty-state wx:if="{{reviews.length === 0}}" emoji="⭐" title="暂无评价" />
+
+    <view wx:for="{{reviews}}" wx:key="id" class="card review-card">
+      <view class="review-top">
+        <view class="ava" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
+        <view class="review-user">
+          <view class="review-name">{{item.fromUserName}}</view>
+          <view class="review-time">{{item.timeText}}</view>
+        </view>
+        <view class="review-stars">{{item.stars}}</view>
+      </view>
+      <view class="review-content {{item.hasContent ? '' : 'placeholder'}}">{{item.contentText}}</view>
+      <view wx:if="{{item.images.length}}" class="review-imgs">
+        <image
+          wx:for="{{item.images}}"
+          wx:for-item="img"
+          wx:for-index="imgIndex"
+          wx:key="imgIndex"
+          class="review-img"
+          src="{{img}}"
+          mode="aspectFill"
+          bindtap="previewImage"
+          data-r-index="{{index}}"
+          data-index="{{imgIndex}}"
+        />
+      </view>
+    </view>
+  </block>
+</view>

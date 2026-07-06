@@ -14,7 +14,8 @@ Page({
     content: '',
     hasReviewed: false,
     images: [],
-    maxImages: MAX_IMAGES
+    maxImages: MAX_IMAGES,
+    submitting: false
   },
 
   onLoad(options) {
@@ -71,10 +72,14 @@ Page({
   },
 
   submit() {
+    if (this.data.submitting) {
+      return
+    }
     if (this.data.hasReviewed) {
       wx.showToast({ title: '该订单已评价', icon: 'none' })
       return
     }
+    this.setData({ submitting: true })
     reviewService.submit({
       orderId: Number(this.data.orderId),
       toUserId: Number(this.data.toUserId),
@@ -88,6 +93,9 @@ Page({
         wx.navigateBack()
       }, 600)
     }).catch(function () {
+      // 提交失败时保留已填写的评分/内容/图片，用户可直接重试
+    }).finally(() => {
+      this.setData({ submitting: false })
     })
   }
 })

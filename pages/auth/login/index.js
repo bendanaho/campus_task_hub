@@ -23,7 +23,8 @@ Page({
   data: {
     account: '',
     password: '',
-    redirect: ''
+    redirect: '',
+    submitting: false
   },
 
   onLoad(options) {
@@ -41,10 +42,14 @@ Page({
   },
 
   submit() {
+    if (this.data.submitting) {
+      return
+    }
     if (!this.data.account || !this.data.password) {
       wx.showToast({ title: '请输入账号和密码', icon: 'none' })
       return
     }
+    this.setData({ submitting: true })
     authService.login({
       account: this.data.account,
       password: this.data.password
@@ -53,6 +58,8 @@ Page({
       wx.showToast({ title: '登录成功', icon: 'success' })
       goAfterLogin(this.data.redirect)
     }).catch(function () {
+    }).finally(() => {
+      this.setData({ submitting: false })
     })
   },
 

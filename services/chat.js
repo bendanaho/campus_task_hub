@@ -44,7 +44,8 @@ function sendPayment(chatId, data) {
 }
 
 function unread() {
-  return request({ url: '/api/messages/unread', method: 'GET' })
+  // 未读角标属后台静默请求：token 失效时不打断用户浏览
+  return request({ url: '/api/messages/unread', method: 'GET', silentAuth: true })
 }
 
 function pay(messageId) {

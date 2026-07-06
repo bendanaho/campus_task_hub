@@ -7,7 +7,7 @@
   <view class="card section">
     <view class="label">充值金额</view>
     <input class="input" type="digit" placeholder="0.01 - 100000" value="{{amount}}" bindinput="onAmountInput" />
-    <button class="btn recharge" bindtap="recharge">确认充值</button>
+    <button class="btn recharge" disabled="{{submitting}}" loading="{{submitting}}" bindtap="recharge">确认充值</button>
   </view>
 
   <button class="btn secondary" bindtap="goBills">查看账单流水</button>

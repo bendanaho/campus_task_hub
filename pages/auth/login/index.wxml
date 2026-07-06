@@ -13,7 +13,7 @@
       <text class="label">密码</text>
       <input class="input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" confirm-type="done" bindconfirm="submit" />
     </view>
-    <button class="btn submit" bindtap="submit">登录</button>
+    <button class="btn submit" bindtap="submit" disabled="{{submitting}}" loading="{{submitting}}">登录</button>
     <button class="register-link" bindtap="goRegister">还没有账号，去注册</button>
   </view>
 

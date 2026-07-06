@@ -11,10 +11,18 @@
       </view>
     </view>
 
-    <view wx:if="{{loading}}" class="empty">正在加载订单...</view>
-    <view wx:elif="{{orders.length == 0}}" class="empty">暂无订单</view>
+    <skeleton wx:if="{{loading && orders.length === 0}}" count="3" />
 
-    <view wx:for="{{orders}}" wx:key="id" class="order card section">
+    <empty-state
+      wx:elif="{{!loading && orders.length === 0}}"
+      emoji="📋"
+      title="还没有订单"
+      sub="去大厅接第一单吧"
+      btn-text="去大厅"
+      bind:action="goHall"
+    />
+
+    <view wx:for="{{orders}}" wx:key="id" class="order card section" hover-class="card-hover" data-chat="{{item.order.chatId}}" bindtap="goDetail">
       <view class="space-between">
         <view class="tag">{{item.order.statusText}}</view>
         <view class="amount">¥{{item.order.amountText}}</view>
@@ -27,11 +35,11 @@
       </view>
 
       <view class="actions">
-        <button class="btn ghost small" data-chat="{{item.order.chatId}}" bindtap="goChat">会话</button>
-        <button wx:if="{{item.canAccept}}" class="btn small" data-id="{{item.order.id}}" bindtap="acceptOrder">接受</button>
-        <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" bindtap="cancelOrder">取消</button>
-        <button wx:if="{{item.canConfirm}}" class="btn small" data-id="{{item.order.id}}" bindtap="confirmOrder">确认完成</button>
-        <button wx:if="{{item.canReview}}" class="btn secondary small" data-index="{{index}}" bindtap="goReview">评价</button>
+        <button class="btn ghost small" data-chat="{{item.order.chatId}}" catchtap="goChat">会话</button>
+        <button wx:if="{{item.canAccept}}" class="btn small" data-id="{{item.order.id}}" catchtap="acceptOrder">接受</button>
+        <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" catchtap="cancelOrder">取消</button>
+        <button wx:if="{{item.canConfirm}}" class="btn small" data-index="{{index}}" catchtap="confirmOrder">确认完成</button>
+        <button wx:if="{{item.canReview}}" class="btn secondary small" data-index="{{index}}" catchtap="goReview">评价</button>
       </view>
     </view>
   </block>

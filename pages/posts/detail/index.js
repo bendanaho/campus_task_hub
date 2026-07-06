@@ -3,6 +3,7 @@ const reviewService = require('../../../services/reviews')
 const chatService = require('../../../services/chat')
 const orderService = require('../../../services/orders')
 const auth = require('../../../utils/auth')
+const confirmUtil = require('../../../utils/confirm')
 const format = require('../../../utils/format')
 const imageUtil = require('../../../utils/image')
 
@@ -18,6 +19,7 @@ Page({
     task: null,
     publisher: null,
     reviews: [],
+    reviewsTotal: 0,
     user: null,
     loading: true
   },
@@ -31,9 +33,23 @@ Page({
     this.setData({ user: auth.getUser() })
   },
 
+  onPullDownRefresh() {
+    this.loadDetail().finally(function () {
+      wx.stopPullDownRefresh()
+    })
+  },
+
+  onShareAppMessage() {
+    const task = this.data.task
+    return {
+      title: (task && task.title) || '校园互助',
+      path: '/pages/posts/detail/index?id=' + this.data.id
+    }
+  },
+
   loadDetail() {
     this.setData({ loading: true })
-    postService.detail(this.data.id).then((data) => {
+    return postService.detail(this.data.id).then((data) => {
       const task = data.task || {}
       const publisher = data.publisher || {}
       task.sideText = format.sideLabel(task.publisherSide)
@@ -56,7 +72,10 @@ Page({
           timeText: format.formatTime(item.time)
         })
       })
-      this.setData({ reviews: list })
+      this.setData({
+        reviews: list.slice(0, 2),
+        reviewsTotal: list.length
+      })
     }).catch(function () {
     }).finally(() => {
       this.setData({ loading: false })
@@ -65,6 +84,28 @@ Page({
 
   previewImage(e) {
     imageUtil.preview(this.data.task.images, Number(e.currentTarget.dataset.index))
+  },
+
+  goPublisherProfile() {
+    const publisher = this.data.publisher
+    if (!publisher || !publisher.id) {
+      return
+    }
+    wx.navigateTo({
+      url: '/pages/user/profile/index?id=' + publisher.id
+    })
+  },
+
+  goAllReviews() {
+    const publisher = this.data.publisher
+    if (!publisher || !publisher.id) {
+      return
+    }
+    const task = this.data.task
+    const name = publisher.username || (task && task.publisherName) || ''
+    wx.navigateTo({
+      url: '/pages/reviews/list/index?userId=' + publisher.id + '&name=' + encodeURIComponent(name)
+    })
   },
 
   ensureChat() {
@@ -105,17 +146,29 @@ Page({
     if (!auth.requireVerified()) {
       return
     }
-    this.ensureChat().then((chatId) => {
-      return orderService.create({
-        postId: this.data.task.id,
-        chatId: chatId
-      }).then(function () {
-        wx.showToast({ title: '已提交响应', icon: 'success' })
-        wx.navigateTo({
-          url: '/pages/chat/room/index?chatId=' + encodeURIComponent(chatId)
+    const task = this.data.task
+    if (!task) {
+      return
+    }
+    confirmUtil.confirm({
+      title: '确认响应',
+      content: '确认响应「' + task.title + '」？'
+    }).then((ok) => {
+      if (!ok) {
+        return
+      }
+      this.ensureChat().then((chatId) => {
+        return orderService.create({
+          postId: this.data.task.id,
+          chatId: chatId
+        }).then(function () {
+          wx.showToast({ title: '已提交响应', icon: 'success' })
+          wx.navigateTo({
+            url: '/pages/chat/room/index?chatId=' + encodeURIComponent(chatId)
+          })
         })
+      }).catch(function () {
       })
-    }).catch(function () {
     })
   }
 })

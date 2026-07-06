@@ -11,7 +11,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="empty">正在加载账单...</view>
-  <view wx:elif="{{list.length == 0}}" class="empty">暂无账单记录</view>
+  <empty-state wx:elif="{{list.length == 0}}" emoji="🧾" title="暂无账单" />
 
   <view wx:for="{{list}}" wx:key="id" class="bill card section">
     <view class="space-between">

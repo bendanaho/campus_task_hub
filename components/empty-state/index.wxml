@@ -1,0 +1,6 @@
+<view class="es-wrap">
+  <view wx:if="{{emoji}}" class="es-emoji">{{emoji}}</view>
+  <view wx:if="{{title}}" class="es-title">{{title}}</view>
+  <view wx:if="{{sub}}" class="es-sub">{{sub}}</view>
+  <view wx:if="{{btnText}}" class="es-btn" hover-class="es-btn-hover" bindtap="onAction">{{btnText}}</view>
+</view>

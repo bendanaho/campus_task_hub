@@ -2,5 +2,9 @@
   "navigationStyle": "custom",
   "navigationBarTextStyle": "white",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#F4F6FA"
+  "backgroundColor": "#F4F6FA",
+  "usingComponents": {
+    "skeleton": "/components/skeleton/index",
+    "empty-state": "/components/empty-state/index"
+  }
 }

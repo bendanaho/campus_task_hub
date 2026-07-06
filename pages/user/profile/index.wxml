@@ -1,0 +1,55 @@
+<view class="page">
+  <view wx:if="{{loading && !profile}}" class="empty">正在加载...</view>
+
+  <block wx:elif="{{profile}}">
+    <view class="card profile section">
+      <view class="avatar">{{profile.avatarText}}</view>
+      <view class="profile-main">
+        <view class="name-row">
+          <text class="name">{{profile.username}}</text>
+          <text wx:if="{{profile.verified}}" class="tag green">已实名</text>
+        </view>
+        <view class="credit">★ {{profile.creditText}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{profile.college || profile.className || profile.bio}}" class="card section">
+      <view class="block-title">基本信息</view>
+      <view wx:if="{{profile.college}}" class="info-row">
+        <text class="info-label">学院</text>
+        <text>{{profile.college}}</text>
+      </view>
+      <view wx:if="{{profile.className}}" class="info-row">
+        <text class="info-label">班级</text>
+        <text>{{profile.className}}</text>
+      </view>
+      <view wx:if="{{profile.bio}}" class="info-row">
+        <text class="info-label">简介</text>
+        <text class="bio">{{profile.bio}}</text>
+      </view>
+    </view>
+
+    <view class="card section">
+      <view class="block-title">收到的评价</view>
+      <view wx:if="{{reviews.length == 0}}" class="review-empty">暂无评价</view>
+      <view wx:for="{{reviews}}" wx:key="id" class="review">
+        <view class="space-between">
+          <text class="strong">{{item.fromUserName}}</text>
+          <text class="score">{{item.rating}} 星</text>
+        </view>
+        <view class="review-content">{{item.content || '用户未填写评价内容'}}</view>
+        <view class="muted time">{{item.timeText}}</view>
+      </view>
+      <view
+        wx:if="{{reviewsTotal > 0}}"
+        class="reviews-more"
+        hover-class="btn-hover"
+        bindtap="goAllReviews"
+      >查看全部 {{reviewsTotal}} 条评价 ›</view>
+    </view>
+
+    <button wx:if="{{isSelf}}" class="btn secondary" bindtap="goEdit">编辑资料</button>
+  </block>
+
+  <view wx:else class="empty">未找到该用户</view>
+</view>

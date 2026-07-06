@@ -1,0 +1,57 @@
+<view class="page">
+  <skeleton wx:if="{{loading && !active && history.length === 0}}" count="2" />
+
+  <block wx:else>
+    <empty-state
+      wx:if="{{!active && history.length === 0}}"
+      emoji="📄"
+      title="该会话暂无订单"
+    />
+
+    <view wx:if="{{active}}" class="card section">
+      <view class="tag {{active.statusClass}}">{{active.statusText}}</view>
+      <view class="amount"><text class="amount-yuan">¥</text>{{active.amountText}}</view>
+
+      <view class="confirm-rows">
+        <view class="confirm-row">
+          <text class="confirm-role">付款方</text>
+          <text class="confirm-state {{active.payerConfirmed ? 'ok' : ''}}">{{active.payerText}}</text>
+        </view>
+        <view class="confirm-row">
+          <text class="confirm-role">收款方</text>
+          <text class="confirm-state {{active.earnerConfirmed ? 'ok' : ''}}">{{active.earnerText}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{active.timeline.length > 0}}" class="timeline">
+        <view wx:for="{{active.timeline}}" wx:key="label" class="tl-item">
+          <view class="tl-dot"></view>
+          <text class="tl-label">{{item.label}}</text>
+          <text class="tl-time">{{item.time}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{active.autoText}}" class="auto-hint">{{active.autoText}}</view>
+
+      <view class="actions">
+        <button class="btn ghost" hover-class="btn-hover" bindtap="goChat">进入会话</button>
+        <button wx:if="{{active.canCancel}}" class="btn warn" hover-class="btn-hover" bindtap="cancelOrder">取消订单</button>
+        <button wx:if="{{active.canConfirm}}" class="btn" hover-class="btn-hover" bindtap="confirmOrder">确认完成</button>
+      </view>
+    </view>
+
+    <view wx:if="{{!active && history.length > 0}}" class="card section">
+      <button class="btn ghost" hover-class="btn-hover" bindtap="goChat">进入会话</button>
+    </view>
+
+    <view wx:if="{{history.length > 0}}" class="card section">
+      <view class="section-title">历史订单</view>
+      <view wx:for="{{history}}" wx:key="id" class="history-item">
+        <view class="tag {{item.statusClass}}">{{item.statusText}}</view>
+        <view wx:if="{{item.isCurrent}}" class="current-pill">当前</view>
+        <text class="history-amount">¥{{item.amountText}}</text>
+        <text class="history-time">{{item.createdText}}</text>
+      </view>
+    </view>
+  </block>
+</view>

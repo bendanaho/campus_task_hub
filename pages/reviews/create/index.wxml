@@ -22,6 +22,6 @@
         <view wx:if="{{images.length < maxImages}}" class="img-add" hover-class="btn-hover" bindtap="addImage">＋</view>
       </view>
     </view>
-    <button class="btn" bindtap="submit">提交评价</button>
+    <button class="btn" bindtap="submit" disabled="{{submitting}}" loading="{{submitting}}">提交评价</button>
   </view>
 </view>

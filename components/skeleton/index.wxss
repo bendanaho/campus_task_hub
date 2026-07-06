@@ -1,0 +1,51 @@
+.sk-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.sk-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.sk-block {
+  background: #EDF1F7;
+  border-radius: 10rpx;
+  animation: sk-pulse 1.2s ease-in-out infinite;
+}
+
+.sk-tag {
+  width: 96rpx;
+  height: 40rpx;
+}
+
+.sk-price {
+  width: 120rpx;
+  height: 40rpx;
+}
+
+.sk-title {
+  width: 70%;
+  height: 40rpx;
+  margin-bottom: 16rpx;
+}
+
+.sk-desc {
+  width: 100%;
+  height: 32rpx;
+  margin-bottom: 24rpx;
+}
+
+.sk-meta {
+  width: 55%;
+  height: 32rpx;
+}
+
+@keyframes sk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

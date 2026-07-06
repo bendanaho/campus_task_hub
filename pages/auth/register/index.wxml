@@ -14,8 +14,8 @@
     </view>
     <view class="field">
       <text class="label">密码</text>
-      <input class="input" password placeholder="请输入密码" value="{{password}}" data-key="password" bindinput="onInput" />
+      <input class="input" password placeholder="至少 6 位" value="{{password}}" data-key="password" bindinput="onInput" />
     </view>
-    <button class="btn" bindtap="submit">创建账号</button>
+    <button class="btn" bindtap="submit" disabled="{{submitting}}" loading="{{submitting}}">创建账号</button>
   </view>
 </view>

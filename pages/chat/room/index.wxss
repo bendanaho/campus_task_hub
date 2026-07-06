@@ -18,6 +18,13 @@
   font-size: 24rpx;
 }
 
+.order-entry {
+  align-self: flex-start;
+  color: var(--brand);
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
 .messages {
   flex: 1;
   height: 0;
@@ -57,11 +64,36 @@
   line-height: 1.4;
 }
 
-.bubble {
+.bubble-row {
   max-width: 78%;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.bubble {
+  min-width: 0;
   padding: 20rpx 22rpx;
   border-radius: 14rpx;
   line-height: 1.55;
+}
+
+.bubble.pending {
+  opacity: 0.65;
+}
+
+.failed-badge {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: var(--reward);
+  color: var(--surface);
+  font-size: 26rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .mine .bubble {
@@ -73,12 +105,6 @@
   background: #ffffff;
   border: 1rpx solid #e6eaf1;
   color: #253044;
-}
-
-.withdraw {
-  margin-top: 8rpx;
-  color: #8a95a6;
-  font-size: 22rpx;
 }
 
 .payment-title {

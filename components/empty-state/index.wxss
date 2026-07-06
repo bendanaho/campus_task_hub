@@ -1,0 +1,47 @@
+.es-wrap {
+  padding: 100rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.es-emoji {
+  font-size: 96rpx;
+  line-height: 1.2;
+}
+
+.es-title {
+  margin-top: 24rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.es-sub {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  color: var(--faint);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.es-btn {
+  margin-top: 32rpx;
+  min-width: 200rpx;
+  min-height: 60rpx;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+  border-radius: 999rpx;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 25rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.es-btn-hover {
+  opacity: 0.8;
+  transform: scale(0.97);
+}

@@ -5,6 +5,8 @@
     class="tab-item {{selected === index ? 'on' : ''}}"
     data-index="{{index}}"
     bindtap="switchTab"
+    aria-role="tab"
+    aria-label="{{index === 1 && unreadTotal > 0 ? item.text + '，' + (unreadTotal > 99 ? '99+' : unreadTotal) + '条未读' : item.text}}"
   >
     <block wx:if="{{item.publish}}">
       <view class="publish-fab {{selected === index ? 'fab-on' : ''}}">
@@ -14,6 +16,7 @@
     </block>
     <block wx:else>
       <image class="tab-icon" src="{{selected === index ? item.iconActive : item.icon}}" mode="aspectFit" />
+      <view wx:if="{{index === 1 && unreadTotal > 0}}" class="tab-badge">{{unreadTotal > 99 ? '99+' : unreadTotal}}</view>
       <view class="tab-text">{{item.text}}</view>
     </block>
   </view>

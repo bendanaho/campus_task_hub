@@ -1,5 +1,6 @@
 const postService = require('../../../services/posts')
 const auth = require('../../../utils/auth')
+const badge = require('../../../utils/badge')
 const constants = require('../../../utils/constants')
 const format = require('../../../utils/format')
 
@@ -9,6 +10,7 @@ const SIDE_CLASS = {
   earner: 'service',
   none: 'mutual'
 }
+const PAGE_SIZE = 10
 
 Page({
   data: {
@@ -20,8 +22,8 @@ Page({
     sides: constants.sideOptions,
     sorts: constants.sortOptions,
     categories: constants.categoryOptions,
-    skeletons: [0, 1, 2],
     posts: [],
+    hasMore: false,
     loading: false,
     loggedIn: false
   },
@@ -41,6 +43,7 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
+    badge.refreshUnread(this)
     this.setData({ loggedIn: auth.isLoggedIn() })
   },
 
@@ -121,11 +124,33 @@ Page({
           thumb: thumb
         })
       })
-      this.setData({ posts: posts })
+      // 本地分批渲染：全量存实例属性，data 里只放当前批次
+      this.allPosts = posts
+      this.setData({
+        posts: posts.slice(0, PAGE_SIZE),
+        hasMore: posts.length > PAGE_SIZE
+      })
     }).catch(function () {
     }).finally(() => {
       this.setData({ loading: false })
     })
+  },
+
+  onReachBottom() {
+    const all = this.allPosts || []
+    const current = this.data.posts.length
+    if (current >= all.length) {
+      if (this.data.hasMore) {
+        this.setData({ hasMore: false })
+      }
+      return
+    }
+    const end = Math.min(current + PAGE_SIZE, all.length)
+    const patch = { hasMore: end < all.length }
+    for (let i = current; i < end; i += 1) {
+      patch['posts[' + i + ']'] = all[i]
+    }
+    this.setData(patch)
   },
 
   openDetail(e) {
@@ -145,8 +170,6 @@ Page({
   },
 
   goLogin() {
-    wx.navigateTo({
-      url: '/pages/auth/login/index'
-    })
+    auth.goLogin()
   }
 })

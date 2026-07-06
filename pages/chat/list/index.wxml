@@ -6,7 +6,15 @@
 
   <block wx:else>
     <view wx:if="{{loading}}" class="empty">正在加载会话...</view>
-    <view wx:elif="{{conversations.length == 0}}" class="empty">暂无会话</view>
+    <empty-state
+      wx:elif="{{conversations.length == 0}}"
+      emoji="💬"
+      title="暂无会话"
+      sub="去大厅找任务，联系发布者"
+      btn-text="去大厅"
+      bind:action="goHall"
+    />
+
 
     <view wx:for="{{conversations}}" wx:key="id" class="conversation card section" data-id="{{item.id}}" bindtap="openRoom">
       <view class="avatar">{{item.avatarText}}</view>

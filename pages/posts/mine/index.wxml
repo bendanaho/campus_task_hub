@@ -1,0 +1,50 @@
+<view class="page">
+  <empty-state
+    wx:if="{{!loggedIn}}"
+    title="登录后查看我的发布"
+    btn-text="去登录"
+    bind:action="goLogin"
+  />
+
+  <block wx:else>
+    <view class="tabs">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="value"
+        class="tab {{tabIndex === index ? 'on' : ''}}"
+        bindtap="onTabTap"
+        data-index="{{index}}"
+      >{{item.label}}</view>
+    </view>
+
+    <skeleton wx:if="{{loading && posts.length === 0}}" count="3" />
+
+    <empty-state
+      wx:elif="{{posts.length === 0}}"
+      emoji="📝"
+      title="还没有发布过任务"
+      btn-text="去发布"
+      bind:action="goPublish"
+    />
+
+    <view
+      wx:for="{{posts}}"
+      wx:key="id"
+      class="mine-card"
+      hover-class="card-hover"
+      bindtap="openDetail"
+      data-id="{{item.id}}"
+    >
+      <view class="mine-top">
+        <view class="side-tag {{item.sideClass}}">{{item.sideText}}</view>
+        <view class="status-badge {{item.status === 'open' ? 'open' : 'closed'}}">{{item.statusText}}</view>
+      </view>
+      <view class="mine-title">{{item.title}}</view>
+      <view class="mine-foot">
+        <view wx:if="{{item.hasPrice}}" class="price"><text class="price-yuan">¥</text>{{item.moneyText}}</view>
+        <view wx:else class="price-alt">{{item.priceAlt}}</view>
+        <text class="mine-time">{{item.timeText}}</text>
+      </view>
+    </view>
+  </block>
+</view>

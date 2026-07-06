@@ -48,7 +48,7 @@
       </view>
     </view>
 
-    <view class="card section">
+    <view class="card section" hover-class="card-hover" bindtap="goPublisherProfile">
       <view class="publisher-title">发布者信息</view>
       <view class="publisher">
         <view class="avatar">{{publisher.avatarText}}</view>
@@ -56,6 +56,7 @@
           <view class="strong">{{publisher.username || task.publisherName}}</view>
           <view class="muted">信用分 {{publisher.creditScore || task.publisherCredit}}</view>
         </view>
+        <view class="publisher-arrow">›</view>
       </view>
     </view>
 
@@ -75,6 +76,7 @@
         <view class="review-content">{{item.content || '用户未填写评价内容'}}</view>
         <view class="muted time">{{item.timeText}}</view>
       </view>
+      <view wx:if="{{reviewsTotal > 2}}" class="reviews-more" hover-class="btn-hover" bindtap="goAllReviews">查看全部 {{reviewsTotal}} 条评价 ›</view>
     </view>
   </block>
 </view>

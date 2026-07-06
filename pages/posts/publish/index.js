@@ -1,10 +1,15 @@
 const postService = require('../../../services/posts')
 const auth = require('../../../utils/auth')
+const badge = require('../../../utils/badge')
 const constants = require('../../../utils/constants')
 const format = require('../../../utils/format')
 const imageUtil = require('../../../utils/image')
 
 const MAX_IMAGES = 3
+const MAX_TITLE_LEN = 30
+const MAX_DESC_LEN = 500
+const MAX_REWARD = 100000
+const REWARD_PATTERN = /^\d+(\.\d{1,2})?$/
 
 Page({
   data: {
@@ -22,7 +27,8 @@ Page({
     date: '',
     time: '18:00',
     images: [],
-    maxImages: MAX_IMAGES
+    maxImages: MAX_IMAGES,
+    submitting: false
   },
 
   onLoad() {
@@ -33,6 +39,7 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
     }
+    badge.refreshUnread(this)
     this.setData({
       loggedIn: auth.isLoggedIn(),
       verified: auth.isVerified()
@@ -63,7 +70,7 @@ Page({
   },
 
   goLogin() {
-    wx.navigateTo({ url: '/pages/auth/login/index' })
+    auth.goLogin()
   },
 
   goVerify() {
@@ -96,6 +103,9 @@ Page({
   },
 
   submit() {
+    if (this.data.submitting) {
+      return
+    }
     if (!auth.requireVerified()) {
       return
     }
@@ -108,9 +118,21 @@ Page({
       return
     }
 
-    if (side !== 'none' && rewardNumber < 0) {
-      wx.showToast({ title: '金额不能为负数', icon: 'none' })
+    if (this.data.title.length > MAX_TITLE_LEN) {
+      wx.showToast({ title: '标题不能超过 ' + MAX_TITLE_LEN + ' 字', icon: 'none' })
       return
+    }
+
+    if (this.data.description.length > MAX_DESC_LEN) {
+      wx.showToast({ title: '描述不能超过 ' + MAX_DESC_LEN + ' 字', icon: 'none' })
+      return
+    }
+
+    if (side !== 'none' && this.data.rewardValue !== '') {
+      if (!REWARD_PATTERN.test(this.data.rewardValue) || rewardNumber < 0 || rewardNumber > MAX_REWARD) {
+        wx.showToast({ title: '金额需为 0-100000 的数字，最多两位小数', icon: 'none' })
+        return
+      }
     }
 
     const rewardText = side === 'none'
@@ -136,6 +158,7 @@ Page({
       payload.serviceTime = this.data.serviceTime
     }
 
+    this.setData({ submitting: true })
     postService.create(payload).then((data) => {
       wx.showToast({ title: '发布成功', icon: 'success' })
       const task = data && data.task ? data.task : null
@@ -147,6 +170,8 @@ Page({
         }
       }, 600)
     }).catch(function () {
+    }).finally(() => {
+      this.setData({ submitting: false })
     })
   }
 })

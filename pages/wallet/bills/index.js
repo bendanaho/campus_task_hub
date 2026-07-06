@@ -17,9 +17,15 @@ Page({
     this.loadBills()
   },
 
+  onPullDownRefresh() {
+    this.loadBills().finally(function () {
+      wx.stopPullDownRefresh()
+    })
+  },
+
   loadBills() {
     this.setData({ loading: true })
-    userService.getBills().then((data) => {
+    return userService.getBills().then((data) => {
       const list = (data.list || []).map(function (item) {
         return Object.assign({}, item, {
           timeText: format.formatTime(item.time),

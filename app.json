@@ -12,7 +12,12 @@
     "pages/chat/room/index",
     "pages/wallet/index/index",
     "pages/wallet/bills/index",
-    "pages/reviews/create/index"
+    "pages/reviews/create/index",
+    "pages/posts/mine/index",
+    "pages/orders/detail/index",
+    "pages/user/profile/index",
+    "pages/user/edit/index",
+    "pages/reviews/list/index"
   ],
   "window": {
     "navigationBarTextStyle": "black",

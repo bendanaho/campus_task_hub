@@ -1,6 +1,7 @@
 const auth = require('../../../utils/auth')
 const chatService = require('../../../services/chat')
 const format = require('../../../utils/format')
+const badge = require('../../../utils/badge')
 
 Page({
   data: {
@@ -18,6 +19,7 @@ Page({
     if (auth.isLoggedIn()) {
       this.loadData()
     }
+    badge.refreshUnread(this)
   },
 
   onPullDownRefresh() {
@@ -52,7 +54,11 @@ Page({
   },
 
   goLogin() {
-    wx.navigateTo({ url: '/pages/auth/login/index' })
+    auth.goLogin()
+  },
+
+  goHall() {
+    wx.switchTab({ url: '/pages/posts/list/index' })
   },
 
   openRoom(e) {

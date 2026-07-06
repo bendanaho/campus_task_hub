@@ -64,10 +64,24 @@ function currentRouteWithQuery() {
   }
   const page = pages[pages.length - 1]
   const options = page.options || {}
+  // options 里的值本身就是 URL 未解码原文，这里不再编码，避免二次编码；
+  // 整串 redirect 由调用方 encodeURIComponent 一次
   const query = Object.keys(options).map(function (key) {
-    return key + '=' + encodeURIComponent(options[key])
+    return key + '=' + options[key]
   }).join('&')
   return '/' + page.route + (query ? '?' + query : '')
+}
+
+function goLogin() {
+  const pages = getCurrentPages()
+  const top = pages && pages.length ? pages[pages.length - 1] : null
+  if (top && top.route === 'pages/auth/login/index') {
+    return
+  }
+  const redirect = encodeURIComponent(currentRouteWithQuery())
+  wx.navigateTo({
+    url: '/pages/auth/login/index?redirect=' + redirect
+  })
 }
 
 function requireLogin() {
@@ -102,6 +116,7 @@ module.exports = {
   clearSession,
   isLoggedIn,
   isVerified,
+  goLogin,
   requireLogin,
   requireVerified
 }
