@@ -1,0 +1,73 @@
+<view class="page">
+  <view wx:if="{{!loggedIn}}" class="card gate">
+    <view class="gate-title">登录后才能发布帖子</view>
+    <view class="muted">课设展示阶段使用后端账号密码登录。</view>
+    <button class="btn gate-btn" bindtap="goLogin">去登录</button>
+  </view>
+
+  <view wx:elif="{{!verified}}" class="card gate">
+    <view class="gate-title">完成实名认证后才能发布</view>
+    <view class="muted">后端要求发布、下单、支付等交易操作必须实名。</view>
+    <button class="btn gate-btn" bindtap="goVerify">去认证</button>
+  </view>
+
+  <view wx:else>
+    <view class="card section">
+      <view class="field">
+        <text class="label">发布类型</text>
+        <picker range="{{sides}}" range-key="label" value="{{sideIndex}}" bindchange="onSideChange">
+          <view class="picker-box">{{sides[sideIndex].label}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">分类</text>
+        <picker range="{{categories}}" range-key="label" value="{{categoryIndex}}" bindchange="onCategoryChange">
+          <view class="picker-box">{{categories[categoryIndex].label}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">标题</text>
+        <input class="input" placeholder="一句话说清楚需求或服务" value="{{title}}" data-key="title" bindinput="onInput" />
+      </view>
+      <view class="field">
+        <text class="label">描述</text>
+        <textarea class="textarea" placeholder="补充地点、时间、要求等信息" value="{{description}}" data-key="description" bindinput="onInput" />
+      </view>
+      <view class="field">
+        <text class="label">金额</text>
+        <input class="input" type="digit" placeholder="纯互助可不填，服务可填 0 表示面议" value="{{rewardValue}}" data-key="rewardValue" bindinput="onInput" />
+      </view>
+      <view class="field" wx:if="{{sides[sideIndex].value == 'payer'}}">
+        <text class="label">截止时间</text>
+        <view class="date-row">
+          <picker mode="date" value="{{date}}" bindchange="onDateChange">
+            <view class="picker-box">{{date}}</view>
+          </picker>
+          <picker mode="time" value="{{time}}" bindchange="onTimeChange">
+            <view class="picker-box">{{time}}</view>
+          </picker>
+        </view>
+      </view>
+      <view class="field" wx:if="{{sides[sideIndex].value == 'earner'}}">
+        <text class="label">服务时间</text>
+        <input class="input" placeholder="例如：工作日晚上、周末全天" value="{{serviceTime}}" data-key="serviceTime" bindinput="onInput" />
+      </view>
+      <view class="field">
+        <text class="label">联系方式</text>
+        <input class="input" placeholder="默认站内联系" value="{{contact}}" data-key="contact" bindinput="onInput" />
+      </view>
+      <view class="field">
+        <text class="label">图片（选填，最多 {{maxImages}} 张）</text>
+        <view class="img-grid">
+          <view wx:for="{{images}}" wx:key="index" class="img-cell">
+            <image src="{{item}}" mode="aspectFill" bindtap="previewImage" data-index="{{index}}" />
+            <view class="img-del" catchtap="removeImage" data-index="{{index}}">✕</view>
+          </view>
+          <view wx:if="{{images.length < maxImages}}" class="img-add" hover-class="btn-hover" bindtap="addImage">＋</view>
+        </view>
+      </view>
+    </view>
+
+    <button class="btn publish-btn" bindtap="submit">发布帖子</button>
+  </view>
+</view>

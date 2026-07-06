@@ -1,0 +1,56 @@
+{
+  "pages": [
+    "pages/posts/list/index",
+    "pages/posts/detail/index",
+    "pages/posts/publish/index",
+    "pages/auth/login/index",
+    "pages/auth/register/index",
+    "pages/user/home/index",
+    "pages/user/verify/index",
+    "pages/orders/list/index",
+    "pages/chat/list/index",
+    "pages/chat/room/index",
+    "pages/wallet/index/index",
+    "pages/wallet/bills/index",
+    "pages/reviews/create/index"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "校园互助",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f6f8"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#98A2B5",
+    "selectedColor": "#2E6BFF",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/posts/list/index",
+        "text": "大厅"
+      },
+      {
+        "pagePath": "pages/chat/list/index",
+        "text": "消息"
+      },
+      {
+        "pagePath": "pages/posts/publish/index",
+        "text": "发布"
+      },
+      {
+        "pagePath": "pages/orders/list/index",
+        "text": "订单"
+      },
+      {
+        "pagePath": "pages/user/home/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "componentFramework": "glass-easel",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

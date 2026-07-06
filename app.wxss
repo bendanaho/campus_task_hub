@@ -1,0 +1,231 @@
+page {
+  --brand: #2E6BFF;
+  --brand-deep: #1746C7;
+  --brand-soft: #EAF1FF;
+  --ink: #17233D;
+  --muted: #66718A;
+  --faint: #98A2B5;
+  --paper: #F4F6FA;
+  --surface: #FFFFFF;
+  --line: #E7ECF4;
+  --field: #F2F5FA;
+  --reward: #F5570B;
+  --reward-soft: #FFF0E8;
+  --green: #0FB77A;
+  --green-soft: #E7F8F1;
+  --amber: #B25E00;
+  --amber-soft: #FFF6E8;
+  --radius-card: 24rpx;
+  --radius-field: 16rpx;
+  --shadow-card: 0 6rpx 24rpx rgba(23, 35, 61, 0.06);
+
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 28rpx;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+
+view,
+text,
+input,
+textarea,
+button {
+  box-sizing: border-box;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  border-radius: 0;
+  background: transparent;
+}
+
+button::after {
+  border: 0;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 24rpx;
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+}
+
+.section {
+  margin-bottom: 24rpx;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 28rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.card-hover {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.space-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.strong {
+  font-weight: 700;
+}
+
+.btn {
+  min-height: 80rpx;
+  padding: 0 32rpx;
+  border-radius: 999rpx;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-hover {
+  opacity: 0.8;
+  transform: scale(0.97);
+}
+
+.btn.secondary {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.btn.ghost {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1rpx solid var(--line);
+}
+
+.btn.warn {
+  background: var(--reward-soft);
+  color: #D94A1F;
+}
+
+.btn.small {
+  min-height: 60rpx;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  background: var(--field);
+  border: 1rpx solid transparent;
+  border-radius: var(--radius-field);
+  font-size: 28rpx;
+}
+
+.input {
+  height: 76rpx;
+  min-height: 76rpx;
+  line-height: 76rpx;
+  padding: 0 24rpx;
+}
+
+.textarea {
+  min-height: 180rpx;
+  padding: 22rpx 24rpx;
+  line-height: 1.5;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44rpx;
+  padding: 0 16rpx;
+  border-radius: 10rpx;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.tag.orange {
+  background: var(--reward-soft);
+  color: #E14D0B;
+}
+
+.tag.green {
+  background: var(--green-soft);
+  color: #0A9463;
+}
+
+.tag.amber {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.empty {
+  padding: 88rpx 24rpx;
+  text-align: center;
+  color: var(--faint);
+}
+
+/* 选图九宫格（发布/评价页共用） */
+.img-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.img-cell {
+  position: relative;
+  width: 180rpx;
+  height: 180rpx;
+}
+
+.img-cell image {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-field);
+}
+
+.img-del {
+  position: absolute;
+  top: -14rpx;
+  right: -14rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(23, 35, 61, 0.72);
+  color: #ffffff;
+  font-size: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.img-add {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: var(--radius-field);
+  background: var(--field);
+  border: 2rpx dashed #C9D2E0;
+  color: var(--faint);
+  font-size: 56rpx;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -1,0 +1,24 @@
+<view class="page">
+  <view wx:if="{{!loggedIn}}" class="card guest">
+    <view class="guest-title">登录后查看消息</view>
+    <button class="btn guest-btn" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{loading}}" class="empty">正在加载会话...</view>
+    <view wx:elif="{{conversations.length == 0}}" class="empty">暂无会话</view>
+
+    <view wx:for="{{conversations}}" wx:key="id" class="conversation card section" data-id="{{item.id}}" bindtap="openRoom">
+      <view class="avatar">{{item.avatarText}}</view>
+      <view class="main">
+        <view class="space-between">
+          <text class="name">{{item.partnerName}}</text>
+          <text class="muted time">{{item.lastTimeText}}</text>
+        </view>
+        <view class="task">{{item.taskTitle || '普通会话'}}</view>
+        <view class="last">{{item.lastMessage || '还没有消息'}}</view>
+      </view>
+      <view wx:if="{{item.unreadCount > 0}}" class="badge">{{item.unreadCount}}</view>
+    </view>
+  </block>
+</view>

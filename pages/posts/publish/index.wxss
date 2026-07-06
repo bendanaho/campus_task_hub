@@ -1,0 +1,49 @@
+.gate {
+  margin-top: 80rpx;
+  text-align: center;
+}
+
+.gate-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  margin-bottom: 14rpx;
+}
+
+.gate-btn {
+  margin-top: 30rpx;
+}
+
+.field {
+  margin-bottom: 26rpx;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #5f6c80;
+  font-weight: 650;
+}
+
+.picker-box {
+  min-height: 76rpx;
+  padding: 0 20rpx;
+  border-radius: 10rpx;
+  background: #f6f8fb;
+  display: flex;
+  align-items: center;
+  color: #253044;
+}
+
+.date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+
+.publish-btn {
+  margin-top: 22rpx;
+}

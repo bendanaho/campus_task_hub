@@ -1,0 +1,27 @@
+<view class="page">
+  <view wx:if="{{user && user.authStatus == 'verified'}}" class="card done section">
+    <view class="done-title">已完成实名认证</view>
+    <view class="muted">姓名：{{user.realName || '已认证'}}</view>
+    <view class="muted">学院：{{user.college || '未填写'}}</view>
+  </view>
+
+  <view class="card form">
+    <view class="field">
+      <text class="label">真实姓名</text>
+      <input class="input" placeholder="请输入真实姓名" value="{{realName}}" data-key="realName" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <text class="label">学号</text>
+      <input class="input" placeholder="请输入学号" value="{{studentId}}" data-key="studentId" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <text class="label">学院</text>
+      <input class="input" placeholder="例如：计算机学院" value="{{college}}" data-key="college" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <text class="label">班级</text>
+      <input class="input" placeholder="选填" value="{{className}}" data-key="className" bindinput="onInput" />
+    </view>
+    <button class="btn" bindtap="submit">提交认证</button>
+  </view>
+</view>

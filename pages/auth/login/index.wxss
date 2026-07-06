@@ -1,0 +1,45 @@
+.auth-page {
+  padding-top: 96rpx;
+}
+
+.brand {
+  margin-bottom: 42rpx;
+}
+
+.brand-title {
+  font-size: 52rpx;
+  font-weight: 850;
+}
+
+.brand-subtitle {
+  margin-top: 14rpx;
+  color: #758195;
+}
+
+.field {
+  margin-bottom: 24rpx;
+}
+
+.label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #5f6c80;
+  font-weight: 600;
+}
+
+.submit {
+  margin-top: 12rpx;
+}
+
+.register-link {
+  margin-top: 28rpx;
+  color: var(--brand);
+  font-size: 27rpx;
+  text-align: center;
+}
+
+.demo {
+  margin-top: 28rpx;
+  text-align: center;
+  font-size: 24rpx;
+}

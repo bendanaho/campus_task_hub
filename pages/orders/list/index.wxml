@@ -1,0 +1,38 @@
+<view class="page">
+  <view wx:if="{{!loggedIn}}" class="card guest">
+    <view class="guest-title">登录后查看订单</view>
+    <button class="btn guest-btn" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
+    <view class="tabs section">
+      <view wx:for="{{tabs}}" wx:key="value" class="tab {{tabIndex == index ? 'active' : ''}}" data-index="{{index}}" bindtap="switchTab">
+        {{item.label}}
+      </view>
+    </view>
+
+    <view wx:if="{{loading}}" class="empty">正在加载订单...</view>
+    <view wx:elif="{{orders.length == 0}}" class="empty">暂无订单</view>
+
+    <view wx:for="{{orders}}" wx:key="id" class="order card section">
+      <view class="space-between">
+        <view class="tag">{{item.order.statusText}}</view>
+        <view class="amount">¥{{item.order.amountText}}</view>
+      </view>
+      <view class="title">{{item.title}}</view>
+      <view class="meta">
+        <text>{{item.roleText}}</text>
+        <text>对方：{{item.partnerName}}</text>
+        <text>{{item.order.createdText}}</text>
+      </view>
+
+      <view class="actions">
+        <button class="btn ghost small" data-chat="{{item.order.chatId}}" bindtap="goChat">会话</button>
+        <button wx:if="{{item.canAccept}}" class="btn small" data-id="{{item.order.id}}" bindtap="acceptOrder">接受</button>
+        <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" bindtap="cancelOrder">取消</button>
+        <button wx:if="{{item.canConfirm}}" class="btn small" data-id="{{item.order.id}}" bindtap="confirmOrder">确认完成</button>
+        <button wx:if="{{item.canReview}}" class="btn secondary small" data-index="{{index}}" bindtap="goReview">评价</button>
+      </view>
+    </view>
+  </block>
+</view>

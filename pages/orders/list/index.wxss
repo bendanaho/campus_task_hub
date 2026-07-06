@@ -1,0 +1,65 @@
+.guest {
+  margin-top: 90rpx;
+  text-align: center;
+}
+
+.guest-title {
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.guest-btn {
+  margin-top: 28rpx;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+}
+
+.tab {
+  min-height: 66rpx;
+  border-radius: 10rpx;
+  background: #ffffff;
+  border: 1rpx solid #e1e6ee;
+  color: #667386;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.amount {
+  color: var(--reward);
+  font-size: 34rpx;
+  font-weight: 850;
+}
+
+.title {
+  margin-top: 18rpx;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.meta {
+  margin-top: 16rpx;
+  color: #8a95a6;
+  font-size: 24rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.actions {
+  margin-top: 22rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}

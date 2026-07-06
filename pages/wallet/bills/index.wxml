@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="summary section">
+    <view class="summary-item card">
+      <text class="muted">总收入</text>
+      <text class="money in">¥{{totalIn}}</text>
+    </view>
+    <view class="summary-item card">
+      <text class="muted">总支出</text>
+      <text class="money out">¥{{totalOut}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="empty">正在加载账单...</view>
+  <view wx:elif="{{list.length == 0}}" class="empty">暂无账单记录</view>
+
+  <view wx:for="{{list}}" wx:key="id" class="bill card section">
+    <view class="space-between">
+      <view>
+        <view class="strong">{{item.note || item.category}}</view>
+        <view class="muted time">{{item.timeText}}</view>
+      </view>
+      <view class="amount {{item.direction == 'in' ? 'in' : 'out'}}">
+        {{item.direction == 'in' ? '+' : '-'}}¥{{item.amountText}}
+      </view>
+    </view>
+  </view>
+</view>

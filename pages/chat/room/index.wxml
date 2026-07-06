@@ -1,0 +1,51 @@
+<view class="page room">
+  <view class="card section chat-head">
+    <view class="strong">{{partnerName || '会话'}}</view>
+    <view class="muted">{{taskTitle || '未关联帖子'}}</view>
+    <view wx:if="{{activeOrder}}" class="order-line">
+      订单：{{activeOrder.statusText}} / ¥{{activeOrder.amountText}}
+    </view>
+  </view>
+
+  <scroll-view class="messages section" scroll-y scroll-into-view="{{bottomId}}" enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{messages.length == 0}}" class="empty">暂无消息</view>
+    <view wx:for="{{messages}}" wx:key="id" class="msg {{item.withdrawn ? 'withdrawn-msg' : item.bubbleClass}}">
+      <view class="msg-time">{{item.timeText}}</view>
+      <view wx:if="{{item.withdrawn}}" class="withdrawn-tip">消息已撤回</view>
+      <block wx:else>
+        <view class="bubble">
+          <block wx:if="{{item.type == 'payment'}}">
+            <view class="payment-title">{{item.paymentTitle}}</view>
+            <view class="payment-money">¥{{item.paymentAmountText}}</view>
+            <view class="muted">状态：{{item.paymentStatusText}}</view>
+            <view class="payment-actions">
+              <button wx:if="{{item.canPay}}" class="btn small" data-id="{{item.id}}" bindtap="payCard">支付</button>
+              <button wx:if="{{item.canCancelPayment}}" class="btn warn small" data-id="{{item.id}}" bindtap="cancelCard">取消</button>
+            </view>
+          </block>
+          <block wx:else>
+            <view>{{item.content}}</view>
+          </block>
+        </view>
+        <button wx:if="{{item.isMine}}" class="withdraw" data-id="{{item.id}}" bindtap="withdraw">撤回</button>
+      </block>
+    </view>
+    <view id="bottom"></view>
+  </scroll-view>
+
+  <view class="card section pay-box">
+    <view class="pay-title">支付卡片</view>
+    <view class="pay-row">
+      <picker range="{{paymentKinds}}" range-key="label" value="{{paymentKindIndex}}" bindchange="onKindChange">
+        <view class="kind">{{paymentKinds[paymentKindIndex].label}}</view>
+      </picker>
+      <input class="pay-input" type="digit" placeholder="金额" value="{{payAmount}}" bindinput="onAmountInput" />
+      <button class="btn small" bindtap="sendPayment">发送</button>
+    </view>
+  </view>
+
+  <view class="input-bar">
+    <input class="message-input" placeholder="输入消息" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="sendText" />
+    <button class="btn small" bindtap="sendText">发送</button>
+  </view>
+</view>

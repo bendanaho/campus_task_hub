@@ -1,0 +1,30 @@
+.target {
+  font-size: 32rpx;
+  font-weight: 800;
+  margin-bottom: 20rpx;
+}
+
+.reviewed {
+  margin-bottom: 20rpx;
+  color: #d94a1f;
+}
+
+.field {
+  margin-bottom: 24rpx;
+}
+
+.label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #5f6c80;
+  font-weight: 650;
+}
+
+.picker-box {
+  min-height: 76rpx;
+  padding: 0 20rpx;
+  border-radius: 10rpx;
+  background: #f6f8fb;
+  display: flex;
+  align-items: center;
+}
