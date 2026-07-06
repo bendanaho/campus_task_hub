@@ -1155,17 +1155,31 @@ html {
     font-weight: 600;
     vertical-align: middle;
 }
-.message-item.has-unread {
-    border-left: 3px solid #ef4444;
-}
-/* 需我操作（待我接受/确认/评价）：橙色醒目待办 */
+/* 新消息：不再加左侧边框，仅靠未读数徽标提示 */
+/* 需我操作（待我接受 / 待我确认）：红色醒目待办 */
 .status-badge.status-action {
-    background-color: #ffedd5;
-    color: #c2410c;
+    background-color: #fee2e2;
+    color: #b91c1c;
     font-weight: 700;
 }
 .message-item.needs-action {
-    border-left: 3px solid #f97316;
+    border-left: 3px solid #ef4444;
+}
+/* 进行中（无需我操作）：绿色左边框 */
+.message-item.needs-progress {
+    border-left: 3px solid #22c55e;
+}
+/* 「暂不评价」按钮：低调链接样式 */
+.btn-link-skip {
+    background: none !important;
+    border: none !important;
+    color: #9ca3af !important;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 6px 8px !important;
+}
+.btn-link-skip:hover {
+    color: #6b7280 !important;
 }
 .message-item .msg-time {
     color: #999;

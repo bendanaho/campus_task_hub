@@ -851,14 +851,20 @@ function initMessageCenter() {
                 return { c: c, roleText: '', statusInfo: { text: '', className: '' }, msgPreview: np };
             }
 
-            var task = c.taskId ? await fetchTaskById(c.taskId) : null;
+            // fetchTaskById 返回 { task, publisher } 包装对象，必须取 .task；
+            // 否则 task.publisherId 恒为 undefined → isPublisher 判断失败，
+            // 服务发起者收到订单时会误显“待对方接受”（且角色文案也错）
+            var _taskRes = c.taskId ? await fetchTaskById(c.taskId) : null;
+            var task = _taskRes ? _taskRes.task : null;
             var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
 
-            // 完成但我还没评价 → 待我评价（待办）
+            // 完成但我还没评价 → 待我评价（低优先级，可暂不评价；不再用红框/待办高亮抢占顶部）
             var order = await getOrder(c.id);
             if (order && order.status === 'completed' && currentUser) {
                 var reviewed = await hasReviewed(order.id);
-                if (!reviewed) statusInfo = { text: '待我评价', className: 'status-pending', action: true };
+                if (!reviewed && !isReviewSkipped(order.id)) {
+                    statusInfo = { text: '待我评价', className: 'status-completed', review: true };
+                }
             }
 
             if (task && currentUser) {
@@ -887,29 +893,45 @@ function initMessageCenter() {
                 }
             }
 
-            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview };
+            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview, orderId: order ? order.id : null };
         }));
 
-        // 排序优先级：先未读、再待我操作。同级保持原有时间倒序（sort 稳定）
+        // 排序优先级：待我操作 > 进行中 > 有未读 > 待评价 > 普通。同级保持原有时间倒序（sort 稳定）
         function convScore(item) {
+            var si = item.statusInfo || {};
+            if (si.action) return 4;                              // 待我接受 / 待我确认
+            if (si.className === 'status-in_progress') return 3;  // 进行中（无需我操作）
             var uc = unreadByChat[item.c.id] || 0;
-            return (uc > 0 ? 2 : 0) + (item.statusInfo && item.statusInfo.action ? 1 : 0);
+            if (uc > 0) return 2;                                 // 有未读新消息
+            if (si.review) return 1;                              // 待我评价
+            return 0;
         }
         enriched.sort(function(a, b) { return convScore(b) - convScore(a); });
 
         list.innerHTML = enriched.map(function(item) {
             var c = item.c;
-            var needAction = item.statusInfo && item.statusInfo.action;
-            var statusBadge = item.statusInfo.text
-                ? '<span class="status-badge ' + (needAction ? 'status-action' : item.statusInfo.className) + '">' +
-                    (needAction ? '● ' : '') + item.statusInfo.text + '</span>'
+            var si = item.statusInfo || {};
+            var needAction = !!si.action;
+            var inProgress = !needAction && si.className === 'status-in_progress';
+            var statusBadge = si.text
+                ? '<span class="status-badge ' + (needAction ? 'status-action' : si.className) + '">' +
+                    (needAction ? '● ' : '') + si.text + '</span>'
                 : '';
             var uc = unreadByChat[c.id] || 0;
             var unreadBadge = uc > 0
                 ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>'
                 : '';
+            // 待评价会话额外提供「暂不评价」按钮（本地记住后不再提示）
+            var reviewBtn = (si.review && item.orderId)
+                ? '<button type="button" class="btn btn-small btn-link-skip" onclick="skipReview(\'' + item.orderId + '\')">暂不评价</button>'
+                : '';
 
-            return '<div class="message-item' + (uc > 0 ? ' has-unread' : '') + (needAction ? ' needs-action' : '') + '">' +
+            // 左侧框：待我操作=红、进行中=绿、新消息=无框（仅未读数徽标）
+            var itemClass = 'message-item';
+            if (needAction) itemClass += ' needs-action';
+            else if (inProgress) itemClass += ' needs-progress';
+
+            return '<div class="' + itemClass + '">' +
                 '<div class="msg-header">' +
                     '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
                     '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
@@ -918,11 +940,33 @@ function initMessageCenter() {
                 '<p class="msg-preview">' + item.msgPreview + '</p>' +
                 '<div class="actions">' +
                     '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
+                    reviewBtn +
                 '</div>' +
             '</div>';
         }).join('');
     });
 }
+
+// 消息中心「暂不评价」：本地记住用户主动跳过的订单，不再在消息中心提示待评价
+function isReviewSkipped(orderId) {
+    if (!orderId) return false;
+    try {
+        var skipped = JSON.parse(localStorage.getItem('skipped_reviews') || '[]');
+        return skipped.indexOf(String(orderId)) >= 0;
+    } catch (e) { return false; }
+}
+window.skipReview = function(orderId) {
+    if (!orderId) return;
+    try {
+        var skipped = JSON.parse(localStorage.getItem('skipped_reviews') || '[]');
+        if (skipped.indexOf(String(orderId)) < 0) {
+            skipped.push(String(orderId));
+            localStorage.setItem('skipped_reviews', JSON.stringify(skipped));
+        }
+    } catch (e) {}
+    // 重新渲染消息中心列表（去掉该会话的待评价提示）
+    initMessageCenter();
+};
 
 // ==================== 聊天详情 ====================
 
@@ -1255,6 +1299,9 @@ function initChatDetail() {
 
     renderMessages();
     renderTaskBar();
+    // 暴露给全局 handleXxx（接单/确认/申诉/支付等写操作成功后局部刷新，不再整页 reload）
+    window.renderMessages = renderMessages;
+    window.renderTaskBar = renderTaskBar;
 
     // 打开聊天即把对方发来的未读消息标记为已读，并刷新导航栏红点（管理员只读不标已读）
     if (!adminView) {
@@ -1341,7 +1388,9 @@ window.handlePayCard = function(messageId) {
     if (!requireVerified()) return;
     payPaymentCard(messageId).then(function() {
         alert('支付成功！');
-        window.location.reload();
+        // 局部刷新：支付卡片状态 + 余额提示（renderTaskBar 内会重拉余额）
+        window.renderMessages && window.renderMessages();
+        window.renderTaskBar && window.renderTaskBar();
     }).catch(function(err) {
         alert(err.message || '支付失败');
     });
@@ -1351,7 +1400,8 @@ window.handlePayCard = function(messageId) {
 window.handleCancelCard = function(messageId) {
     if (!confirm('确定取消这笔收款吗？')) return;
     cancelPaymentCard(messageId).then(function() {
-        window.location.reload();
+        // 局部刷新：只更新卡片状态，不影响订单/余额
+        window.renderMessages && window.renderMessages();
     }).catch(function(err) {
         alert(err.message || '取消失败');
     });
@@ -1362,7 +1412,9 @@ window.handleOrderCreate = function(postId, chatId) {
     if (!requireVerified()) return;
     createOrder(postId, chatId).then(function() {
         alert('已发起订单，等待对方接受！');
-        window.location.reload();
+        // 局部刷新：任务栏（按钮变"等待对方接受"）+ 系统消息
+        window.renderTaskBar && window.renderTaskBar();
+        window.renderMessages && window.renderMessages();
     }).catch(function(err) {
         alert(err.message || '操作失败');
     });
@@ -1373,7 +1425,9 @@ window.handleOrderAccept = function(orderId) {
     if (!requireVerified()) return;
     acceptOrder(orderId).then(function() {
         alert('已接受订单，开始执行！');
-        window.location.reload();
+        // 局部刷新：任务栏（状态变进行中、余额冻结提示）+ 系统消息
+        window.renderTaskBar && window.renderTaskBar();
+        window.renderMessages && window.renderMessages();
     }).catch(function(err) {
         alert(err.message || '操作失败');
     });
@@ -1385,7 +1439,9 @@ window.handleOrderCancel = function(orderId) {
     if (!confirm('确定取消该订单吗？')) return;
     cancelOrder(orderId).then(function() {
         alert('订单已取消。');
-        window.location.reload();
+        // 局部刷新：任务栏（按钮变回"接单/下单"）+ 系统消息
+        window.renderTaskBar && window.renderTaskBar();
+        window.renderMessages && window.renderMessages();
     }).catch(function(err) {
         alert(err.message || '操作失败');
     });
@@ -1416,7 +1472,9 @@ window.handleDispute = function(orderId) {
     if (reason === null) return;
     disputeOrder(orderId, reason).then(function() {
         alert('申诉已提交，订单已冻结，等待管理员处理。');
-        window.location.reload();
+        // 局部刷新：任务栏（状态变争议处理中）+ 系统消息
+        window.renderTaskBar && window.renderTaskBar();
+        window.renderMessages && window.renderMessages();
     }).catch(function(err) {
         alert(err.message || '申诉失败');
     });
@@ -1431,7 +1489,9 @@ window.handleOrderConfirm = function(orderId) {
         } else {
             alert('已确认完成，等待对方确认。');
         }
-        window.location.reload();
+        // 局部刷新：任务栏（按钮/状态流转，完成时余额变化）+ 系统消息
+        window.renderTaskBar && window.renderTaskBar();
+        window.renderMessages && window.renderMessages();
     }).catch(function(err) {
         alert(err.message || '操作失败');
     });
