@@ -41,6 +41,7 @@ public class DataInitializer implements org.springframework.boot.CommandLineRunn
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final ReviewRepository reviewRepository;
+    private final com.example.keshe_backend.review.service.ReviewService reviewService;
     private final PasswordEncoder passwordEncoder;
 
     private static final int AUTO_DAYS = 2;
@@ -104,6 +105,15 @@ public class DataInitializer implements org.springframework.boot.CommandLineRunn
         uIds[7] = saveUser("周同学", "13800138008", "zhou@example.com", encodedPassword,
                 "", 2.5, "周佳",
                 "2021080008", "文学院", "汉语言2101", "校内打印店兼职，可以帮忙打印资料。", new BigDecimal("100"));
+
+        // 平台管理员（role=1）：不参与交易，负责争议订单仲裁与内容管理。账号 admin / 1
+        Long adminId = saveUser("admin", "13800138009", "admin@example.com", encodedPassword,
+                "https://picsum.photos/seed/avatarAdmin/200/200", 5.0, "平台管理员",
+                "ADMIN", "平台运营", "管理组", "平台管理员，负责争议订单仲裁与内容管理。", BigDecimal.ZERO);
+        userRepository.findById(adminId).ifPresent(u -> {
+            u.setRole(1);
+            userRepository.save(u);
+        });
     }
 
     private Long saveUser(String username, String phone, String email, String passwordHash,
@@ -487,12 +497,36 @@ public class DataInitializer implements org.springframework.boot.CommandLineRunn
 
     private void createReviews() {
         LocalDateTime now = LocalDateTime.now();
-        // r1: u1→u2 关于 t1
-        saveReview(uIds[0], "张三", uIds[1], "李四", tIds[0], 1L, 5, "非常准时，服务态度很好！", false,
-                now.minusHours(24));
-        // r2: u1→u7 关于 t15
-        saveReview(uIds[0], "张三", uIds[6], "孙同学", tIds[14], 3L, 5, "取快递很及时，下次还会找他！", false,
-                now.minusHours(23));
+        // 信用分由这些评价按贝叶斯公式算出（见 recalcAllCredits），不再硬编码。
+        saveReview(uIds[0], "张三", uIds[1], "李四", tIds[0], null, 5, "非常准时，服务态度很好！", false, now.minusHours(24));
+        saveReview(uIds[0], "张三", uIds[6], "孙同学", tIds[14], null, 5, "取快递很及时，下次还会找他！", false, now.minusHours(23));
+        // u1 张三（高）
+        saveReview(uIds[1], "李四", uIds[0], "张三", tIds[0], null, 5, "沟通顺畅，靠谱", false, now.minusHours(40));
+        saveReview(uIds[2], "王同学", uIds[0], "张三", tIds[0], null, 4, "整体不错", false, now.minusHours(39));
+        // u2 李四（较高）
+        saveReview(uIds[2], "王同学", uIds[1], "李四", tIds[0], null, 4, "还行", false, now.minusHours(38));
+        saveReview(uIds[3], "陈同学", uIds[1], "李四", tIds[0], null, 4, "可以", false, now.minusHours(37));
+        // u3 王同学（中）
+        saveReview(uIds[0], "张三", uIds[2], "王同学", tIds[0], null, 3, "一般般", false, now.minusHours(36));
+        saveReview(uIds[4], "赵同学", uIds[2], "王同学", tIds[0], null, 3, "有点慢", false, now.minusHours(35));
+        // u4 陈同学（偏低）
+        saveReview(uIds[0], "张三", uIds[3], "陈同学", tIds[0], null, 2, "响应较慢", false, now.minusHours(34));
+        saveReview(uIds[1], "李四", uIds[3], "陈同学", tIds[0], null, 2, "体验一般", false, now.minusHours(33));
+        // u5 赵同学（高）
+        saveReview(uIds[5], "刘同学", uIds[4], "赵同学", tIds[0], null, 5, "很专业", false, now.minusHours(32));
+        saveReview(uIds[6], "孙同学", uIds[4], "赵同学", tIds[0], null, 5, "好评", false, now.minusHours(31));
+        // u6 刘同学（中上）
+        saveReview(uIds[4], "赵同学", uIds[5], "刘同学", tIds[0], null, 4, "不错", false, now.minusHours(30));
+        saveReview(uIds[7], "周同学", uIds[5], "刘同学", tIds[0], null, 4, "满意", false, now.minusHours(29));
+        // u7 孙同学（高）
+        saveReview(uIds[2], "王同学", uIds[6], "孙同学", tIds[0], null, 4, "挺好", false, now.minusHours(28));
+        // u8 周同学（低）
+        saveReview(uIds[0], "张三", uIds[7], "周同学", tIds[0], null, 1, "爽约了", false, now.minusHours(27));
+        saveReview(uIds[1], "李四", uIds[7], "周同学", tIds[0], null, 2, "不太靠谱", false, now.minusHours(26));
+        saveReview(uIds[4], "赵同学", uIds[7], "周同学", tIds[0], null, 2, "拖延", false, now.minusHours(25));
+
+        // 种子阶段即按评价重算所有用户信用分，覆盖 saveUser 里的初始硬编码值
+        userRepository.findAll().forEach(u -> reviewService.recalcCreditScore(u.getId()));
     }
 
     private void saveReview(Long fromUserId, String fromUserName, Long toUserId, String toUserName,

@@ -43,6 +43,20 @@ public class ChatService {
     }
 
     private ConversationDTO toConversationDTO(Conversation c, Long currentUserId) {
+        // 系统通知会话：对方固定为「系统通知」，不去查真实用户
+        if (c.getId() != null && c.getId().startsWith("sys-notify-")) {
+            return ConversationDTO.builder()
+                    .id(c.getId())
+                    .partnerId(0L)
+                    .partnerName("系统通知")
+                    .partnerAvatar("")
+                    .taskId(null)
+                    .taskTitle("系统通知")
+                    .lastMessage(c.getLastMessage())
+                    .lastTime(c.getLastTime())
+                    .lastMessageSenderId(0L)
+                    .build();
+        }
         Long partnerId = c.getUser1Id().equals(currentUserId) ? c.getUser2Id() : c.getUser1Id();
         User partner = userRepository.findById(partnerId).orElse(null);
         return ConversationDTO.builder()
@@ -75,7 +89,13 @@ public class ChatService {
 
     public List<MessageDTO> getMessages(String chatId) {
         Long userId = SecurityUtils.getCurrentUserId();
-        requireParticipant(chatId, userId);
+        // 管理员（role=1）可只读查看任意会话消息，作为争议仲裁的取证依据；普通用户仍须是参与者
+        boolean isAdmin = userRepository.findById(userId)
+                .map(u -> u.getRole() != null && u.getRole() == 1)
+                .orElse(false);
+        if (!isAdmin) {
+            requireParticipant(chatId, userId);
+        }
         return messageRepository.findByChatIdOrderByTimeAsc(chatId)
                 .stream().map(MessageDTO::from).collect(Collectors.toList());
     }
@@ -108,6 +128,93 @@ public class ChatService {
         return MessageDTO.from(msg);
     }
 
+    // 保证同一操作连发多条系统消息时时间严格递增，避免同刻并列导致顺序不定
+    private static final Object SYS_TIME_LOCK = new Object();
+    private static LocalDateTime lastSystemTime = LocalDateTime.MIN;
+
+    /**
+     * 供订单/评价等业务在状态变更时向会话插入一条系统消息：
+     * senderId=null、type="system"，前端居中显示；未读查询已用 senderId IS NOT NULL 排除，故不计未读。
+     * 同步更新会话预览（lastMessage/lastTime），使消息中心显示最新进展。
+     */
+    @Transactional
+    public void addSystemMessage(String chatId, String content, String taskId, String taskTitle) {
+        if (chatId == null || chatId.isBlank()) return;
+        LocalDateTime t;
+        synchronized (SYS_TIME_LOCK) {
+            t = LocalDateTime.now();
+            if (!t.isAfter(lastSystemTime)) t = lastSystemTime.plusNanos(1_000_000);
+            lastSystemTime = t;
+        }
+        final LocalDateTime now = t; // lambda 需要 final
+
+        Message msg = new Message();
+        msg.setChatId(chatId);
+        msg.setSenderId(null);
+        msg.setSenderName("系统");
+        msg.setReceiverId(null);
+        msg.setContent(content);
+        msg.setType("system");
+        msg.setTime(now);
+        msg.setTaskId(taskId != null ? taskId : "");
+        msg.setTaskTitle(taskTitle != null ? taskTitle : "");
+        msg.setWithdrawn(false);
+        msg.setRead(true);
+        messageRepository.save(msg);
+
+        conversationRepository.findById(chatId).ifPresent(conv -> {
+            conv.setLastMessage(content);
+            conv.setLastTime(now);
+            conv.setLastMessageSenderId(null);
+            conversationRepository.save(conv);
+        });
+    }
+
+    /**
+     * 系统通知（平台 → 单个用户），挂在该用户专属会话 sys-notify-&lt;userId&gt;。
+     * 与订单里的系统消息(senderId=null)区别：这里 senderId=0（非 null → 计入未读；
+     * 无对应真实用户），type="system"（聊天里居中显示）。用于帖子下架/删除等平台通知。
+     */
+    @Transactional
+    public void addSystemNotify(Long userId, String content) {
+        if (userId == null) return;
+        String chatId = "sys-notify-" + userId;
+        LocalDateTime t;
+        synchronized (SYS_TIME_LOCK) {
+            t = LocalDateTime.now();
+            if (!t.isAfter(lastSystemTime)) t = lastSystemTime.plusNanos(1_000_000);
+            lastSystemTime = t;
+        }
+        final LocalDateTime now = t;
+
+        Conversation conv = conversationRepository.findById(chatId).orElse(null);
+        if (conv == null) {
+            conv = new Conversation();
+            conv.setId(chatId);
+            conv.setUser1Id(userId);
+            conv.setUser2Id(0L);        // 哨兵：系统通知无真实对方
+            conv.setTaskTitle("系统通知");
+        }
+        conv.setLastMessage(content);
+        conv.setLastTime(now);
+        conv.setLastMessageSenderId(0L);
+        conversationRepository.save(conv);
+
+        Message msg = new Message();
+        msg.setChatId(chatId);
+        msg.setSenderId(0L);            // 非 null → 计入未读；0 无对应真实用户
+        msg.setSenderName("系统通知");
+        msg.setReceiverId(userId);
+        msg.setContent(content);
+        msg.setType("system");
+        msg.setTime(now);
+        msg.setTaskId("");
+        msg.setTaskTitle("");
+        msg.setWithdrawn(false);
+        msg.setRead(false);
+        messageRepository.save(msg);
+    }
+
     @Transactional
     public int markMessagesRead(String chatId) {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -119,6 +226,10 @@ public class ChatService {
     public MessageDTO sendPaymentCard(String chatId, SendPaymentRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         User currentUser = requireVerified(userId);
+        // 管理员为纯管理角色，不参与交易/收付款
+        if (currentUser.getRole() != null && currentUser.getRole() == 1) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号不参与交易");
+        }
         requireParticipant(chatId, userId);
         User partner = userRepository.findById(request.getPartnerId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "对方不存在"));

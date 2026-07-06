@@ -3,6 +3,8 @@ package com.example.keshe_backend.post.controller;
 import com.example.keshe_backend.common.api.ApiResponse;
 import com.example.keshe_backend.post.dto.*;
 import com.example.keshe_backend.post.service.PostService;
+import com.example.keshe_backend.report.dto.ReportRequest;
+import com.example.keshe_backend.report.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +17,7 @@ import java.util.List;
 public class PostController {
 
     private final PostService postService;
+    private final ReportService reportService;
 
     /**
      * 帖子列表（大厅）
@@ -50,5 +53,15 @@ public class PostController {
     @GetMapping("/mine")
     public ApiResponse<List<PostDTO>> getMyPosts() {
         return ApiResponse.success(postService.getMyPosts());
+    }
+
+    /**
+     * 举报帖子（登录的普通用户）
+     */
+    @PostMapping("/{id}/report")
+    public ApiResponse<Void> reportPost(@PathVariable Long id,
+                                        @Valid @RequestBody ReportRequest request) {
+        reportService.reportPost(id, request.getReason());
+        return ApiResponse.success();
     }
 }

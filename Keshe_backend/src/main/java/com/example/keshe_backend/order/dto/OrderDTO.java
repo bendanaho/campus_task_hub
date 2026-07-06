@@ -29,6 +29,15 @@ public class OrderDTO {
     private LocalDateTime autoConfirmAt;
     private LocalDateTime reviewDeadline;
 
+    // 争议/仲裁字段（对齐 JS mock）
+    private String disputeReason;
+    private Long disputedBy;
+    private LocalDateTime disputedAt;
+    private String resolution;
+    private BigDecimal resolutionAmountToEarner;
+    private String resolutionNote;
+    private LocalDateTime resolvedAt;
+
     public static OrderDTO from(Order o) {
         return OrderDTO.builder()
                 .id(o.getId())
@@ -45,6 +54,13 @@ public class OrderDTO {
                 .completedAt(o.getCompletedAt())
                 .autoConfirmAt(o.getAutoConfirmAt())
                 .reviewDeadline(o.getReviewDeadline())
+                .disputeReason(o.getDisputeReason())
+                .disputedBy(o.getDisputedBy())
+                .disputedAt(o.getDisputedAt())
+                .resolution(o.getResolution())
+                .resolutionAmountToEarner(o.getResolutionAmountToEarner())
+                .resolutionNote(o.getResolutionNote())
+                .resolvedAt(o.getResolvedAt())
                 .build();
     }
 }

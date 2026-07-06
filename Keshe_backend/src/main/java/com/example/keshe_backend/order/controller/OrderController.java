@@ -2,6 +2,7 @@ package com.example.keshe_backend.order.controller;
 
 import com.example.keshe_backend.common.api.ApiResponse;
 import com.example.keshe_backend.order.dto.CreateOrderRequest;
+import com.example.keshe_backend.order.dto.DisputeRequest;
 import com.example.keshe_backend.order.dto.MyOrderResponse;
 import com.example.keshe_backend.order.dto.OrderDTO;
 import com.example.keshe_backend.order.service.OrderService;
@@ -41,6 +42,15 @@ public class OrderController {
     @PostMapping("/{id}/cancel")
     public ApiResponse<OrderDTO> cancelOrder(@PathVariable Long id) {
         return ApiResponse.success(orderService.cancelOrder(id));
+    }
+
+    /**
+     * 发起申诉（参与者、仅进行中订单）→ disputed，等待管理员裁决
+     */
+    @PostMapping("/{id}/dispute")
+    public ApiResponse<OrderDTO> disputeOrder(@PathVariable Long id,
+                                              @Valid @RequestBody DisputeRequest request) {
+        return ApiResponse.success(orderService.disputeOrder(id, request.getReason()));
     }
 
     /**

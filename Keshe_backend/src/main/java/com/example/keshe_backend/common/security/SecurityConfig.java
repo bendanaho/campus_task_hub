@@ -38,6 +38,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        //放行 WebSocket 握手协议路径
+                        .requestMatchers("/ws/**").permitAll()
+                        // 管理后台：仅管理员（user.role=1，JwtAuthenticationFilter 授予 ROLE_ADMIN）
+                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         // 其余全部需要认证
                         .anyRequest().authenticated()
                 )
@@ -56,7 +60,10 @@ public class SecurityConfig {
         configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
+        
+        // 🛠️ 核心修改：将原来的 "/api/**" 修改为 "/**"，确保全站路径（包括 WebSocket 的 /ws/**）都能畅通无阻地跨域
+        source.registerCorsConfiguration("/**", configuration);
+        
         return source;
     }
 

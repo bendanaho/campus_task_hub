@@ -26,4 +26,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByStatusAndAutoConfirmAtBefore(String status, LocalDateTime time);
 
     List<Order> findByStatusAndReviewDeadlineBefore(String status, LocalDateTime time);
+
+    // 管理员：争议列表（按申诉时间倒序）与全部订单总览
+    List<Order> findByStatusOrderByDisputedAtDesc(String status);
+
+    List<Order> findAllByOrderByCreatedAtDesc();
 }
