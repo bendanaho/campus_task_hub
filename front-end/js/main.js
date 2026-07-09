@@ -1076,7 +1076,7 @@ function initChatDetail() {
     updateChatHeader();
 
     // 渲染一张收款/转账卡片（气泡按发送者左右对齐，卡片自带样式）
-    function paymentCardHTML(m, currentUser, isSelf) {
+    function paymentCardHTML(m, currentUser, isSelf, myBalance) {
         var p = m.payment;
         var side = isSelf ? 'chat-right' : 'chat-left';
         var kindLabel = p.kind === 'request' ? '收款' : '转账';
@@ -1088,8 +1088,15 @@ function initChatDetail() {
         } else { // pending：仅收款卡片会处于此状态
             var iAmPayer = currentUser && currentUser.id === p.payerId;
             if (iAmPayer) {
-                statusText = '待你支付';
-                actions = '<button type="button" class="btn btn-small pay-card-btn" onclick="handlePayCard(\'' + m.id + '\')">支付 ¥' + p.amount + '</button>';
+                // 余额预判：不足则禁用支付按钮，避免点了才被后端拒绝（myBalance 为 null 时放行，交后端兜底）
+                var insufficient = (myBalance !== null && myBalance !== undefined) && (Number(myBalance) < Number(p.amount));
+                if (insufficient) {
+                    statusText = '余额不足，无法支付';
+                    actions = '<button type="button" class="btn btn-small" disabled style="opacity:0.6;cursor:not-allowed;">余额不足</button>';
+                } else {
+                    statusText = '待你支付';
+                    actions = '<button type="button" class="btn btn-small pay-card-btn" onclick="handlePayCard(\'' + m.id + '\')">支付 ¥' + p.amount + '</button>';
+                }
             } else {
                 statusText = '等待对方支付';
                 if (currentUser && currentUser.id === m.senderId) {
@@ -1109,11 +1116,16 @@ function initChatDetail() {
     }
 
     function renderMessages() {
-        getMessages(chatId).then(function(messages) {
+        getMessages(chatId).then(async function(messages) {
             var currentUser = getCurrentUser();
             if (!messages || messages.length === 0) {
                 messageList.innerHTML = '<p style="text-align:center;color:#999;">暂无消息，开始聊天吧</p>';
                 return;
+            }
+            // 预查当前用户余额，供收款卡片支付按钮做余额预判（查询失败则放行，交后端兜底）
+            var myBalance = null;
+            if (currentUser) {
+                try { myBalance = (await getMyBalance()).balance; } catch (e) { myBalance = null; }
             }
             messageList.innerHTML = messages.map(function(m) {
                 // String()：真后端 id 是数字、mock 是字符串，统一转字符串比较
@@ -1125,7 +1137,7 @@ function initChatDetail() {
                     '</div>';
                 }
                 if (m.type === 'payment') {
-                    return paymentCardHTML(m, currentUser, isSelf);
+                    return paymentCardHTML(m, currentUser, isSelf, myBalance);
                 }
                 // mock 用 senderId='system' 标记系统消息，真后端用 type='system'——两种都识别
                 if (m.senderId === 'system' || m.type === 'system') {
