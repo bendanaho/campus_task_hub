@@ -57,6 +57,12 @@ public class PostController {
         return ApiResponse.success(postService.getMyPosts());
     }
 
+    /** 发布者撤回自己的帖子（软下架，区别于管理员下架） */
+    @PostMapping("/{id}/close")
+    public ApiResponse<PostDTO> ownerClosePost(@PathVariable Long id) {
+        return ApiResponse.success(postService.ownerClosePost(id));
+    }
+
     /**
      * 举报帖子（登录的普通用户）
      */

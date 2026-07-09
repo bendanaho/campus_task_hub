@@ -5,6 +5,8 @@ import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
 import com.example.keshe_backend.common.util.ImageUtil;
 import com.example.keshe_backend.chat.service.ChatService;
+import com.example.keshe_backend.order.entity.Order;
+import com.example.keshe_backend.order.repository.OrderRepository;
 import com.example.keshe_backend.post.dto.*;
 import com.example.keshe_backend.report.service.ReportService;
 import com.example.keshe_backend.task.entity.Task;
@@ -34,6 +36,7 @@ public class PostService {
     private final UserRepository userRepository;
     private final ReportService reportService;
     private final ChatService chatService;
+    private final OrderRepository orderRepository;
 
     /**
      * 帖子列表（大厅，支持筛选、排序、分页）
@@ -237,6 +240,44 @@ public class PostService {
                 .stream()
                 .map(PostDTO::from)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 发布者撤回自己的帖子（软下架）：大厅不再显示；取消该帖所有 pending 申请；
+     * in_progress 订单不动（继续走完结算）。仅 status=open 可撤回。
+     */
+    @Transactional
+    public PostDTO ownerClosePost(Long postId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        Task task = taskRepository.findById(postId)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
+        if (!task.getPublisherId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发布者可以撤回");
+        }
+        if (!"open".equals(task.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该帖子已不可撤回");
+        }
+        task.setStatus("closed");
+        taskRepository.save(task);
+
+        // 取消该帖所有 pending 订单（in_progress 不动，继续走完结算），并通知申请方
+        List<Order> pendings = orderRepository.findByPostIdAndStatusIn(postId, Arrays.asList("pending"));
+        for (Order o : pendings) {
+            o.setStatus("cancelled");
+            orderRepository.save(o);
+            Long applicantId = o.getPayerId().equals(userId) ? o.getEarnerId() : o.getPayerId();
+            chatService.addSystemMessage(o.getChatId(),
+                    "发布者撤回了互助「" + task.getTitle() + "」，订单已取消",
+                    String.valueOf(task.getId()), task.getTitle());
+            try {
+                com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(applicantId,
+                        "{\"type\":\"PERSONAL_NOTICE\",\"message\":\"您申请的互助『" + task.getTitle() + "』被发布者撤回，订单已取消。\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return PostDTO.from(task);
     }
 
 
