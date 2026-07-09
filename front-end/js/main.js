@@ -420,15 +420,16 @@ function initHomePage() {
     var taskList = document.querySelector('.task-list');
     if (!taskList) return;
 
-    getTasks({}).then(function(tasks) {
-        if (!tasks || tasks.length === 0) {
+    getTasks({ page: 0, size: 4 }).then(function(res) {
+        var tasks = (res && res.list) ? res.list : [];
+        if (tasks.length === 0) {
             taskList.innerHTML = '<p>暂无推荐任务</p>';
             return;
         }
-        taskList.innerHTML = tasks.slice(0, 4).map(function(task) {
+        taskList.innerHTML = tasks.map(function(task) {
             var catName = CATEGORY_MAP[task.category] || task.category;
             var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
-                return '<img src="' + img + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
+                return '<img src="' + (img.thumb || img) + '" data-full="' + (img.full || img) + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
             }).join('') + '</div>' : '';
             return '<div class="task-item">' +
                 '<div class="task-item-main">' +
@@ -458,7 +459,12 @@ function initTaskHall() {
     var emptyState = document.getElementById('emptyState');
     if (!taskList) return;
 
-    function renderTasks() {
+    var currentPage = 0;
+    var pageSize = 10;
+    var loadMoreBtn = document.getElementById('loadMoreBtn');
+    var loadMoreWrap = document.getElementById('loadMoreWrap');
+
+    function buildFilters() {
         var typeFilter = document.getElementById('taskTypeFilter');
         var keywordInput = document.getElementById('taskKeyword');
         var sortSelect = document.getElementById('sortSelect');
@@ -470,59 +476,74 @@ function initTaskHall() {
         var checkedInputs = document.querySelectorAll('input[name="taskCategory"]:checked');
         var selectedCategories = Array.from(checkedInputs).map(function(input) { return input.value; });
 
-        var filters = {
+        return {
             side: selectedSide,
             categories: selectedCategories,
             keyword: keyword,
             sort: sortValue
         };
+    }
 
-        getTasks(filters).then(function(tasks) {
-            if (!tasks || tasks.length === 0) {
-                taskList.innerHTML = '';
+    function renderTaskItem(task) {
+        var typeLabel = task.publisherSide === 'payer' ? '悬赏求助' : (task.publisherSide === 'none' ? '组队互助' : '提供服务');
+        var typeClass = task.publisherSide === 'payer' ? 'badge-demand' : (task.publisherSide === 'none' ? 'badge-mutual' : 'badge-service');
+        var catName = CATEGORY_MAP[task.category] || task.category;
+        var creditColor = getCreditColorClass(task.publisherCredit);
+        var timeStr = timeAgo(task.publishTime);
+
+        var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
+        var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : (task.publisherSide === 'none' ? 'btn-mutual' : 'btn-service');
+        // 管理员为纯管理角色，大厅只读巡查：不显示接单/下单按钮
+        var actionBtn = isAdminUser() ? '' :
+            '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
+
+        var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
+            return '<img src="' + (img.thumb || img) + '" data-full="' + (img.full || img) + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
+        }).join('') + '</div>' : '';
+        return '<div class="task-item" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
+            '<div class="task-item-main">' +
+                '<div class="task-item-top">' +
+                    '<h3>' + task.title + '</h3>' +
+                    '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
+                '</div>' +
+                '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
+                '<div class="task-item-body">' +
+                    '<p class="task-desc">' + task.description + '</p>' +
+                    bodyImages +
+                '</div>' +
+                '<div class="actions">' +
+                    '<a href="task-detail.html?id=' + task.id + '" class="btn btn-secondary">查看详情</a>' +
+                    actionBtn +
+                    // 登录的普通用户可举报；管理员/未登录不显示
+                    (isLoggedIn() && !isAdminUser() ? '<button type="button" class="btn btn-small btn-link-report" onclick="handleReport(\'' + task.id + '\')">举报</button>' : '') +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    // reset=true：回到首页并清空列表（筛选/排序/搜索变化时）；reset=false：加载下一页追加
+    function fetchAndRender(reset) {
+        if (reset) {
+            currentPage = 0;
+            taskList.innerHTML = '';
+        }
+        var filters = buildFilters();
+        filters.page = currentPage;
+        filters.size = pageSize;
+        getTasks(filters).then(function(res) {
+            var tasks = (res && res.list) ? res.list : [];
+            var hasMore = res ? res.hasMore : false;
+            if (tasks.length === 0 && currentPage === 0) {
                 if (emptyState) emptyState.style.display = 'block';
-                return;
+            } else {
+                if (emptyState) emptyState.style.display = 'none';
+                taskList.innerHTML += tasks.map(renderTaskItem).join('');
             }
-            if (emptyState) emptyState.style.display = 'none';
-
-            taskList.innerHTML = tasks.map(function(task) {
-                var typeLabel = task.publisherSide === 'payer' ? '悬赏求助' : (task.publisherSide === 'none' ? '组队互助' : '提供服务');
-                var typeClass = task.publisherSide === 'payer' ? 'badge-demand' : (task.publisherSide === 'none' ? 'badge-mutual' : 'badge-service');
-                var catName = CATEGORY_MAP[task.category] || task.category;
-                var creditColor = getCreditColorClass(task.publisherCredit);
-                var timeStr = timeAgo(task.publishTime);
-
-                var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
-                var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : (task.publisherSide === 'none' ? 'btn-mutual' : 'btn-service');
-                // 管理员为纯管理角色，大厅只读巡查：不显示接单/下单按钮
-                var actionBtn = isAdminUser() ? '' :
-                    '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
-
-                var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
-                    return '<img src="' + img + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
-                }).join('') + '</div>' : '';
-                return '<div class="task-item" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
-                    '<div class="task-item-main">' +
-                        '<div class="task-item-top">' +
-                            '<h3>' + task.title + '</h3>' +
-                            '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
-                        '</div>' +
-                        '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
-                        '<div class="task-item-body">' +
-                            '<p class="task-desc">' + task.description + '</p>' +
-                            bodyImages +
-                        '</div>' +
-                        '<div class="actions">' +
-                            '<a href="task-detail.html?id=' + task.id + '" class="btn btn-secondary">查看详情</a>' +
-                            actionBtn +
-                            // 登录的普通用户可举报；管理员/未登录不显示
-                            (isLoggedIn() && !isAdminUser() ? '<button type="button" class="btn btn-small btn-link-report" onclick="handleReport(\'' + task.id + '\')">举报</button>' : '') +
-                        '</div>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
+            if (loadMoreWrap) loadMoreWrap.style.display = hasMore ? '' : 'none';
         });
     }
+
+    function renderTasks() { fetchAndRender(true); }
 
     renderTasks();
 
@@ -540,6 +561,7 @@ function initTaskHall() {
     }
     if (typeFilter) typeFilter.addEventListener('change', renderTasks);
     if (sortSelect) sortSelect.addEventListener('change', renderTasks);
+    if (loadMoreBtn) loadMoreBtn.addEventListener('click', function() { currentPage++; fetchAndRender(false); });
     categoryInputs.forEach(function(input) {
         input.addEventListener('change', function() {
             updateFilterText();
@@ -663,6 +685,8 @@ function initPublishForm() {
     var serviceTimeGroup = document.getElementById('serviceTimeGroup');
     var rewardGroup = document.getElementById('rewardGroup');
     var rewardLabel = document.getElementById('rewardLabel');
+    // 报酬 label 文本由 syncFields 动态切换，固定一个 span 承载文本，保留必填 * 标记不被覆盖
+    var rewardText = rewardLabel ? rewardLabel.querySelector('.reward-text') : null;
 
     function getSide() {
         var checked = form.querySelector('input[name="publisherSide"]:checked');
@@ -674,7 +698,7 @@ function initPublishForm() {
         if (serviceTimeGroup) serviceTimeGroup.style.display = side === 'earner' ? '' : 'none';
         // 纯互助不涉及金钱，隐藏报酬字段，并默认把分类设为「组队协作」
         if (rewardGroup) rewardGroup.style.display = side === 'none' ? 'none' : '';
-        if (rewardLabel) rewardLabel.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '期望报酬（你的收费）';
+        if (rewardText) rewardText.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '期望报酬（你的收费）';
         if (side === 'none') {
             var cat = document.getElementById('postCategory');
             if (cat) cat.value = 'teamwork';
@@ -696,14 +720,18 @@ function initPublishForm() {
         var description = document.getElementById('postDesc').value.trim();
         var reward = document.getElementById('postReward').value.trim();
         var contact = document.getElementById('postContact').value.trim();
+        var deadline = document.getElementById('postDeadline').value;
 
+        // 逐项校验必填，给出具体提示（与表单 * 标注一致）
+        if (!title) { alert('请填写标题。'); return; }
+        if (!category) { alert('请选择分类。'); return; }
+        if (!description) { alert('请填写描述。'); return; }
+        if (side === 'payer' && !deadline) { alert('请选择截止时间。'); return; }
         // 纯互助无报酬，reward 固定为「无」；其余方向报酬为必填
         if (side === 'none') {
             reward = '无';
         }
-        if (!title || !category || !description || !reward) {
-            alert('请填写必填项。'); return;
-        }
+        if (side !== 'none' && !reward) { alert('请填写报酬金额。'); return; }
 
         var data = {
             title: title,
@@ -758,7 +786,7 @@ function initTaskDetail() {
         if (task.images && task.images.length > 0) {
             imagesHtml = '<div class="detail-images">' +
                 task.images.map(function(img) {
-                    return '<img src="' + img + '" class="detail-image" onerror="this.style.display=\'none\'">';
+                    return '<img src="' + (img.full || img) + '" class="detail-image" onerror="this.style.display=\'none\'">';
                 }).join('') +
             '</div>';
         }
@@ -787,7 +815,6 @@ function initTaskDetail() {
                         : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
                             : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>')) +
                     '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
-                    '<a href="task-hall.html" class="btn btn-gray">返回互助大厅</a>' +
                 '</div>';
         }
     });
@@ -1509,6 +1536,9 @@ function initOrderCenter() {
 
     var list = document.querySelector('.record-list');
     var filterSelect = document.getElementById('orderFilter');
+    var statusSelect = document.getElementById('orderStatus');
+    var keywordInput = document.getElementById('orderKeyword');
+    var searchBtn = document.getElementById('orderSearchBtn');
     if (!list) return;
 
     async function renderAll() {
@@ -1520,9 +1550,11 @@ function initOrderCenter() {
 
         var filterValue = filterSelect ? filterSelect.value : 'all';
         var moneyRole = (filterValue === 'payer' || filterValue === 'earner') ? filterValue : undefined;
-        var records = await getMyOrders(moneyRole);
+        var statusValue = statusSelect ? statusSelect.value : 'all';
+        var keyword = keywordInput ? keywordInput.value.trim() : '';
+        var records = await getMyOrders(moneyRole, keyword, statusValue);
         if (!records || records.length === 0) {
-            list.innerHTML = '<div class="card empty-state"><p>暂无订单</p></div>';
+            list.innerHTML = '<div class="card empty-state"><p>暂无符合条件的订单</p></div>';
             return;
         }
 
@@ -1561,8 +1593,13 @@ function initOrderCenter() {
     }
 
     renderAll();
-    if (filterSelect) {
-        filterSelect.addEventListener('change', renderAll);
+    if (filterSelect) filterSelect.addEventListener('change', renderAll);
+    if (statusSelect) statusSelect.addEventListener('change', renderAll);
+    if (searchBtn) searchBtn.addEventListener('click', renderAll);
+    if (keywordInput) {
+        keywordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); renderAll(); }
+        });
     }
 }
 
@@ -1740,7 +1777,7 @@ function initLightbox() {
             if (e.target.classList.contains('task-image-thumb')) {
                 e.stopPropagation();
                 var bigImg = overlay.querySelector('img');
-                bigImg.src = e.target.src;
+                bigImg.src = e.target.getAttribute('data-full') || e.target.src;
                 overlay.classList.add('active');
             }
         });

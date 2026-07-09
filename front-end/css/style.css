@@ -28,6 +28,13 @@ select {
     outline: none;
 }
 
+/* 必填项标记 */
+.required {
+    color: #cf222e;
+    margin-left: 2px;
+    font-weight: bold;
+}
+
 .container {
     width: 90%;
     max-width: 1200px;

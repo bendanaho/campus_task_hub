@@ -209,8 +209,16 @@ async function getTasks(filters) {
     if (USE_MOCK) {
         return mockGetTasks(filters);
     }
-    var query = new URLSearchParams(filters || {}).toString();
-    var res = await fetch(API_BASE + '/posts?' + query);
+    // 显式拼参：categories 为数组时join成逗号分隔（后端 split(",") 解析）
+    var f = filters || {};
+    var params = new URLSearchParams();
+    if (f.side) params.set('side', f.side);
+    if (f.categories && f.categories.length) params.set('categories', f.categories.join(','));
+    if (f.keyword) params.set('keyword', f.keyword);
+    if (f.sort) params.set('sort', f.sort);
+    if (f.page != null) params.set('page', f.page);
+    if (f.size != null) params.set('size', f.size);
+    var res = await fetch(API_BASE + '/posts?' + params.toString());
     return _handleRes(res);
 }
 
@@ -441,12 +449,17 @@ async function getOrderHistory(chatId) {
 }
 
 // 我的订单。moneyRole: 'payer'(我付款的) | 'earner'(我收款的) | 不传(全部)
-async function getMyOrders(moneyRole) {
+// keyword: 按标题/对方用户名/订单号检索；status: 订单状态筛选('all' 或空为不筛选)
+async function getMyOrders(moneyRole, keyword, status) {
     if (USE_MOCK) {
-        return mockGetMyOrders(moneyRole);
+        return mockGetMyOrders(moneyRole, keyword, status);
     }
-    var query = moneyRole ? '?role=' + moneyRole : '';
-    var res = await fetch(API_BASE + '/orders/mine' + query, {
+    var params = new URLSearchParams();
+    if (moneyRole) params.set('role', moneyRole);
+    if (keyword) params.set('keyword', keyword);
+    if (status && status !== 'all') params.set('status', status);
+    var query = params.toString();
+    var res = await fetch(API_BASE + '/orders/mine' + (query ? '?' + query : ''), {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
     return _handleRes(res);
@@ -1073,50 +1086,54 @@ function mockGetTasks(filters) {
             var db = _mockGetDB();
             // 大厅只展示挂出来、未过截止时间、且未被管理员删除的帖子
             var result = db.tasks.filter(function(t) { return t.status === 'open' && !t.deletedAt && !_isExpired(t); });
+            var f = filters || {};
 
-            if (filters) {
-                // side: 'payer'(别人出钱,我能赚) | 'earner'(别人收钱,我要花钱) | 'none'(纯互助) | 'all'
-                if (filters.side && filters.side !== 'all') {
-                    result = result.filter(function(t) { return t.publisherSide === filters.side; });
-                }
-                if (filters.categories && filters.categories.length > 0) {
-                    result = result.filter(function(t) { return filters.categories.indexOf(t.category) >= 0; });
-                }
-                if (filters.keyword) {
-                    var kw = filters.keyword.toLowerCase();
-                    result = result.filter(function(t) {
-                        return t.title.toLowerCase().indexOf(kw) >= 0 ||
-                               t.description.toLowerCase().indexOf(kw) >= 0 ||
-                               t.publisherName.toLowerCase().indexOf(kw) >= 0;
-                    });
-                }
-                if (filters.sort) {
-                    switch (filters.sort) {
-                        case 'time_asc':
-                            result.sort(function(a, b) { return new Date(a.publishTime) - new Date(b.publishTime); });
-                            break;
-                        case 'time_desc':
-                            result.sort(function(a, b) { return new Date(b.publishTime) - new Date(a.publishTime); });
-                            break;
-                        case 'reward_asc':
-                            result.sort(function(a, b) { return a.rewardValue - b.rewardValue; });
-                            break;
-                        case 'reward_desc':
-                            result.sort(function(a, b) { return b.rewardValue - a.rewardValue; });
-                            break;
-                        case 'credit_asc':
-                            result.sort(function(a, b) { return a.publisherCredit - b.publisherCredit; });
-                            break;
-                        case 'credit_desc':
-                            result.sort(function(a, b) { return b.publisherCredit - a.publisherCredit; });
-                            break;
-                        default:
-                            break;
-                    }
+            // side: 'payer'(别人出钱,我能赚) | 'earner'(别人收钱,我要花钱) | 'none'(纯互助) | 'all'
+            if (f.side && f.side !== 'all') {
+                result = result.filter(function(t) { return t.publisherSide === f.side; });
+            }
+            if (f.categories && f.categories.length > 0) {
+                result = result.filter(function(t) { return f.categories.indexOf(t.category) >= 0; });
+            }
+            if (f.keyword) {
+                var kw = f.keyword.toLowerCase();
+                result = result.filter(function(t) {
+                    return t.title.toLowerCase().indexOf(kw) >= 0 ||
+                           t.description.toLowerCase().indexOf(kw) >= 0 ||
+                           t.publisherName.toLowerCase().indexOf(kw) >= 0;
+                });
+            }
+            // 默认按发布时间倒序（与后端 buildSort 一致），再按 sort 覆盖
+            result.sort(function(a, b) { return new Date(b.publishTime) - new Date(a.publishTime); });
+            if (f.sort) {
+                switch (f.sort) {
+                    case 'time_asc':
+                        result.sort(function(a, b) { return new Date(a.publishTime) - new Date(b.publishTime); });
+                        break;
+                    case 'reward_asc':
+                        result.sort(function(a, b) { return a.rewardValue - b.rewardValue; });
+                        break;
+                    case 'reward_desc':
+                        result.sort(function(a, b) { return b.rewardValue - a.rewardValue; });
+                        break;
+                    case 'credit_asc':
+                        result.sort(function(a, b) { return a.publisherCredit - b.publisherCredit; });
+                        break;
+                    case 'credit_desc':
+                        result.sort(function(a, b) { return b.publisherCredit - a.publisherCredit; });
+                        break;
+                    // time_desc 已是默认排序，无需再排
+                    default:
+                        break;
                 }
             }
 
-            resolve(result);
+            // 分页
+            var page = f.page || 0;
+            var size = f.size || 10;
+            var start = page * size;
+            var pageList = result.slice(start, start + size);
+            resolve({ list: pageList, hasMore: start + size < result.length, total: result.length, page: page, size: size });
         }, 150);
     });
 }
@@ -1751,7 +1768,7 @@ function mockGetOrderHistory(chatId) {
     });
 }
 
-function mockGetMyOrders(moneyRole) {
+function mockGetMyOrders(moneyRole, keyword, status) {
     return new Promise(function(resolve, reject) {
         setTimeout(function() {
             var currentUser = getCurrentUser();
@@ -1761,6 +1778,8 @@ function mockGetMyOrders(moneyRole) {
             }
             var db = _mockGetDB();
             _sweep(db);
+            var kw = keyword ? keyword.trim().toLowerCase() : '';
+            var filterStatus = status && status !== 'all';
             var result = (db.orders || []).filter(function(o) {
                 var isPayer = o.payerId === currentUser.id;
                 var isEarner = o.earnerId === currentUser.id;
@@ -1781,6 +1800,17 @@ function mockGetMyOrders(moneyRole) {
                     partnerId: partnerId,
                     partnerName: partner ? partner.username : '未知'
                 };
+            }).filter(function(r) {
+                // 状态筛选
+                if (filterStatus && r.order.status !== status) return false;
+                // 关键词检索：标题 / 对方用户名 / 订单号
+                if (kw) {
+                    var hit = (r.title || '').toLowerCase().indexOf(kw) >= 0
+                        || (r.partnerName || '').toLowerCase().indexOf(kw) >= 0
+                        || String(r.order.id).indexOf(kw) >= 0;
+                    if (!hit) return false;
+                }
+                return true;
             });
             result.sort(function(a, b) { return new Date(b.order.createdAt) - new Date(a.order.createdAt); });
             resolve(result);

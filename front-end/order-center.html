@@ -28,6 +28,22 @@
                     <option value="payer">我付款的</option>
                     <option value="earner">我收款的</option>
                 </select>
+                <select id="orderStatus" class="form-control">
+                    <option value="all">全部状态</option>
+                    <option value="pending">待接受</option>
+                    <option value="in_progress">进行中</option>
+                    <option value="completed">已完成</option>
+                    <option value="cancelled">已取消</option>
+                    <option value="disputed">争议中</option>
+                    <option value="closed">已结案</option>
+                </select>
+                <input
+                    type="text"
+                    id="orderKeyword"
+                    class="form-control"
+                    placeholder="搜索标题 / 对方用户名 / 订单号"
+                />
+                <button type="button" class="btn" id="orderSearchBtn">搜索</button>
             </div>
 
             <div class="record-list"></div>
