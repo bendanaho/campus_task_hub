@@ -78,11 +78,13 @@ public class OrderController {
     }
 
     /**
-     * 我的订单
+     * 我的订单（支持按关键词检索 + 状态筛选）
      */
     @GetMapping("/mine")
     public ApiResponse<List<MyOrderResponse>> getMyOrders(
-            @RequestParam(required = false) String role) {
-        return ApiResponse.success(orderService.getMyOrders(role));
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status) {
+        return ApiResponse.success(orderService.getMyOrders(role, keyword, status));
     }
 }

@@ -20,15 +20,17 @@ public class PostController {
     private final ReportService reportService;
 
     /**
-     * 帖子列表（大厅）
+     * 帖子列表（大厅，分页）
      */
     @GetMapping
-    public ApiResponse<List<PostDTO>> listPosts(
+    public ApiResponse<PostPageResponse> listPosts(
             @RequestParam(required = false) String side,
             @RequestParam(required = false) String categories,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String sort) {
-        return ApiResponse.success(postService.listPosts(side, categories, keyword, sort));
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success(postService.listPosts(side, categories, keyword, sort, page, size));
     }
 
     /**
