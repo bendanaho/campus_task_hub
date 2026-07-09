@@ -197,8 +197,11 @@ public class OrderService {
         orderRepository.save(order);
 
         try {
-                    String takenMsg = String.format("{\"type\":\"TASK_TAKEN\",\"postId\":%d}", post.getId());
-                    com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(takenMsg);
+                    // TASK_TAKEN 只对悬赏帖（payer，被接即 closed）广播：服务帖可复用，被接不影响他人，无需让大厅移除
+                    if ("payer".equals(post.getPublisherSide())) {
+                        String takenMsg = String.format("{\"type\":\"TASK_TAKEN\",\"postId\":%d}", post.getId());
+                        com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(takenMsg);
+                    }
 
                     Long applicantId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
                     String pNotice = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"您对任务『%s』的订单申请已被对方接受，任务正式开始执行！\"}", post.getTitle());
