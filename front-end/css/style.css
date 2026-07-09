@@ -1202,6 +1202,17 @@ html {
     white-space: nowrap;
 }
 
+/* 我的订单：进行中任务概览区 */
+.active-orders {
+    margin-bottom: 16px;
+}
+.active-title {
+    font-size: 15px;
+    font-weight: bold;
+    margin: 0 0 10px 0;
+    color: #1d4ed8;
+}
+
 /* 【仅测试用】一键切换账号浮层（接后端时不渲染，可整段删除） */
 .dev-switcher {
     position: fixed;

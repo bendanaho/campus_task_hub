@@ -813,7 +813,9 @@ function initTaskDetail() {
                 '<p><strong>状态：</strong>' + statusText + '</p>' +
                 imagesHtml +
                 '<div class="actions">' +
-                    (isMine ? '<span class="note">这是你发布的帖子</span>'
+                    (isMine ? (task.status === 'open'
+                            ? '<span class="note">这是你发布的帖子</span> <button type="button" class="btn btn-small btn-secondary" onclick="handleOwnerClose(\'' + task.id + '\')">撤回</button>'
+                            : '<span class="note">这是你发布的帖子（已结束）</span>')
                         : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
                             : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>')) +
                     '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
@@ -864,6 +866,73 @@ function initMessageCenter() {
     var list = document.querySelector('.message-list');
     if (!list) return;
 
+    var statusFilter = document.getElementById('msgStatusFilter');
+    var roleFilter = document.getElementById('msgRoleFilter');
+    var keywordInput = document.getElementById('msgKeyword');
+    var searchBtn = document.getElementById('msgSearchBtn');
+
+    var enrichedCache = null;
+    var unreadByChat = {};
+
+    // 按筛选条件过滤并渲染（enriched 已缓存，筛选变化不重新拉数据）
+    function applyFilters() {
+        if (!enrichedCache) return;
+        var st = statusFilter ? statusFilter.value : 'all';
+        var rl = roleFilter ? roleFilter.value : 'all';
+        var kw = keywordInput ? keywordInput.value.trim().toLowerCase() : '';
+        var filtered = enrichedCache.filter(function(item) {
+            var c = item.c;
+            var si = item.statusInfo || {};
+            if (st === 'action' && !si.action) return false;
+            if (st === 'progress' && si.className !== 'status-in_progress') return false;
+            if (st === 'review' && !si.review) return false;
+            if (st === 'done' && si.text !== '已完成') return false;
+            if (rl === 'payer' && item.roleText !== '我是付款方') return false;
+            if (rl === 'earner' && item.roleText !== '我是收款方') return false;
+            if (kw) {
+                var hay = ((c.taskTitle || '') + ' ' + (c.partnerName || '')).toLowerCase();
+                if (hay.indexOf(kw) < 0) return false;
+            }
+            return true;
+        });
+        if (filtered.length === 0) {
+            list.innerHTML = '<div class="card empty-state"><p>没有符合条件的会话</p></div>';
+            return;
+        }
+        list.innerHTML = filtered.map(function(item) {
+            var c = item.c;
+            var si = item.statusInfo || {};
+            var needAction = !!si.action;
+            var inProgress = !needAction && si.className === 'status-in_progress';
+            var statusBadge = si.text
+                ? '<span class="status-badge ' + (needAction ? 'status-action' : si.className) + '">' +
+                    (needAction ? '● ' : '') + si.text + '</span>'
+                : '';
+            var uc = unreadByChat[c.id] || 0;
+            var unreadBadge = uc > 0
+                ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>'
+                : '';
+            var reviewBtn = (si.review && item.orderId)
+                ? '<button type="button" class="btn btn-small btn-link-skip" onclick="skipReview(\'' + item.orderId + '\')">暂不评价</button>'
+                : '';
+            var itemClass = 'message-item';
+            if (needAction) itemClass += ' needs-action';
+            else if (inProgress) itemClass += ' needs-progress';
+            return '<div class="' + itemClass + '">' +
+                '<div class="msg-header">' +
+                    '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
+                    '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
+                '</div>' +
+                '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
+                '<p class="msg-preview">' + item.msgPreview + '</p>' +
+                '<div class="actions">' +
+                    '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
+                    reviewBtn +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
     getConversations().then(async function(conversations) {
         if (!conversations || conversations.length === 0) {
             list.innerHTML = '<div class="card empty-state"><p>暂无消息</p></div>';
@@ -871,7 +940,7 @@ function initMessageCenter() {
         }
 
         var unread = await getUnreadCounts();
-        var unreadByChat = (unread && unread.byChat) || {};
+        unreadByChat = (unread && unread.byChat) || {};
 
         var enriched = await Promise.all(conversations.map(async function(c) {
             var currentUser = getCurrentUser();
@@ -940,43 +1009,19 @@ function initMessageCenter() {
         }
         enriched.sort(function(a, b) { return convScore(b) - convScore(a); });
 
-        list.innerHTML = enriched.map(function(item) {
-            var c = item.c;
-            var si = item.statusInfo || {};
-            var needAction = !!si.action;
-            var inProgress = !needAction && si.className === 'status-in_progress';
-            var statusBadge = si.text
-                ? '<span class="status-badge ' + (needAction ? 'status-action' : si.className) + '">' +
-                    (needAction ? '● ' : '') + si.text + '</span>'
-                : '';
-            var uc = unreadByChat[c.id] || 0;
-            var unreadBadge = uc > 0
-                ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>'
-                : '';
-            // 待评价会话额外提供「暂不评价」按钮（本地记住后不再提示）
-            var reviewBtn = (si.review && item.orderId)
-                ? '<button type="button" class="btn btn-small btn-link-skip" onclick="skipReview(\'' + item.orderId + '\')">暂不评价</button>'
-                : '';
-
-            // 左侧框：待我操作=红、进行中=绿、新消息=无框（仅未读数徽标）
-            var itemClass = 'message-item';
-            if (needAction) itemClass += ' needs-action';
-            else if (inProgress) itemClass += ' needs-progress';
-
-            return '<div class="' + itemClass + '">' +
-                '<div class="msg-header">' +
-                    '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
-                    '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
-                '</div>' +
-                '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
-                '<p class="msg-preview">' + item.msgPreview + '</p>' +
-                '<div class="actions">' +
-                    '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
-                    reviewBtn +
-                '</div>' +
-            '</div>';
-        }).join('');
+        list.innerHTML = '';
+        enrichedCache = enriched;
+        applyFilters();
     });
+
+    if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+    if (roleFilter) roleFilter.addEventListener('change', applyFilters);
+    if (searchBtn) searchBtn.addEventListener('click', applyFilters);
+    if (keywordInput) {
+        keywordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); applyFilters(); }
+        });
+    }
 }
 
 // 消息中心「暂不评价」：本地记住用户主动跳过的订单，不再在消息中心提示待评价
@@ -1513,6 +1558,17 @@ window.handleReport = function(postId) {
     });
 };
 
+// 发布者撤回自己的帖子（软下架）
+window.handleOwnerClose = function(postId) {
+    if (!confirm('确定撤回该互助吗？\n撤回后大厅不再显示，已有待接受申请将取消，进行中订单继续执行完。')) return;
+    ownerClosePost(postId).then(function() {
+        alert('已撤回');
+        window.location.href = 'task-hall.html';
+    }).catch(function(err) {
+        alert(err.message || '撤回失败');
+    });
+};
+
 // 发起申诉：填写理由 → 订单转 disputed（资金保持冻结），聊天发系统消息
 window.handleDispute = function(orderId) {
     if (blockIfAdmin()) return;
@@ -1559,6 +1615,43 @@ function initOrderCenter() {
     var keywordInput = document.getElementById('orderKeyword');
     var searchBtn = document.getElementById('orderSearchBtn');
     if (!list) return;
+
+    // 进行中任务概览：顶部醒目展示未完成订单（pending/in_progress/disputed），独立于下方筛选列表
+    async function loadActiveOrders() {
+        var activeBox = document.getElementById('activeOrders');
+        if (!activeBox) return;
+        var currentUser = getCurrentUser();
+        if (!currentUser) { activeBox.innerHTML = ''; return; }
+        try {
+            var records = await getMyOrders();
+            var active = (records || []).filter(function(r) {
+                return ['pending', 'in_progress', 'disputed'].indexOf(r.order.status) >= 0;
+            });
+            if (active.length === 0) {
+                activeBox.innerHTML = '<div class="card empty-state"><p>暂无进行中任务</p></div>';
+                return;
+            }
+            activeBox.innerHTML = '<div class="active-title">进行中任务（' + active.length + '）</div>' +
+                active.map(function(r) {
+                    var o = r.order;
+                    var isPublisher = r.post ? r.post.publisherId === currentUser.id : false;
+                    var st = describeOrderStatus(o, currentUser.id, isPublisher);
+                    var isMutual = r.post && r.post.publisherSide === 'none';
+                    var roleLabel = isMutual
+                        ? (r.post.publisherId === currentUser.id ? '发起者' : '参与者')
+                        : (r.myRole === 'payer' ? '我付款' : '我收款');
+                    var amountText = isMutual ? '不涉及金钱' : ((r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元');
+                    return '<div class="record-item">' +
+                        '<h3>' + r.title + '</h3>' +
+                        '<p class="meta"><span class="status-badge ' + st.className + '">' + st.text + '</span>身份：' + roleLabel + ' ｜ 金额：' + amountText + ' ｜ 对方：' + r.partnerName + '</p>' +
+                        '<div class="actions"><a href="chat-detail.html?chatId=' + o.chatId + '&partner=' + r.partnerId + '&task=' + o.postId + '" class="btn">进入聊天</a>' +
+                        '<a href="task-detail.html?id=' + o.postId + '" class="btn btn-secondary">查看详情</a></div>' +
+                    '</div>';
+                }).join('');
+        } catch (e) {
+            activeBox.innerHTML = '';
+        }
+    }
 
     async function renderAll() {
         var currentUser = getCurrentUser();
@@ -1612,6 +1705,7 @@ function initOrderCenter() {
     }
 
     renderAll();
+    loadActiveOrders();
     if (filterSelect) filterSelect.addEventListener('change', renderAll);
     if (statusSelect) statusSelect.addEventListener('change', renderAll);
     if (searchBtn) searchBtn.addEventListener('click', renderAll);
@@ -1752,15 +1846,41 @@ function initBills() {
             list.innerHTML = '<div class="card empty-state"><p>暂无账单记录</p></div>';
             return;
         }
-        list.innerHTML = items.map(function(t) {
-            var sign = t.direction === 'in' ? '+' : '-';
-            var cls = t.direction === 'in' ? 'bill-in' : 'bill-out';
-            return '<div class="bill-item">' +
-                '<div class="bill-item-main">' +
-                    '<div class="bill-note">' + (t.note || catMap[t.category] || '交易') + '</div>' +
-                    '<div class="bill-meta">' + (catMap[t.category] || t.category) + ' ｜ ' + formatDateTime(t.time) + '</div>' +
+        // 按月分组（YYYY-MM），月份倒序；每月一个卡片：月汇总 + 月内流水
+        var months = {}, monthOrder = [];
+        items.forEach(function(t) {
+            var ym = (t.time || '').substring(0, 7);
+            if (!months[ym]) { months[ym] = []; monthOrder.push(ym); }
+            months[ym].push(t);
+        });
+        monthOrder.sort().reverse();
+        list.innerHTML = monthOrder.map(function(ym) {
+            var ms = months[ym];
+            var min = 0, mout = 0;
+            ms.forEach(function(t) {
+                if (t.direction === 'in') min += Number(t.amount) || 0;
+                else mout += Number(t.amount) || 0;
+            });
+            var mnet = min - mout;
+            var parts = ym.split('-');
+            var ymLabel = parts[0] + '年' + parseInt(parts[1], 10) + '月';
+            var itemsHtml = ms.map(function(t) {
+                var sign = t.direction === 'in' ? '+' : '-';
+                var cls = t.direction === 'in' ? 'bill-in' : 'bill-out';
+                return '<div class="bill-item">' +
+                    '<div class="bill-item-main">' +
+                        '<div class="bill-note">' + (t.note || catMap[t.category] || '交易') + '</div>' +
+                        '<div class="bill-meta">' + (catMap[t.category] || t.category) + ' ｜ ' + formatDateTime(t.time) + '</div>' +
+                    '</div>' +
+                    '<div class="bill-amount ' + cls + '">' + sign + '¥' + t.amount + '</div>' +
+                '</div>';
+            }).join('');
+            return '<div class="card bill-month">' +
+                '<div class="bill-month-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #eee;">' +
+                    '<strong style="font-size:15px;">' + ymLabel + '</strong>' +
+                    '<span style="font-size:12px;color:#666;">收入 +¥' + min + ' ｜ 支出 -¥' + mout + ' ｜ 净额 ' + (mnet >= 0 ? '+' : '-') + '¥' + Math.abs(mnet) + '</span>' +
                 '</div>' +
-                '<div class="bill-amount ' + cls + '">' + sign + '¥' + t.amount + '</div>' +
+                itemsHtml +
             '</div>';
         }).join('');
     }).catch(function(err) {

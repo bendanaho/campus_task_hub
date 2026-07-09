@@ -256,6 +256,15 @@ async function getMyPosts() {
     return _handleRes(res);
 }
 
+// 发布者撤回自己的帖子（软下架）：大厅不再显示，pending 申请取消，in_progress 继续
+async function ownerClosePost(postId) {
+    var res = await fetch(API_BASE + '/posts/' + postId + '/close', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
 // ==================== 订单（统一：payer 付款方 / earner 收款方）====================
 
 // 响应一个帖子（接单 / 下单）→ 创建 pending 订单。取代旧 takeTask + createServiceOrder
