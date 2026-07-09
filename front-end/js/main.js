@@ -1245,8 +1245,9 @@ function initChatDetail() {
     // 当「当前用户是本单付款方」时，在任务栏展示：当前余额 ｜ 本单需支付金额（不足则标红）
     async function buildBalanceHint(task, order, currentUser) {
         if (!currentUser || task.publisherSide === 'none') return '';
-        // 仅在「待付款/进行中/尚未下单」阶段提示，已完成/已取消不再提示
-        if (order && ['cancelled', 'completed', 'disputed', 'closed'].indexOf(order.status) >= 0) return '';
+        // 仅在「尚未下单 / pending 待接受」阶段提示付款方备款；
+        // in_progress 起资金已冻结（acceptOrder 时已扣款），不再用当前余额比对订单金额，否则会误报"余额不足"
+        if (order && order.status !== 'pending') return '';
         var isPublisher = currentUser.id === task.publisherId;
         // 是否为本单付款方：有订单看 payerId；无订单时——服务帖(earner)由响应者付、悬赏帖(payer)由发布者付
         var iAmPayer = order
