@@ -500,7 +500,7 @@ function initTaskHall() {
         var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
             return '<img src="' + (img.thumb || img) + '" data-full="' + (img.full || img) + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
         }).join('') + '</div>' : '';
-        return '<div class="task-item" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
+        return '<div class="task-item" data-postid="' + task.id + '" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
             '<div class="task-item-main">' +
                 '<div class="task-item-top">' +
                     '<h3>' + task.title + '</h3>' +
@@ -546,6 +546,8 @@ function initTaskHall() {
     function renderTasks() { fetchAndRender(true); }
 
     renderTasks();
+    // 暴露给 initWebSocket 的 NEW_TASK 局部插入新卡片用
+    window.renderTaskItem = renderTaskItem;
 
     var searchBtn = document.getElementById('searchBtn');
     var keywordInput = document.getElementById('taskKeyword');
@@ -1115,7 +1117,7 @@ function initChatDetail() {
         '</div>';
     }
 
-    function renderMessages() {
+    function renderMessages(forceScroll) {
         getMessages(chatId).then(async function(messages) {
             var currentUser = getCurrentUser();
             if (!messages || messages.length === 0) {
@@ -1127,6 +1129,8 @@ function initChatDetail() {
             if (currentUser) {
                 try { myBalance = (await getMyBalance()).balance; } catch (e) { myBalance = null; }
             }
+            // 记录刷新前是否在底部附近（用户在看最新消息），用于智能滚动
+            var wasNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 80;
             messageList.innerHTML = messages.map(function(m) {
                 // String()：真后端 id 是数字、mock 是字符串，统一转字符串比较
                 var isSelf = !!currentUser && String(m.senderId) === String(currentUser.id);
@@ -1149,8 +1153,10 @@ function initChatDetail() {
                     '<div class="chat-time">' + formatDateTime(m.time) + '</div>' +
                 '</div>';
             }).join('');
-            // 滚动容器是 chat-box（overflow-y:auto），滚它才能让最新消息落到最底部
-            chatBox.scrollTop = chatBox.scrollHeight;
+            // 智能滚动：forceScroll 非 false（进入页面/发消息）或原本在底部附近 -> 滚到底；否则保持位置（不打断查看历史）
+            if (forceScroll !== false || wasNearBottom) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
             bindContextMenu();
         });
     }
@@ -2115,16 +2121,31 @@ function initWebSocket() {
         try {
             var data = JSON.parse(event.data);
             
-            // 场景一：有新任务发布（广播给所有正在浏览大厅的用户）
+            // 场景一：有新任务发布（广播给所有正在浏览大厅的用户）--大厅局部插入新卡片，不 reload、不丢滚动
             if (data.type === 'NEW_TASK') {
-                if (window.location.pathname.includes('task-hall.html')) {
-                    showRealtimeBanner('📢 有新互助任务发布：《' + data.title + '》，点击可刷新列表！', function() {
-                        window.location.reload();
+                if (window.location.pathname.includes('task-hall.html') && data.postId) {
+                    fetchTaskById(data.postId).then(function(res) {
+                        var task = res && res.task;
+                        if (!task) return;
+                        var taskList = document.getElementById('taskList');
+                        if (!taskList) return;
+                        // 已存在同 id 卡片则不重复插入
+                        if (taskList.querySelector('.task-item[data-postid="' + task.id + '"]')) return;
+                        if (!window.renderTaskItem) return;
+                        var wrap = document.createElement('div');
+                        wrap.innerHTML = window.renderTaskItem(task);
+                        var card = wrap.firstChild;
+                        if (card) {
+                            card.style.transition = 'background-color 0.8s ease';
+                            card.style.backgroundColor = '#fff7e6';
+                            taskList.insertBefore(card, taskList.firstChild);
+                            setTimeout(function() { card.style.backgroundColor = ''; }, 1500);
+                        }
                     });
                 }
             }
             
-            // 场景二：任务已被抢单/正式接取（通知详情页的竞争者快速退出）
+            // 场景二：任务已被抢单/正式接取（通知详情页竞争者退出 + 大厅局部移除被接卡片，不 reload）
             if (data.type === 'TASK_TAKEN') {
                 var currentTaskId = getUrlParam('id');
                 if (window.location.pathname.includes('task-detail.html') && String(currentTaskId) === String(data.postId)) {
@@ -2137,6 +2158,15 @@ function initWebSocket() {
                     setTimeout(function() {
                         window.location.href = 'task-hall.html';
                     }, 3000);
+                }
+                // 大厅：淡出移除被接的悬赏帖卡片，保留滚动位置
+                if (window.location.pathname.includes('task-hall.html') && data.postId) {
+                    var takenCard = document.querySelector('.task-item[data-postid="' + data.postId + '"]');
+                    if (takenCard) {
+                        takenCard.style.transition = 'opacity 0.4s ease';
+                        takenCard.style.opacity = '0';
+                        setTimeout(function() { takenCard.remove(); }, 400);
+                    }
                 }
             }
             
@@ -2155,6 +2185,21 @@ function initWebSocket() {
 
                 // 自动联动刷新导航栏的消息未读红点（非阻塞）
                 if (typeof updateNavUnread === 'function') updateNavUnread();
+            }
+
+            // 场景四：聊天页实时刷新（对方发消息/支付卡片/订单系统消息）--局部刷新，不 reload、不丢滚动
+            if (data.type === 'CHAT_UPDATE') {
+                if (window.location.pathname.includes('chat-detail.html')) {
+                    var curChat = getUrlParam('chatId');
+                    if (curChat && String(curChat) === String(data.chatId)) {
+                        // forceScroll=false：原本在底部才滚到底，否则保持位置（不打断查看历史）
+                        if (window.renderMessages) window.renderMessages(false);
+                        if (window.renderTaskBar) window.renderTaskBar();
+                    }
+                } else if (window.location.pathname.includes('message-center.html')) {
+                    // 消息中心：刷新会话列表（状态文案/预览/未读/排序）
+                    if (typeof initMessageCenter === 'function') initMessageCenter();
+                }
             }
         } catch (e) {
             console.error('【WebSocket】消息包解析异常:', e);
