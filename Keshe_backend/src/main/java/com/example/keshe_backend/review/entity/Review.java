@@ -65,7 +65,7 @@ public class Review {
     /**
      * 评价图片列表（JSON 数组字符串）
      */
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String images;
 
     /**

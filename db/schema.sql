@@ -1,15 +1,19 @@
 -- ============================================
--- Campus Task Hub 建表脚本
+-- Campus Task Hub 建表脚本（生产基准 DDL）
 -- 数据库: campus_task_hub  字符集: utf8mb4
 --
--- 本脚本与后端 JPA 实体严格对齐（H2 用 ddl-auto=create 自动建表，
--- MySQL 生产用 ddl-auto=validate，故列名/类型须一致）。
+-- 与后端 JPA 实体严格对齐（详见仓库根 DATABASE.md）：
+--   - dev  用 H2 内存库 + ddl-auto=update 自动建表（不读本脚本）
+--   - prod 用 MySQL    + ddl-auto=validate 只校验不建表
+-- 故本脚本的列名/类型必须与 Entity 一致，否则 prod 启动 validate 失败。
 --
 -- 说明：
 --  1) 实体使用裸 Long 外键（无 @ManyToOne），Hibernate 不生成外键约束；
 --     且「系统通知」会话使用 user2_id=0 / sender_id=0 作为哨兵（无对应用户行），
 --     因此本脚本【不声明 FOREIGN KEY】，与后端实际行为一致。
---  2) conversations.id 为字符串（如 c-1-2、sys-notify-8），非自增。
+--  2) conversations.id 为字符串（如 c1、sys-notify-8），非自增。
+--  3) 图片列 images 用 LONGTEXT：存 base64 图片 JSON，单张原图远超 TEXT 的 64KB 上限。
+--  4) credit_score / publisher_credit 用 DECIMAL(3,1)：信用分 0.0–5.0，1 位小数。
 -- ============================================
 SET NAMES utf8mb4;
 
@@ -30,7 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     wechat_openid VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '微信OpenID（预留）',
     wechat_unionid VARCHAR(100) DEFAULT NULL COMMENT '微信UnionID（预留）',
     avatar VARCHAR(255) DEFAULT NULL COMMENT '头像地址',
-    credit_score DECIMAL(10,2) NOT NULL DEFAULT 5.00 COMMENT '信用分',
+    credit_score DECIMAL(3,1) NOT NULL DEFAULT 5.0 COMMENT '信用分 0.0-5.0',
     auth_status INT NOT NULL DEFAULT 0 COMMENT '实名认证 0=未认证 1=已认证',
     real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
     student_id VARCHAR(50) DEFAULT NULL COMMENT '学号',
@@ -49,6 +53,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- 2. 帖子/任务表  (entity: Task)
 --    publisher_side: payer 悬赏求助 / earner 提供服务 / none 组队互助
 --    status: open 上架 / closed 下架关闭；deleted_at 非空=已删除
+--    images 用 LONGTEXT：存 base64 图片 JSON，单张原图远超 TEXT 的 64KB 上限
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS tasks (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -58,14 +63,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT NOT NULL COMMENT '描述',
     publisher_id BIGINT NOT NULL COMMENT '发布者ID',
     publisher_name VARCHAR(50) NOT NULL COMMENT '发布者用户名（冗余）',
-    publisher_credit DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '发布时信用分快照',
+    publisher_credit DECIMAL(3,1) NOT NULL DEFAULT 0.0 COMMENT '发布时信用分快照',
     reward VARCHAR(50) NOT NULL COMMENT '报酬描述（如：10元、面议）',
     reward_value DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '报酬数值（冻结/结算用）',
     deadline DATETIME DEFAULT NULL COMMENT '截止时间（悬赏帖）',
     publish_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
     status VARCHAR(10) NOT NULL COMMENT '状态 open/closed',
     contact VARCHAR(255) DEFAULT '站内联系' COMMENT '联系方式',
-    images TEXT DEFAULT NULL COMMENT '图片列表(JSON字符串)',
+    images LONGTEXT DEFAULT NULL COMMENT '图片列表(JSON字符串，base64，须用LONGTEXT)',
     publisher_side VARCHAR(10) NOT NULL DEFAULT 'payer' COMMENT 'payer/earner/none',
     service_time VARCHAR(100) DEFAULT NULL COMMENT '服务时间（服务帖）',
     taker_id BIGINT DEFAULT NULL COMMENT '旧字段兼容',
@@ -78,7 +83,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at DATETIME DEFAULT NULL,
     deleted_at DATETIME DEFAULT NULL COMMENT '软删除时间（管理员删除）',
     KEY idx_tasks_publisher (publisher_id),
-    KEY idx_tasks_status (status)
+    KEY idx_tasks_hall (status, deleted_at, publish_time) COMMENT '大厅列表主查询',
+    KEY idx_tasks_side (publisher_side),
+    KEY idx_tasks_category (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='帖子/任务表';
 
 -- -------------------------------------------
@@ -112,13 +119,14 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_at DATETIME DEFAULT NULL,
     KEY idx_orders_chat (chat_id),
     KEY idx_orders_post (post_id),
-    KEY idx_orders_payer (payer_id),
-    KEY idx_orders_earner (earner_id),
+    KEY idx_orders_payer_status (payer_id, status) COMMENT '我的订单（付款方+状态）',
+    KEY idx_orders_earner_status (earner_id, status) COMMENT '我的订单（收款方+状态）',
     KEY idx_orders_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
 -- -------------------------------------------
 -- 4. 评价表  (entity: Review)
+--    images 用 LONGTEXT（同 tasks.images）
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS reviews (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -130,10 +138,10 @@ CREATE TABLE IF NOT EXISTS reviews (
     to_user_name VARCHAR(50) NOT NULL COMMENT '被评价者用户名',
     rating INT NOT NULL COMMENT '评分 1-5',
     content VARCHAR(500) DEFAULT NULL COMMENT '评价内容',
-    images TEXT DEFAULT NULL COMMENT '图片(JSON字符串)',
+    images LONGTEXT DEFAULT NULL COMMENT '图片(JSON字符串，base64，须用LONGTEXT)',
     auto_review TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统默认好评',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_reviews_to_user (to_user_id),
+    KEY idx_reviews_to_user (to_user_id) COMMENT '信用分按被评价者聚合',
     KEY idx_reviews_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评价表';
 
@@ -149,12 +157,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     related_id VARCHAR(100) DEFAULT NULL COMMENT '关联ID（如订单ID）',
     note VARCHAR(500) DEFAULT '' COMMENT '备注',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_tx_user (user_id)
+    KEY idx_tx_user_time (user_id, created_at) COMMENT '用户账单按时间倒序'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易流水表';
 
 -- -------------------------------------------
 -- 6. 会话表  (entity: Conversation)
---    id 为字符串：普通会话 c-<postId>-<userId>；系统通知 sys-notify-<userId>
+--    id 为字符串：普通会话 c1；系统通知 sys-notify-<userId>
 --    系统通知会话 user2_id=0（哨兵，无对应用户）
 -- -------------------------------------------
 CREATE TABLE IF NOT EXISTS conversations (
@@ -186,12 +194,12 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     content TEXT NOT NULL COMMENT '消息内容',
     type VARCHAR(20) NOT NULL DEFAULT 'text' COMMENT '类型 text/system/payment',
     time DATETIME NOT NULL COMMENT '发送时间',
-    task_id VARCHAR(50) DEFAULT NULL COMMENT '关联帖子ID',
+    task_id VARCHAR(50) DEFAULT NULL COMMENT '关联帖子ID（字符串，历史遗留）',
     task_title VARCHAR(200) DEFAULT NULL COMMENT '帖子标题',
     withdrawn TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已撤回',
     is_read TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已读',
     payment TEXT DEFAULT NULL COMMENT '付款卡片信息(JSON，type=payment 时)',
-    KEY idx_msg_chat (chat_id),
+    KEY idx_msg_chat_time (chat_id, time) COMMENT '会话内消息分页',
     KEY idx_msg_receiver (receiver_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天/系统消息表';
 
@@ -206,6 +214,5 @@ CREATE TABLE IF NOT EXISTS reports (
     reason TEXT NOT NULL COMMENT '举报理由',
     status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending 待处理 / handled 已处理',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_reports_post (post_id),
-    KEY idx_reports_status (status)
+    KEY idx_reports_post_status (post_id, status) COMMENT '管理员按帖子查 pending 举报'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='举报表';
