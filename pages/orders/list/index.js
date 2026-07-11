@@ -74,6 +74,11 @@ Page({
           canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
           canReview: order.status === 'completed',
           canDelete: FINISHED.indexOf(order.status) > -1,
+          waitingText: order.status === 'in_progress' && ((isPayer && order.payerConfirmed) || (isEarner && order.earnerConfirmed))
+            ? '你已确认完成，等待对方确认后结算（超时自动结算），之后可评价'
+            : (order.status === 'in_progress' && ((isPayer && order.earnerConfirmed) || (isEarner && order.payerConfirmed))
+              ? '对方已确认完成，请你确认'
+              : ''),
           partnerId: partnerId,
           partnerName: partnerName
         })
@@ -155,7 +160,11 @@ Page({
     }).then((ok) => {
       if (!ok) return
       orderService.confirm(item.order.id).then((order) => {
-        wx.showToast({ title: '已确认', icon: 'success' })
+        if (order && order.status === 'completed') {
+          wx.showToast({ title: '订单已完成', icon: 'success' })
+        } else {
+          wx.showToast({ title: '已确认，等待对方确认', icon: 'none' })
+        }
         this.loadOrders()
         if (order && order.status === 'completed') {
           wx.showModal({

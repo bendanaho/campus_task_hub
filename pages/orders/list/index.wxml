@@ -34,6 +34,8 @@
         <text>{{item.order.createdText}}</text>
       </view>
 
+      <view wx:if="{{item.waitingText}}" class="waiting-tip">{{item.waitingText}}</view>
+
       <view class="actions">
         <button class="btn ghost small" data-chat="{{item.order.chatId}}" catchtap="goChat">会话</button>
         <button wx:if="{{item.canAccept}}" class="btn small" data-id="{{item.order.id}}" catchtap="acceptOrder">接受</button>
