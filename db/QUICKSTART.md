@@ -49,17 +49,26 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
 ```
 
-### 3. （可选）导入测试数据
+### 3. （可选）导入演示数据
+
+> ⚠️ **环境区分，别搞混**：
+> - **dev**（默认，H2 内存库）：`DataInitializer` 会自动生成完整种子数据（8 用户/22 帖子/6 订单…，**密码统一为 `1`**），**不要**再导入 `test-data.sql`。
+> - **prod**（MySQL）：`DataInitializer` 不运行（`@Profile("!prod")`），库为空。**仅在 prod 演示时**导入本脚本。
+> - **真实上线**：不要导入任何演示数据，保持库为空让用户自行注册。
 
 ```bash
+# 仅 prod 空库演示用
 mysql -u root -p campus_task_hub < db/test-data.sql
 ```
 
-测试账号（密码均为 `123456`）：
-- `xiaoming` / `123456` - 普通用户
-- `xiaohong` / `123456` - 普通用户
+导入后的演示账号（密码均为 `123456`）：
+- `xiaoming` / `123456` - 普通用户，余额 100
+- `xiaohong` / `123456` - 普通用户，余额 50.50
 - `xiaowang` / `123456` - 未认证用户
 - `admin` / `123456` - 管理员
+
+> 若用 dev profile（H2），则用 DataInitializer 自带账号登录，密码 `1`：
+> `张三`/`李四`/`王同学`/…/`admin`（用户名即中文，密码均为 `1`）。
 
 ### 4. 启动后端服务
 
@@ -270,10 +279,11 @@ UNION ALL SELECT 'reports', COUNT(*) FROM reports;
 
 ---
 
-## 清理测试数据
+## 清理测试数据 / 上线准备
+
+### 场景 A：演示完毕，清空数据重新演示（保留表结构）
 
 ```sql
--- 仅保留表结构，清空数据
 USE campus_task_hub;
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE reports;
@@ -285,10 +295,30 @@ TRUNCATE TABLE orders;
 TRUNCATE TABLE tasks;
 TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
+-- TRUNCATE 会自动重置 AUTO_INCREMENT=1，可重新导入 test-data.sql
 ```
 
-或删除整个数据库重新创建：
+### 场景 B：正式上线（最干净）
+
+**上线时数据库应为空，不要导入 `test-data.sql`。** 如果之前导入过演示数据，重建库：
+
 ```sql
 DROP DATABASE IF EXISTS campus_task_hub;
-SOURCE db/schema.sql;
+SOURCE db/schema.sql;   -- 只建表，不插数据
+```
+
+然后启动 prod profile，用户自行注册即可。生产库初始应为 0 行用户（管理员账号也建议通过注册接口 + SQL 改 `role=1` 产生，而非用演示 admin）。
+
+### 场景 C：只删演示用户，保留真实用户
+
+```sql
+-- 删除 id<=4 的演示用户及其关联数据（注意顺序，先子表后父表）
+DELETE r  FROM reviews r  JOIN users u ON r.from_user_id=u.id  WHERE u.id<=4;
+DELETE tx FROM transactions tx WHERE tx.user_id<=4;
+DELETE m  FROM chat_messages m WHERE m.sender_id<=4 OR m.receiver_id<=4;
+DELETE c  FROM conversations c WHERE c.user1_id<=4 OR c.user2_id<=4;
+DELETE o  FROM orders o WHERE o.payer_id<=4 OR o.earner_id<=4;
+DELETE rp FROM reports rp WHERE rp.reporter_id<=4;
+DELETE t  FROM tasks t WHERE t.publisher_id<=4;
+DELETE FROM users WHERE id<=4;
 ```
