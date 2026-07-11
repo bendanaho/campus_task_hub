@@ -103,6 +103,22 @@
   padding: 14rpx 28rpx;
 }
 
+/* 实时新帖提示胶囊 */
+.new-pill {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--ink);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  padding: 14rpx 30rpx;
+  box-shadow: 0 8rpx 24rpx rgba(23, 35, 61, 0.25);
+  transition: top 0.25s ease;
+}
+
 /* 内容区：头部收起时补回等量高度，保持文档总高不变，消除滚动跳动 */
 .hall-body {
   padding: 20rpx 24rpx calc(160rpx + env(safe-area-inset-bottom));

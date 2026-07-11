@@ -1,5 +1,6 @@
 const authService = require('../../../services/auth')
 const auth = require('../../../utils/auth')
+const socket = require('../../../utils/socket')
 
 const tabPages = [
   '/pages/posts/list/index',
@@ -55,6 +56,7 @@ Page({
       password: this.data.password
     }).then((data) => {
       auth.setSession(data)
+      socket.connect()
       wx.showToast({ title: '登录成功', icon: 'success' })
       goAfterLogin(this.data.redirect)
     }).catch(function () {

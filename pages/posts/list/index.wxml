@@ -18,6 +18,13 @@
     </view>
   </view>
 
+  <view
+    wx:if="{{hasNewPosts}}"
+    class="new-pill"
+    style="top: calc({{statusBarHeight}}px + {{collapsed ? '210rpx' : '330rpx'}});"
+    bindtap="refreshFromPill"
+  >有新任务 · 点击刷新</view>
+
   <view class="hall-body {{collapsed ? 'pad' : ''}}">
     <view class="chips-row">
       <scroll-view class="chips-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">

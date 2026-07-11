@@ -35,6 +35,35 @@ App({
     this.globalData.token = token
     this.globalData.user = user
     this.initNetworkStatus()
+    this.initRealtime()
+  },
+
+  // WebSocket 实时通知：全局兜底处理（订单事件横幅 + 未读角标刷新）
+  initRealtime() {
+    const socket = require('./utils/socket')
+    const badge = require('./utils/badge')
+    if (this.globalData.token) {
+      socket.connect()
+    }
+    function refreshTopBadge() {
+      try {
+        const pages = getCurrentPages()
+        const top = pages && pages.length ? pages[pages.length - 1] : null
+        if (top) {
+          badge.refreshUnread(top)
+        }
+      } catch (e) {
+      }
+    }
+    socket.on('PERSONAL_NOTICE', function (msg) {
+      if (msg && msg.message) {
+        wx.showToast({ title: msg.message, icon: 'none', duration: 2500 })
+      }
+      refreshTopBadge()
+    })
+    socket.on('CHAT_UPDATE', function () {
+      refreshTopBadge()
+    })
   },
 
   onError(msg) {

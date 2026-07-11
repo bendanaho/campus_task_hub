@@ -3,6 +3,7 @@ const auth = require('../../../utils/auth')
 const badge = require('../../../utils/badge')
 const constants = require('../../../utils/constants')
 const format = require('../../../utils/format')
+const socket = require('../../../utils/socket')
 
 const AVATAR_COLORS = ['#2E6BFF', '#0FB77A', '#F5570B', '#8B5CF6', '#0EA5C4', '#E1518F']
 const SIDE_CLASS = {
@@ -30,7 +31,8 @@ Page({
     hasMore: false,
     loading: false,
     loggedIn: false,
-    collapsed: false
+    collapsed: false,
+    hasNewPosts: false
   },
 
   onPageScroll(e) {
@@ -51,6 +53,19 @@ Page({
     } catch (e) {
     }
     this.setData({ statusBarHeight: statusBarHeight })
+    // 大厅是常驻 tab 页不销毁，WS 订阅一次即可：有新帖/有帖被接走时提示刷新
+    const markStale = () => {
+      if (!this.data.hasNewPosts) {
+        this.setData({ hasNewPosts: true })
+      }
+    }
+    socket.on('NEW_TASK', markStale)
+    socket.on('TASK_TAKEN', markStale)
+    this.loadPosts()
+  },
+
+  refreshFromPill() {
+    wx.pageScrollTo({ scrollTop: 0, duration: 200 })
     this.loadPosts()
   },
 
@@ -199,7 +214,7 @@ Page({
 
   loadPosts() {
     this.pageNum = 0
-    this.setData({ loading: true })
+    this.setData({ loading: true, hasNewPosts: false })
     return postService.list(this.buildQuery(0)).then((res) => {
       // 新版后端返回分页对象 {list, hasMore}；兼容旧版直接返回数组
       const isPaged = res && !Array.isArray(res)

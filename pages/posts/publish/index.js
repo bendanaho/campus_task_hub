@@ -160,15 +160,28 @@ Page({
 
     this.setData({ submitting: true })
     postService.create(payload).then((data) => {
-      wx.showToast({ title: '发布成功', icon: 'success' })
       const task = data && data.task ? data.task : null
-      setTimeout(function () {
+      const go = function () {
         if (task && task.id) {
           wx.navigateTo({ url: '/pages/posts/detail/index?id=' + task.id })
         } else {
           wx.switchTab({ url: '/pages/posts/list/index' })
         }
-      }, 600)
+      }
+      // 首次发布弹一次性引导，之后只 toast
+      if (!wx.getStorageSync('campus_pub_guide_shown')) {
+        wx.setStorageSync('campus_pub_guide_shown', 1)
+        wx.showModal({
+          title: '发布成功',
+          content: '可以随时在「我的 → 我的发布」里查看和管理你发布的任务',
+          showCancel: false,
+          confirmText: '知道了',
+          complete: go
+        })
+      } else {
+        wx.showToast({ title: '发布成功', icon: 'success' })
+        setTimeout(go, 600)
+      }
     }).catch(function () {
     }).finally(() => {
       this.setData({ submitting: false })

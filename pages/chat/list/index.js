@@ -3,6 +3,7 @@ const chatService = require('../../../services/chat')
 const format = require('../../../utils/format')
 const badge = require('../../../utils/badge')
 const confirmUtil = require('../../../utils/confirm')
+const socket = require('../../../utils/socket')
 
 const SYS_PREFIX = 'sys-notify-'
 const HIDDEN_KEY = 'campus_hidden_convs'
@@ -26,6 +27,27 @@ Page({
       this.loadData()
     }
     badge.refreshUnread(this)
+    // 页面可见期间，任何会话有新内容就静默刷新列表
+    this.stopRealtime()
+    this.unsubChat = socket.on('CHAT_UPDATE', () => {
+      this.loadData()
+      badge.refreshUnread(this)
+    })
+  },
+
+  onHide() {
+    this.stopRealtime()
+  },
+
+  onUnload() {
+    this.stopRealtime()
+  },
+
+  stopRealtime() {
+    if (this.unsubChat) {
+      this.unsubChat()
+      this.unsubChat = null
+    }
   },
 
   onPullDownRefresh() {

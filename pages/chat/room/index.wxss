@@ -63,6 +63,29 @@
   overflow: hidden;
 }
 
+/* 加载骨架气泡 */
+.sk-bubble {
+  height: 72rpx;
+  width: 44%;
+  border-radius: 14rpx;
+  background: #EDF1F7;
+  margin-bottom: 26rpx;
+  animation: chat-sk-pulse 1.2s ease-in-out infinite;
+}
+
+.sk-bubble.wide {
+  width: 62%;
+}
+
+.sk-bubble.side-mine {
+  margin-left: auto;
+}
+
+@keyframes chat-sk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .msg {
   margin-bottom: 24rpx;
   display: flex;

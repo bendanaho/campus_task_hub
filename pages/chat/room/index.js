@@ -5,6 +5,7 @@ const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
 const confirm = require('../../../utils/confirm').confirm
 const settings = require('../../../utils/settings')
+const socket = require('../../../utils/socket')
 
 const SYS_PREFIX = 'sys-notify-'
 
@@ -93,14 +94,30 @@ Page({
     }
     this.stopPolling()
     this.pollTimer = setInterval(() => this.loadMessages(true), 4000)
+    // WS 即时刷新（轮询保留作兜底）
+    this.stopRealtime()
+    this.unsubChat = socket.on('CHAT_UPDATE', (msg) => {
+      if (msg && msg.chatId === this.data.chatId) {
+        this.loadMessages(true)
+      }
+    })
   },
 
   onHide() {
     this.stopPolling()
+    this.stopRealtime()
   },
 
   onUnload() {
     this.stopPolling()
+    this.stopRealtime()
+  },
+
+  stopRealtime() {
+    if (this.unsubChat) {
+      this.unsubChat()
+      this.unsubChat = null
+    }
   },
 
   stopPolling() {

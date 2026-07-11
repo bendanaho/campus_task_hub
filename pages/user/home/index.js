@@ -112,6 +112,7 @@ Page({
       }
       authService.logout().catch(function () {
       }).finally(function () {
+        require('../../../utils/socket').close()
         auth.clearSession()
         wx.showToast({ title: '已退出', icon: 'success' })
         wx.reLaunch({ url: '/pages/posts/list/index' })
