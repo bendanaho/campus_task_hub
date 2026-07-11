@@ -23,6 +23,7 @@
 --   chat_messages.chat_id                      -> conversations.id
 --   reports.post_id                            -> tasks.id
 -- ============================================
+SET NAMES utf8mb4;
 USE campus_task_hub;
 
 -- ============================================
