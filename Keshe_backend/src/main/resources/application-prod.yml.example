@@ -14,7 +14,7 @@
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/campus_task_hub?useUnicode=true&serverTimezone=Asia/Shanghai&useSSL=false&characterEncoding=utf8
+    url: jdbc:mysql://localhost:3306/campus_task_hub?useUnicode=true&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: your_password_here
