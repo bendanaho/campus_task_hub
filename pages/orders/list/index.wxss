@@ -57,6 +57,71 @@
   gap: 16rpx;
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  background: var(--surface);
+  border-radius: 999rpx;
+  padding: 0 24rpx;
+  height: 72rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.search-icon {
+  width: 22rpx;
+  height: 22rpx;
+  border: 4rpx solid var(--faint);
+  border-radius: 50%;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.search-icon::after {
+  content: '';
+  position: absolute;
+  width: 4rpx;
+  height: 12rpx;
+  background: var(--faint);
+  border-radius: 2rpx;
+  left: 18rpx;
+  top: 16rpx;
+  transform: rotate(-45deg);
+}
+
+.search-input {
+  flex: 1;
+  font-size: 26rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+}
+
+.sort-entry {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 999rpx;
+  padding: 14rpx 22rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.sort-caret {
+  font-size: 18rpx;
+  color: var(--faint);
+}
+
 .waiting-tip {
   margin-top: 18rpx;
   background: var(--amber-soft);

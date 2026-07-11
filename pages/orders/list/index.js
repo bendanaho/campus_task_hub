@@ -7,6 +7,13 @@ const badge = require('../../../utils/badge')
 const HIDDEN_KEY = 'campus_hidden_orders'
 const FINISHED = ['completed', 'cancelled', 'closed']
 
+const SORTS = [
+  { label: '最新优先', value: 'time_desc' },
+  { label: '最早优先', value: 'time_asc' },
+  { label: '金额从高到低', value: 'amount_desc' },
+  { label: '金额从低到高', value: 'amount_asc' }
+]
+
 Page({
   data: {
     tabs: [
@@ -15,6 +22,9 @@ Page({
       { label: '我收款', value: 'earner' }
     ],
     tabIndex: 0,
+    keyword: '',
+    sortIndex: 0,
+    sorts: SORTS,
     orders: [],
     loading: true,
     loggedIn: false
@@ -83,11 +93,42 @@ Page({
           partnerName: partnerName
         })
       })
-      this.setData({ orders: orders })
+      // 全量存实例属性，搜索/排序在前端做（该接口无对应参数）
+      this.allOrders = orders
+      this.applyView()
     }).catch(function () {
     }).finally(() => {
       this.setData({ loading: false })
     })
+  },
+
+  onSearchInput(e) {
+    this.setData({ keyword: e.detail.value })
+    this.applyView()
+  },
+
+  onSortChange(e) {
+    this.setData({ sortIndex: Number(e.detail.value) })
+    this.applyView()
+  },
+
+  applyView() {
+    const all = this.allOrders || []
+    const kw = (this.data.keyword || '').trim().toLowerCase()
+    let orders = !kw ? all.slice() : all.filter(function (item) {
+      return [item.title, item.partnerName, item.order.statusText].some(function (field) {
+        return field && String(field).toLowerCase().indexOf(kw) !== -1
+      })
+    })
+    const sort = this.data.sorts[this.data.sortIndex].value
+    orders.sort(function (a, b) {
+      if (sort === 'amount_desc') return Number(b.order.amount || 0) - Number(a.order.amount || 0)
+      if (sort === 'amount_asc') return Number(a.order.amount || 0) - Number(b.order.amount || 0)
+      const ta = String(a.order.createdAt || '')
+      const tb = String(b.order.createdAt || '')
+      return sort === 'time_asc' ? (ta < tb ? -1 : 1) : (ta > tb ? -1 : 1)
+    })
+    this.setData({ orders: orders })
   },
 
   // 已结束订单可从列表移除（仅本地隐藏，不影响后台记录）

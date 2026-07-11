@@ -11,6 +11,16 @@
       </view>
     </view>
 
+    <view class="toolbar section">
+      <view class="search-box">
+        <view class="search-icon"></view>
+        <input class="search-input" placeholder="搜索标题、对方或状态" value="{{keyword}}" bindinput="onSearchInput" />
+      </view>
+      <picker range="{{sorts}}" range-key="label" value="{{sortIndex}}" bindchange="onSortChange">
+        <view class="sort-entry">{{sorts[sortIndex].label}}<text class="sort-caret">▾</text></view>
+      </picker>
+    </view>
+
     <skeleton wx:if="{{loading && orders.length === 0}}" count="3" />
 
     <empty-state
