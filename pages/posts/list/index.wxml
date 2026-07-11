@@ -18,7 +18,23 @@
     </view>
   </view>
 
-  <view class="hall-body">
+  <view class="hall-body {{collapsed ? 'pad' : ''}}">
+    <view class="chips-row">
+      <scroll-view class="chips-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <view class="chips">
+          <view class="chip {{selectedCount === 0 ? 'on' : ''}}" bindtap="clearCats">全部</view>
+          <view
+            wx:for="{{categories}}"
+            wx:key="value"
+            class="chip {{selMap[item.value] ? 'on' : ''}}"
+            bindtap="toggleCat"
+            data-value="{{item.value}}"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
+      <view class="chips-more" hover-class="btn-hover" bindtap="openFilter" aria-role="button" aria-label="展开全部分类">﹀</view>
+    </view>
+
     <view class="filter-row">
       <view class="seg">
         <view
@@ -32,14 +48,6 @@
       <picker range="{{sorts}}" range-key="label" value="{{sortIndex}}" bindchange="onSortChange">
         <view class="sort-entry">{{sorts[sortIndex].label}}<text class="sort-caret">▾</text></view>
       </picker>
-      <view class="filter-entry" hover-class="btn-hover" bindtap="openFilter" aria-role="button" aria-label="分类筛选">
-        <view class="f-bars">
-          <view class="f-bar b1"></view>
-          <view class="f-bar b2"></view>
-          <view class="f-bar b3"></view>
-        </view>
-        <view wx:if="{{selectedCount > 0}}" class="f-dot">{{selectedCount}}</view>
-      </view>
     </view>
 
     <view wx:if="{{!loggedIn}}" class="login-banner">

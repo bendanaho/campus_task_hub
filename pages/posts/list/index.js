@@ -21,6 +21,7 @@ Page({
     sheetShow: false,
     tempMap: {},
     tempCount: 0,
+    selMap: {},
     selectedCount: 0,
     sides: constants.sideOptions,
     sorts: constants.sortOptions,
@@ -33,9 +34,12 @@ Page({
   },
 
   onPageScroll(e) {
-    const collapsed = e.scrollTop > 40
-    if (collapsed !== this.data.collapsed) {
-      this.setData({ collapsed: collapsed })
+    // 收起/展开用两个错开的阈值（迟滞），避免高度变化把 scrollTop 推回阈值附近来回抖
+    const t = e.scrollTop
+    if (!this.data.collapsed && t > 100) {
+      this.setData({ collapsed: true })
+    } else if (this.data.collapsed && t < 20) {
+      this.setData({ collapsed: false })
     }
   },
 
@@ -77,6 +81,34 @@ Page({
     this.loadPosts()
   },
 
+  // chips 行上的快捷多选：点一下加入/移出筛选集合并立即生效
+  toggleCat(e) {
+    const value = e.currentTarget.dataset.value
+    const cats = (this.selectedCats || []).slice()
+    const idx = cats.indexOf(value)
+    if (idx > -1) {
+      cats.splice(idx, 1)
+    } else {
+      cats.push(value)
+    }
+    this.commitCats(cats)
+  },
+
+  clearCats() {
+    if (!(this.selectedCats || []).length) {
+      return
+    }
+    this.commitCats([])
+  },
+
+  commitCats(cats) {
+    this.selectedCats = cats
+    const selMap = {}
+    cats.forEach(function (v) { selMap[v] = true })
+    this.setData({ selMap: selMap, selectedCount: cats.length })
+    this.loadPosts()
+  },
+
   openFilter() {
     const tempMap = {}
     ;(this.selectedCats || []).forEach(function (v) {
@@ -109,9 +141,8 @@ Page({
   },
 
   applyFilter() {
-    this.selectedCats = Object.keys(this.data.tempMap)
-    this.setData({ sheetShow: false, selectedCount: this.selectedCats.length })
-    this.loadPosts()
+    this.setData({ sheetShow: false })
+    this.commitCats(Object.keys(this.data.tempMap))
   },
 
   onSortChange(e) {
