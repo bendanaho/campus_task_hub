@@ -80,14 +80,6 @@ Page({
     }
   },
 
-  goOrders() {
-    wx.switchTab({ url: '/pages/orders/list/index' })
-  },
-
-  goMessages() {
-    wx.switchTab({ url: '/pages/chat/list/index' })
-  },
-
   goMine() {
     if (auth.requireLogin()) {
       wx.navigateTo({ url: '/pages/posts/mine/index' })
