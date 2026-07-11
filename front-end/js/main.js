@@ -2230,7 +2230,11 @@ function initWebSocket() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
     // 建立与后端的 WebSocket 连接
-    ws = new WebSocket('ws://localhost:8080/ws/notification/' + currentUser.id);
+    // 本地开发连本机 8080；部署后走同源相对路径，由 Nginx 反代 /ws -> 8080，协议自动跟随页面（https->wss）。
+    const wsUrl = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+        ? 'ws://localhost:8080/ws/notification/' + currentUser.id
+        : (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/notification/' + currentUser.id;
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = function() {
         console.log('【WebSocket】校园实时通知系统连接成功');

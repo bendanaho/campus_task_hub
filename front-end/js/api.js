@@ -1,5 +1,8 @@
 const USE_MOCK = false;
-const API_BASE = 'http://localhost:8080/api';
+// 本地开发（file:// 或 localhost/127.0.0.1）连本机 8080；部署后走同源相对路径 /api，由 Nginx 反代到后端。
+// 这样前端代码本地与部署通用，无需在部署时手动改。
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:')
+    ? 'http://localhost:8080/api' : '/api';
 
 // ==================== 真实后端响应处理 ====================
 
