@@ -27,7 +27,9 @@ function orderStatusLabel(value) {
     pending: '待接受',
     in_progress: '进行中',
     completed: '已完成',
-    cancelled: '已取消'
+    cancelled: '已取消',
+    disputed: '申诉处理中',
+    closed: '已结案'
   }
   return map[value] || value || '未知'
 }

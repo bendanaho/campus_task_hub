@@ -13,7 +13,7 @@
 
 .brand-subtitle {
   margin-top: 14rpx;
-  color: #758195;
+  color: var(--muted);
 }
 
 .field {
@@ -23,7 +23,7 @@
 .label {
   display: block;
   margin-bottom: 12rpx;
-  color: #5f6c80;
+  color: var(--muted);
   font-weight: 600;
 }
 

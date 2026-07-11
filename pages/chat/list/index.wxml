@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view class="chat-header">
     <view class="chat-title">聊天</view>
     <view class="chat-tools">
@@ -15,9 +15,13 @@
   <block wx:else>
     <view class="search-box">
       <view class="search-icon"></view>
-      <input class="search-input" placeholder="搜索联系人、任务或消息" value="{{keyword}}" bindinput="onSearchInput" />
+      <input class="search-input" placeholder="搜索联系人、任务或消息" value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" bindfocus="onSearchFocus" bindblur="onSearchBlur" />
     </view>
 
+    <view wx:if="{{searchFocus && !keyword && searchHistory.length > 0}}" class="hist-row">
+      <view wx:for="{{searchHistory}}" wx:key="*this" class="hist-chip" catchtap="onHistTap" data-term="{{item}}">{{item}}</view>
+      <view class="hist-clear" catchtap="onHistClear">清空</view>
+    </view>
     <view class="conversation card section sys-entry" bindtap="openSystem" hover-class="card-hover">
       <view class="avatar sys-avatar">🔔</view>
       <view class="main">

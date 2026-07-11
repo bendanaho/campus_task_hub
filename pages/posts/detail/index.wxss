@@ -7,7 +7,7 @@
 
 .desc {
   margin-top: 20rpx;
-  color: #4f5d72;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -41,13 +41,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20rpx;
-  color: #253044;
+  color: var(--ink);
 }
 
 .label {
   display: block;
   margin-bottom: 8rpx;
-  color: #8792a3;
+  color: var(--faint);
   font-size: 23rpx;
 }
 
@@ -90,7 +90,7 @@
 
 .review {
   padding: 22rpx 0;
-  border-top: 1rpx solid #edf0f5;
+  border-top: 1rpx solid var(--line);
 }
 
 .review:first-of-type {
@@ -98,13 +98,13 @@
 }
 
 .review-empty {
-  color: #8a95a6;
+  color: var(--faint);
   padding: 26rpx 0;
 }
 
 .review-content {
   margin-top: 12rpx;
-  color: #4f5d72;
+  color: var(--muted);
   line-height: 1.5;
 }
 

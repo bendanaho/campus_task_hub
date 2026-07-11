@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view class="card section">
     <view class="setting-title">聊天字号</view>
     <view class="setting-sub">聊天气泡文字的显示大小</view>

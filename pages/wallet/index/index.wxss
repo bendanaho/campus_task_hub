@@ -10,10 +10,32 @@
 
 .label {
   margin-bottom: 12rpx;
-  color: #5f6c80;
+  color: var(--muted);
   font-weight: 650;
 }
 
 .recharge {
   margin-top: 24rpx;
+}
+
+.quick-amounts {
+  display: flex;
+  gap: 16rpx;
+  margin: 16rpx 0 20rpx;
+}
+
+.quick-amount {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 600;
+  padding: 16rpx 0;
+  border-radius: 12rpx;
+  background: var(--field);
+  color: var(--muted);
+}
+
+.quick-amount.on {
+  background: var(--brand-soft);
+  color: var(--brand);
 }

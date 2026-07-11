@@ -31,6 +31,15 @@ Page({
 
   onShow() {
     this.setData({ user: auth.getUser() })
+    this.updateOwnership()
+  },
+
+  updateOwnership() {
+    const user = auth.getUser()
+    const task = this.data.task
+    this.setData({
+      isMine: !!(user && task && String(user.id) === String(task.publisherId))
+    })
   },
 
   onPullDownRefresh() {
@@ -70,6 +79,7 @@ Page({
         task: task,
         publisher: publisher
       })
+      this.updateOwnership()
       if (publisher.id) {
         return reviewService.list(publisher.id)
       }
@@ -93,6 +103,45 @@ Page({
   previewImage(e) {
     const full = this.fullImages && this.fullImages.length ? this.fullImages : this.data.task.images
     imageUtil.preview(full, Number(e.currentTarget.dataset.index))
+  },
+
+  // 下架自己的帖子（软下架，进行中订单不受影响）
+  closeMyPost() {
+    const task = this.data.task
+    if (!task) {
+      return
+    }
+    confirmUtil.confirm({
+      title: '下架帖子',
+      content: '下架后大厅不再显示「' + task.title + '」，进行中的订单不受影响'
+    }).then((ok) => {
+      if (!ok) return
+      postService.closePost(task.id).then(() => {
+        wx.showToast({ title: '已下架', icon: 'success' })
+        this.loadDetail()
+      }).catch(function () {
+      })
+    })
+  },
+
+  // 以本帖为模板再发一单：写入发布页草稿并跳转
+  repost() {
+    const task = this.data.task
+    if (!task) {
+      return
+    }
+    wx.setStorageSync('campus_pub_draft', {
+      source: 'repost',
+      ts: Date.now(),
+      title: task.title || '',
+      description: task.description || '',
+      rewardValue: Number(task.rewardValue) > 0 ? String(task.rewardValue) : '',
+      contact: task.contact || '站内联系',
+      serviceTime: task.serviceTime || '',
+      sideValue: task.publisherSide || 'payer',
+      categoryValue: task.category || ''
+    })
+    wx.switchTab({ url: '/pages/posts/publish/index' })
   },
 
   goPublisherProfile() {

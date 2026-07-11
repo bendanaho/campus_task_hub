@@ -34,6 +34,16 @@ function mine(role) {
   return request({ url: '/api/orders/mine' + query, method: 'GET' })
 }
 
+// 申诉进行中的订单（冻结资金，等待管理员仲裁）
+function dispute(id, reason) {
+  return request({
+    url: '/api/orders/' + id + '/dispute',
+    method: 'POST',
+    data: { reason: reason },
+    showLoading: true
+  })
+}
+
 module.exports = {
   create,
   accept,
@@ -41,5 +51,6 @@ module.exports = {
   confirm,
   byChat,
   history,
-  mine
+  mine,
+  dispute
 }

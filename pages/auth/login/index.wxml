@@ -1,4 +1,4 @@
-<view class="page auth-page">
+<view class="page auth-page {{themeCls}}">
   <view class="brand">
     <view class="brand-title">校园互助</view>
     <view class="brand-subtitle">使用后端账号登录，不启用微信登录</view>

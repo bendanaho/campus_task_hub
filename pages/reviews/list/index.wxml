@@ -1,4 +1,4 @@
-<view class="page reviews-page">
+<view class="page reviews-page {{themeCls}}">
   <skeleton wx:if="{{loading && !hasAny}}" count="3" />
 
   <block wx:else>

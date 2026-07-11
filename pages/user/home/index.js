@@ -4,6 +4,7 @@ const userService = require('../../../services/user')
 const confirmUtil = require('../../../utils/confirm')
 const badge = require('../../../utils/badge')
 const avatarUtil = require('../../../utils/avatar')
+const themeUtil = require('../../../utils/theme')
 
 function decorateUser(user) {
   if (!user) {
@@ -22,7 +23,9 @@ Page({
   data: {
     loggedIn: false,
     user: null,
-    balance: '--'
+    balance: '--',
+    theme: { mode: 'light', bg: 'b1' },
+    bgs: themeUtil.BGS
   },
 
   onShow() {
@@ -30,7 +33,26 @@ Page({
       this.getTabBar().setData({ selected: 4 })
     }
     badge.refreshUnread(this)
+    this.setData({ theme: themeUtil.get() })
     this.refresh()
+  },
+
+  setLight() {
+    this.applyTheme({ mode: 'light' })
+  },
+
+  setDark() {
+    this.applyTheme({ mode: 'dark' })
+  },
+
+  pickBg(e) {
+    this.applyTheme({ bg: e.currentTarget.dataset.value })
+  },
+
+  applyTheme(partial) {
+    const t = themeUtil.set(partial)
+    this.setData({ theme: t })
+    themeUtil.applyPage(this)
   },
 
   onPullDownRefresh() {

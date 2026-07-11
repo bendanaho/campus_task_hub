@@ -9,6 +9,6 @@
 .label {
   display: block;
   margin-bottom: 12rpx;
-  color: #5f6c80;
+  color: var(--muted);
   font-weight: 600;
 }

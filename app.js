@@ -1,3 +1,17 @@
+// 包装全局 Page：每个页面 onShow 自动应用外观主题（themeCls / 导航栏 / tabBar）
+const themeUtil = require('./utils/theme')
+const originalPage = Page
+Page = function (config) {
+  const originOnShow = config.onShow
+  config.onShow = function () {
+    themeUtil.applyPage(this)
+    if (originOnShow) {
+      originOnShow.apply(this, arguments)
+    }
+  }
+  return originalPage(config)
+}
+
 let realtimeLogger = null
 let realtimeLoggerInited = false
 

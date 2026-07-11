@@ -16,7 +16,7 @@
 .label {
   display: block;
   margin-bottom: 12rpx;
-  color: #5f6c80;
+  color: var(--muted);
   font-weight: 650;
 }
 
@@ -24,7 +24,7 @@
   min-height: 76rpx;
   padding: 0 20rpx;
   border-radius: 10rpx;
-  background: #f6f8fb;
+  background: var(--field);
   display: flex;
   align-items: center;
 }

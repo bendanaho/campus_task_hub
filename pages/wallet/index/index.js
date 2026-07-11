@@ -33,6 +33,10 @@ Page({
     this.setData({ amount: e.detail.value })
   },
 
+  pickAmount(e) {
+    this.setData({ amount: String(e.currentTarget.dataset.value) })
+  },
+
   recharge() {
     if (this.data.submitting) {
       return

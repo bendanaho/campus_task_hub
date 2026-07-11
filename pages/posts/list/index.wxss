@@ -50,7 +50,7 @@
 
 .hall-search {
   margin-top: 24rpx;
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 999rpx;
   display: flex;
   align-items: center;
@@ -90,7 +90,7 @@
 }
 
 .search-placeholder {
-  color: #9AA5B8;
+  color: var(--faint);
 }
 
 .search-go {
@@ -152,7 +152,7 @@
   font-size: 25rpx;
   padding: 12rpx 26rpx;
   border-radius: 999rpx;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--muted);
   box-shadow: 0 2rpx 10rpx rgba(23, 35, 61, 0.05);
 }
@@ -168,7 +168,7 @@
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: 0 2rpx 10rpx rgba(23, 35, 61, 0.05);
   color: var(--muted);
   font-size: 26rpx;
@@ -252,7 +252,7 @@
 .seg {
   flex: 1;
   display: flex;
-  background: #E9EDF5;
+  background: var(--field);
   border-radius: 16rpx;
   padding: 6rpx;
 }
@@ -267,7 +267,7 @@
 }
 
 .seg-item.on {
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ink);
   font-weight: 700;
   box-shadow: 0 2rpx 8rpx rgba(23, 35, 61, 0.08);
@@ -280,7 +280,7 @@
   gap: 6rpx;
   font-size: 24rpx;
   color: var(--muted);
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 999rpx;
   padding: 14rpx 22rpx;
   box-shadow: 0 2rpx 10rpx rgba(23, 35, 61, 0.05);
@@ -317,7 +317,7 @@
 
 /* 任务卡 */
 .post-card {
-  background: #ffffff;
+  background: var(--surface);
   border-radius: var(--radius-card);
   padding: 28rpx 30rpx;
   margin-bottom: 20rpx;
@@ -461,4 +461,27 @@
   color: #C2CAD6;
   font-size: 22rpx;
   padding: 20rpx 0 10rpx;
+}
+
+.hist-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14rpx;
+  margin-bottom: 20rpx;
+}
+
+.hist-chip {
+  font-size: 24rpx;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 999rpx;
+  padding: 10rpx 24rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.hist-clear {
+  font-size: 22rpx;
+  color: var(--faint);
+  margin-left: auto;
 }

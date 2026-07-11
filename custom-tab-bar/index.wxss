@@ -1,12 +1,15 @@
 .tab-bar {
+  --surface: #ffffff;
+  --line: #E7ECF4;
+  --faint: #98A2B5;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   display: flex;
   align-items: flex-end;
-  background: #ffffff;
-  border-top: 1rpx solid #EEF1F6;
+  background: var(--surface);
+  border-top: 1rpx solid var(--line);
   padding: 12rpx 8rpx;
   padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
   z-index: 100;
@@ -46,7 +49,7 @@
 
 .tab-text {
   font-size: 21rpx;
-  color: #98A2B5;
+  color: var(--faint);
   line-height: 1.2;
 }
 
@@ -81,7 +84,7 @@
 .fab-plus::after {
   content: '';
   position: absolute;
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 4rpx;
 }
 
@@ -99,4 +102,11 @@
   right: 0;
   height: 5rpx;
   margin-top: -2.5rpx;
+}
+
+
+.tab-bar.theme-dark {
+  --surface: #1C2230;
+  --line: #2A3346;
+  --faint: #77839A;
 }

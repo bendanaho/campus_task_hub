@@ -4,6 +4,9 @@ const format = require('../../../utils/format')
 const badge = require('../../../utils/badge')
 const confirmUtil = require('../../../utils/confirm')
 const socket = require('../../../utils/socket')
+const history = require('../../../utils/history')
+
+const HIST_KEY = 'chat'
 
 const SYS_PREFIX = 'sys-notify-'
 const HIDDEN_KEY = 'campus_hidden_convs'
@@ -12,6 +15,8 @@ Page({
   data: {
     loggedIn: false,
     keyword: '',
+    searchFocus: false,
+    searchHistory: [],
     conversations: [],
     sysConv: null,
     swipeId: '',
@@ -95,6 +100,32 @@ Page({
     this.setData({ keyword: e.detail.value })
     this.applySearch()
   },
+
+  onSearchConfirm() {
+    if (this.data.keyword.trim()) {
+      this.setData({ searchHistory: history.push(HIST_KEY, this.data.keyword) })
+    }
+  },
+
+  onHistTap(e) {
+    this.setData({ keyword: e.currentTarget.dataset.term, searchFocus: false })
+    this.applySearch()
+  },
+
+  onHistClear() {
+    this.setData({ searchHistory: history.clear(HIST_KEY) })
+  },
+
+  onSearchFocus() {
+    this.setData({ searchFocus: true, searchHistory: history.get(HIST_KEY) })
+  },
+
+  onSearchBlur() {
+    setTimeout(() => {
+      this.setData({ searchFocus: false })
+    }, 200)
+  },
+
 
   applySearch() {
     const all = this.allConversations || []

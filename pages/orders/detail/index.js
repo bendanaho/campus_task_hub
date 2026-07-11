@@ -7,7 +7,19 @@ const STATUS_CLASS = {
   pending: 'amber',
   in_progress: '',
   completed: 'green',
-  cancelled: 'gray'
+  cancelled: 'gray',
+  disputed: 'amber',
+  closed: 'gray'
+}
+
+function resolutionLabel(order) {
+  const map = {
+    refund: '仲裁结果：全额退款给付款方',
+    settle: '仲裁结果：全额结算给收款方',
+    partial: '仲裁结果：部分结算 ¥' + format.formatMoney(order.resolutionAmountToEarner) + ' 给收款方'
+  }
+  const base = map[order.resolution] || '订单已结案'
+  return order.resolutionNote ? base + '（' + order.resolutionNote + '）' : base
 }
 
 Page({
@@ -100,7 +112,11 @@ Page({
         ? '若对方未确认，将于 ' + format.formatTime(order.autoConfirmAt) + ' 自动结算'
         : '',
       canCancel: order.status === 'pending' && (isPayer || isEarner),
-      canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed))
+      canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
+      canDispute: order.status === 'in_progress' && (isPayer || isEarner),
+      disputeText: order.status === 'disputed' && order.disputeReason
+        ? '申诉理由：' + order.disputeReason
+        : (order.status === 'closed' ? resolutionLabel(order) : '')
     }
   },
 
@@ -133,6 +149,30 @@ Page({
         this.loadData()
       }).catch(function () {
       })
+    })
+  },
+
+  disputeOrder() {
+    const active = this.data.active
+    if (!active) return
+    wx.showModal({
+      title: '订单申诉',
+      editable: true,
+      placeholderText: '请填写申诉理由（必填）',
+      confirmText: '提交申诉',
+      success: (res) => {
+        if (!res.confirm) return
+        const reason = (res.content || '').trim()
+        if (!reason) {
+          wx.showToast({ title: '请填写申诉理由', icon: 'none' })
+          return
+        }
+        orderService.dispute(active.id, reason).then(() => {
+          wx.showToast({ title: '已提交申诉，等待平台仲裁', icon: 'none' })
+          this.loadData()
+        }).catch(function () {
+        })
+      }
     })
   },
 

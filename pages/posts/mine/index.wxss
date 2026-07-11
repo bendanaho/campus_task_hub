@@ -116,3 +116,63 @@
   font-size: 23rpx;
   color: var(--faint);
 }
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  background: var(--surface);
+  border-radius: 999rpx;
+  padding: 0 24rpx;
+  height: 72rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.search-icon {
+  width: 22rpx;
+  height: 22rpx;
+  border: 4rpx solid var(--faint);
+  border-radius: 50%;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.search-icon::after {
+  content: '';
+  position: absolute;
+  width: 4rpx;
+  height: 12rpx;
+  background: var(--faint);
+  border-radius: 2rpx;
+  left: 18rpx;
+  top: 16rpx;
+  transform: rotate(-45deg);
+}
+
+.search-input {
+  flex: 1;
+  font-size: 26rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+}
+
+.mine-ops {
+  margin-left: auto;
+  display: flex;
+  gap: 14rpx;
+}
+
+.mine-op {
+  font-size: 23rpx;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 999rpx;
+  padding: 8rpx 20rpx;
+}
+
+.mine-op.warn {
+  color: #D94A1F;
+  background: var(--reward-soft);
+}

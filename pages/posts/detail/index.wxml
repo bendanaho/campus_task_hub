@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view wx:if="{{loading}}" class="empty">正在加载详情...</view>
 
   <block wx:elif="{{task}}">
@@ -60,9 +60,13 @@
       </view>
     </view>
 
-    <view class="section actions">
+    <view class="section actions" wx:if="{{!isMine}}">
       <button class="btn secondary" bindtap="contactPublisher">联系 TA</button>
       <button class="btn" bindtap="respondPost">响应帖子</button>
+    </view>
+    <view class="section actions" wx:else>
+      <button wx:if="{{task.status === 'open'}}" class="btn warn" bindtap="closeMyPost">下架帖子</button>
+      <button class="btn secondary" bindtap="repost">再发一单</button>
     </view>
 
     <view class="card section">

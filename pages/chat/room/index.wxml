@@ -1,4 +1,4 @@
-<view class="page room">
+<view class="page room {{themeCls}}">
   <view class="card section chat-head">
     <view class="head-row">
       <view class="strong">{{partnerName || '会话'}}</view>
@@ -56,6 +56,12 @@
       <button class="btn small" bindtap="sendPayment">发送</button>
     </view>
   </view>
+
+  <scroll-view wx:if="{{!isSystemChat}}" class="quick-row" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+    <view class="quick-inner">
+      <view wx:for="{{quickPhrases}}" wx:key="*this" class="quick-chip" hover-class="btn-hover" bindtap="sendQuick" data-text="{{item}}">{{item}}</view>
+    </view>
+  </scroll-view>
 
   <view wx:if="{{!isSystemChat}}" class="input-bar">
     <view class="emoji-toggle" hover-class="btn-hover" bindtap="toggleEmoji">😊</view>

@@ -66,12 +66,12 @@
   margin-top: 8rpx;
   font-size: 42rpx;
   font-weight: 850;
-  color: #162033;
+  color: var(--ink);
 }
 
 .menu-item {
   min-height: 92rpx;
-  border-bottom: 1rpx solid #edf0f5;
+  border-bottom: 1rpx solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -83,4 +83,58 @@
 
 .logout {
   margin-top: 28rpx;
+}
+
+.appearance-title {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.appearance-sub {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: var(--faint);
+}
+
+.mode-seg {
+  margin-top: 18rpx;
+  display: flex;
+  background: var(--field);
+  border-radius: 16rpx;
+  padding: 6rpx;
+}
+
+.mode-item {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  padding: 14rpx 0;
+  border-radius: 12rpx;
+  color: var(--muted);
+}
+
+.mode-item.on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 2rpx 8rpx rgba(23, 35, 61, 0.08);
+}
+
+.bg-swatches {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 20rpx;
+}
+
+.bg-swatch {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  border: 3rpx solid var(--line);
+  box-sizing: border-box;
+}
+
+.bg-swatch.on {
+  border-color: var(--brand);
+  border-width: 6rpx;
 }

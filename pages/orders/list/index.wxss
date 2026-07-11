@@ -21,9 +21,9 @@
 .tab {
   min-height: 66rpx;
   border-radius: 10rpx;
-  background: #ffffff;
-  border: 1rpx solid #e1e6ee;
-  color: #667386;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,7 +50,7 @@
 
 .meta {
   margin-top: 16rpx;
-  color: #8a95a6;
+  color: var(--faint);
   font-size: 24rpx;
   display: flex;
   flex-wrap: wrap;
@@ -149,6 +149,16 @@
   padding-right: 0;
 }
 
+.order-del-hit {
+  flex: 0 0 auto;
+  width: 88rpx;
+  height: 88rpx;
+  margin: -16rpx -16rpx -16rpx auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .order-del {
   flex: 0 0 auto;
   width: 56rpx;
@@ -161,4 +171,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.hist-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14rpx;
+  margin-bottom: 20rpx;
+}
+
+.hist-chip {
+  font-size: 24rpx;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 999rpx;
+  padding: 10rpx 24rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.hist-clear {
+  font-size: 22rpx;
+  color: var(--faint);
+  margin-left: auto;
 }

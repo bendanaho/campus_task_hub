@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view class="card balance-card section">
     <view class="muted">当前余额</view>
     <view class="balance">¥{{balance}}</view>
@@ -6,7 +6,10 @@
 
   <view class="card section">
     <view class="label">充值金额</view>
-    <input class="input" type="digit" placeholder="0.01 - 100000" value="{{amount}}" bindinput="onAmountInput" />
+    <view class="quick-amounts">
+      <view wx:for="{{[10, 20, 50, 100]}}" wx:key="*this" class="quick-amount {{amount == item ? 'on' : ''}}" bindtap="pickAmount" data-value="{{item}}">¥{{item}}</view>
+    </view>
+    <input class="input" type="digit" placeholder="0.01 - 100000，或点上方快捷金额" value="{{amount}}" bindinput="onAmountInput" />
     <button class="btn recharge" disabled="{{submitting}}" loading="{{submitting}}" bindtap="recharge">确认充值</button>
   </view>
 

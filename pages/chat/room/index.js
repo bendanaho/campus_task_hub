@@ -11,6 +11,8 @@ const SYS_PREFIX = 'sys-notify-'
 
 const WITHDRAW_WINDOW = 120 * 1000
 
+const QUICK_PHRASES = ['在吗？', '多少钱？', '好的', '已到楼下', '麻烦快一点', '谢谢！']
+
 const EMOJIS = [
   '😀', '😄', '😂', '🤣', '😊', '😍', '😉', '🤔',
   '😅', '😭', '😳', '😴', '🙏', '👍', '👎', '👌',
@@ -57,6 +59,7 @@ Page({
     intoView: '',
     showEmoji: false,
     emojis: EMOJIS,
+    quickPhrases: QUICK_PHRASES,
     tradeDone: false,
     canReview: false,
     hasNewReview: false,
@@ -263,6 +266,13 @@ Page({
 
   onInput(e) {
     this.setData({ input: e.detail.value })
+  },
+
+  sendQuick(e) {
+    const text = e.currentTarget.dataset.text
+    if (text) {
+      this.pushLocalAndSend(text)
+    }
   },
 
   sendText() {

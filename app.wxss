@@ -229,3 +229,34 @@ button::after {
   align-items: center;
   justify-content: center;
 }
+
+
+/* ===== 外观主题（我的页可切换） ===== */
+.theme-light {
+  background: var(--paper);
+  min-height: 100vh;
+}
+
+.theme-light.bg-b1 { --paper: #F4F6FA; }
+.theme-light.bg-b2 { --paper: #FAF6EF; }
+.theme-light.bg-b3 { --paper: #EFF7F1; }
+.theme-light.bg-b4 { --paper: #EFF4FE; }
+.theme-light.bg-b5 { --paper: #FBF3F5; }
+
+.theme-dark {
+  --paper: #12161F;
+  --surface: #1C2230;
+  --ink: #E8EDF6;
+  --muted: #9AA5B8;
+  --faint: #77839A;
+  --line: #2A3346;
+  --field: #242C3C;
+  --brand-soft: #20304F;
+  --reward-soft: #3A2318;
+  --green-soft: #12312A;
+  --amber-soft: #33270F;
+  --shadow-card: 0 6rpx 24rpx rgba(0, 0, 0, 0.4);
+  background: var(--paper);
+  min-height: 100vh;
+  color: var(--ink);
+}

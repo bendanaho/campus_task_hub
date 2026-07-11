@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view wx:if="{{!loggedIn}}" class="card guest">
     <view class="guest-title">还没有登录</view>
     <view class="muted">登录后可以发布任务、查看订单和消息。</view>
@@ -23,6 +23,27 @@
         <view class="balance">¥{{balance}}</view>
       </view>
       <button class="btn secondary small" bindtap="goWallet">充值</button>
+    </view>
+
+    <view class="card section">
+      <view class="appearance-title">外观</view>
+      <view class="mode-seg">
+        <view class="mode-item {{theme.mode === 'light' ? 'on' : ''}}" bindtap="setLight">浅色</view>
+        <view class="mode-item {{theme.mode === 'dark' ? 'on' : ''}}" bindtap="setDark">深色</view>
+      </view>
+      <block wx:if="{{theme.mode === 'light'}}">
+        <view class="appearance-sub">背景色</view>
+        <view class="bg-swatches">
+          <view
+            wx:for="{{bgs}}"
+            wx:key="value"
+            class="bg-swatch {{theme.bg === item.value ? 'on' : ''}}"
+            style="background: {{item.color}};"
+            bindtap="pickBg"
+            data-value="{{item.value}}"
+          ></view>
+        </view>
+      </block>
     </view>
 
     <view class="card menu section">

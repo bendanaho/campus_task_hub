@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <skeleton wx:if="{{loading && !active && history.length === 0}}" count="2" />
 
   <block wx:else>
@@ -32,11 +32,13 @@
       </view>
 
       <view wx:if="{{active.autoText}}" class="auto-hint">{{active.autoText}}</view>
+      <view wx:if="{{active.disputeText}}" class="auto-hint">{{active.disputeText}}</view>
 
       <view class="actions">
         <button class="btn ghost" hover-class="btn-hover" bindtap="goChat">进入会话</button>
         <button wx:if="{{active.canCancel}}" class="btn warn" hover-class="btn-hover" bindtap="cancelOrder">取消订单</button>
         <button wx:if="{{active.canConfirm}}" class="btn" hover-class="btn-hover" bindtap="confirmOrder">确认完成</button>
+        <button wx:if="{{active.canDispute}}" class="btn ghost" hover-class="btn-hover" bindtap="disputeOrder">申诉</button>
       </view>
     </view>
 

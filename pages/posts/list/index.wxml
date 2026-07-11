@@ -1,4 +1,4 @@
-<view class="hall">
+<view class="hall {{themeCls}}">
   <view class="hall-header {{collapsed ? 'collapsed' : ''}}" style="padding-top: {{statusBarHeight}}px;">
     <view class="hall-nav"></view>
     <view class="hall-title">校园互助</view>
@@ -11,6 +11,8 @@
         placeholder-class="search-placeholder"
         value="{{keyword}}"
         bindinput="onKeywordInput"
+        bindfocus="onSearchFocus"
+        bindblur="onSearchBlur"
         confirm-type="search"
         bindconfirm="onSearch"
       />
@@ -26,6 +28,10 @@
   >有新任务 · 点击刷新</view>
 
   <view class="hall-body {{collapsed ? 'pad' : ''}}">
+    <view wx:if="{{searchFocus && !keyword && searchHistory.length > 0}}" class="hist-row">
+      <view wx:for="{{searchHistory}}" wx:key="*this" class="hist-chip" catchtap="onHistTap" data-term="{{item}}">{{item}}</view>
+      <view class="hist-clear" catchtap="onHistClear">清空</view>
+    </view>
     <view class="chips-row">
       <scroll-view class="chips-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
         <view class="chips">

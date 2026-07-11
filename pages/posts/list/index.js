@@ -4,6 +4,9 @@ const badge = require('../../../utils/badge')
 const constants = require('../../../utils/constants')
 const format = require('../../../utils/format')
 const socket = require('../../../utils/socket')
+const history = require('../../../utils/history')
+
+const HIST_KEY = 'posts'
 
 const AVATAR_COLORS = ['#2E6BFF', '#0FB77A', '#F5570B', '#8B5CF6', '#0EA5C4', '#E1518F']
 const SIDE_CLASS = {
@@ -32,7 +35,9 @@ Page({
     loading: false,
     loggedIn: false,
     collapsed: false,
-    hasNewPosts: false
+    hasNewPosts: false,
+    searchFocus: false,
+    searchHistory: []
   },
 
   onPageScroll(e) {
@@ -164,8 +169,32 @@ Page({
   },
 
   onSearch() {
+    if (this.data.keyword.trim()) {
+      this.setData({ searchHistory: history.push(HIST_KEY, this.data.keyword) })
+    }
     this.loadPosts()
   },
+
+  onHistTap(e) {
+    const term = e.currentTarget.dataset.term
+    this.setData({ keyword: term, searchFocus: false })
+    this.loadPosts()
+  },
+
+  onHistClear() {
+    this.setData({ searchHistory: history.clear(HIST_KEY) })
+  },
+
+  onSearchFocus() {
+    this.setData({ searchFocus: true, searchHistory: history.get(HIST_KEY) })
+  },
+
+  onSearchBlur() {
+    setTimeout(() => {
+      this.setData({ searchFocus: false })
+    }, 200)
+  },
+
 
   buildQuery(page) {
     return {

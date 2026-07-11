@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view wx:if="{{!loggedIn}}" class="card gate">
     <view class="gate-title">登录后才能发布帖子</view>
     <view class="muted">课设展示阶段使用后端账号密码登录。</view>
@@ -36,14 +36,15 @@
       <view class="field">
         <text class="label">金额</text>
         <input class="input" type="digit" placeholder="纯互助可不填，服务可填 0 表示面议" value="{{rewardValue}}" data-key="rewardValue" bindinput="onInput" />
+        <view wx:if="{{balanceWarn}}" class="warn-tip">{{balanceWarn}}<text class="warn-link" catchtap="goWallet"> 去充值 ›</text></view>
       </view>
       <view class="field" wx:if="{{sides[sideIndex].value == 'payer'}}">
         <text class="label">截止时间</text>
         <view class="date-row">
-          <picker mode="date" value="{{date}}" bindchange="onDateChange">
+          <picker mode="date" value="{{date}}" start="{{todayDate}}" bindchange="onDateChange">
             <view class="picker-box">{{date}}</view>
           </picker>
-          <picker mode="time" value="{{time}}" bindchange="onTimeChange">
+          <picker mode="time" value="{{time}}" start="{{date === todayDate ? nowTime : ''}}" bindchange="onTimeChange">
             <view class="picker-box">{{time}}</view>
           </picker>
         </view>

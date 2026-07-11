@@ -13,7 +13,7 @@
 }
 
 .sk-block {
-  background: #EDF1F7;
+  background: var(--field);
   border-radius: 10rpx;
   animation: sk-pulse 1.2s ease-in-out infinite;
 }

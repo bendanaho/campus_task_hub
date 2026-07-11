@@ -3,9 +3,23 @@ const orderService = require('../../../services/orders')
 const format = require('../../../utils/format')
 const confirmUtil = require('../../../utils/confirm')
 const badge = require('../../../utils/badge')
+const history = require('../../../utils/history')
+
+const HIST_KEY = 'orders'
 
 const HIDDEN_KEY = 'campus_hidden_orders'
 const FINISHED = ['completed', 'cancelled', 'closed']
+
+// 仲裁结果文案
+function resolutionLabel(order) {
+  const map = {
+    refund: '仲裁结果：全额退款给付款方',
+    settle: '仲裁结果：全额结算给收款方',
+    partial: '仲裁结果：部分结算 ¥' + format.formatMoney(order.resolutionAmountToEarner) + ' 给收款方'
+  }
+  const base = map[order.resolution] || '订单已结案'
+  return order.resolutionNote ? base + '（' + order.resolutionNote + '）' : base
+}
 
 const SORTS = [
   { label: '最新优先', value: 'time_desc' },
@@ -23,6 +37,8 @@ Page({
     ],
     tabIndex: 0,
     keyword: '',
+    searchFocus: false,
+    searchHistory: [],
     sortIndex: 0,
     sorts: SORTS,
     orders: [],
@@ -84,6 +100,10 @@ Page({
           canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
           canReview: order.status === 'completed',
           canDelete: FINISHED.indexOf(order.status) > -1,
+          canDispute: order.status === 'in_progress',
+          disputeText: order.status === 'disputed' && order.disputeReason
+            ? '申诉理由：' + order.disputeReason
+            : (order.status === 'closed' ? resolutionLabel(order) : ''),
           waitingText: order.status === 'in_progress' && ((isPayer && order.payerConfirmed) || (isEarner && order.earnerConfirmed))
             ? '你已确认完成，等待对方确认后结算（超时自动结算），之后可评价'
             : (order.status === 'in_progress' && ((isPayer && order.earnerConfirmed) || (isEarner && order.payerConfirmed))
@@ -107,6 +127,32 @@ Page({
     this.applyView()
   },
 
+  onSearchConfirm() {
+    if (this.data.keyword.trim()) {
+      this.setData({ searchHistory: history.push(HIST_KEY, this.data.keyword) })
+    }
+  },
+
+  onHistTap(e) {
+    this.setData({ keyword: e.currentTarget.dataset.term, searchFocus: false })
+    this.applyView()
+  },
+
+  onHistClear() {
+    this.setData({ searchHistory: history.clear(HIST_KEY) })
+  },
+
+  onSearchFocus() {
+    this.setData({ searchFocus: true, searchHistory: history.get(HIST_KEY) })
+  },
+
+  onSearchBlur() {
+    setTimeout(() => {
+      this.setData({ searchFocus: false })
+    }, 200)
+  },
+
+
   onSortChange(e) {
     this.setData({ sortIndex: Number(e.detail.value) })
     this.applyView()
@@ -129,6 +175,30 @@ Page({
       return sort === 'time_asc' ? (ta < tb ? -1 : 1) : (ta > tb ? -1 : 1)
     })
     this.setData({ orders: orders })
+  },
+
+  // 申诉进行中的订单，理由必填，提交后订单进入仲裁流程并冻结资金
+  disputeOrder(e) {
+    const id = e.currentTarget.dataset.id
+    wx.showModal({
+      title: '订单申诉',
+      editable: true,
+      placeholderText: '请填写申诉理由（必填）',
+      confirmText: '提交申诉',
+      success: (res) => {
+        if (!res.confirm) return
+        const reason = (res.content || '').trim()
+        if (!reason) {
+          wx.showToast({ title: '请填写申诉理由', icon: 'none' })
+          return
+        }
+        orderService.dispute(id, reason).then(() => {
+          wx.showToast({ title: '已提交申诉，等待平台仲裁', icon: 'none' })
+          this.loadOrders()
+        }).catch(function () {
+        })
+      }
+    })
   },
 
   // 已结束订单可从列表移除（仅本地隐藏，不影响后台记录）

@@ -2,6 +2,7 @@ Component({
   data: {
     selected: 0,
     unreadTotal: 0,
+    themeCls: '',
     list: [
       {
         pagePath: '/pages/posts/list/index',

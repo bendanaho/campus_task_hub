@@ -68,7 +68,7 @@
   height: 72rpx;
   width: 44%;
   border-radius: 14rpx;
-  background: #EDF1F7;
+  background: var(--field);
   margin-bottom: 26rpx;
   animation: chat-sk-pulse 1.2s ease-in-out infinite;
 }
@@ -111,7 +111,7 @@
 }
 
 .system-tip {
-  background: #EDF1F7;
+  background: var(--field);
   color: var(--muted);
   font-size: 23rpx;
   line-height: 1.5;
@@ -132,12 +132,12 @@
 
 .msg-time {
   margin-bottom: 8rpx;
-  color: #9aa4b4;
+  color: var(--faint);
   font-size: 22rpx;
 }
 
 .withdrawn-tip {
-  color: #9aa4b4;
+  color: var(--faint);
   font-size: 23rpx;
   line-height: 1.4;
 }
@@ -180,9 +180,9 @@
 }
 
 .other .bubble {
-  background: #ffffff;
-  border: 1rpx solid #e6eaf1;
-  color: #253044;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  color: var(--ink);
 }
 
 .payment-title {
@@ -225,7 +225,7 @@
   min-height: 64rpx;
   padding: 0 16rpx;
   border-radius: 10rpx;
-  background: #f6f8fb;
+  background: var(--field);
   display: flex;
   align-items: center;
 }
@@ -248,8 +248,8 @@
   width: 68rpx;
   height: 68rpx;
   border-radius: 50%;
-  background: #ffffff;
-  border: 1rpx solid #dfe4ec;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
   font-size: 38rpx;
   display: flex;
   align-items: center;
@@ -259,7 +259,7 @@
 .emoji-panel {
   flex: none;
   margin-top: 14rpx;
-  background: #ffffff;
+  background: var(--surface);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 16rpx;
@@ -283,12 +283,33 @@
   line-height: 72rpx;
   padding: 0 20rpx;
   border-radius: 12rpx;
-  background: #ffffff;
-  border: 1rpx solid #dfe4ec;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
 }
 
 .input-bar .btn {
   width: 100%;
   min-width: 0;
   padding: 0;
+}
+
+.quick-row {
+  flex: none;
+  margin-bottom: 14rpx;
+  width: 100%;
+}
+
+.quick-inner {
+  display: inline-flex;
+  gap: 14rpx;
+}
+
+.quick-chip {
+  flex: 0 0 auto;
+  font-size: 24rpx;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  border-radius: 999rpx;
+  padding: 10rpx 24rpx;
 }

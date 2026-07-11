@@ -32,9 +32,15 @@ function mine() {
   return request({ url: '/api/posts/mine', method: 'GET' })
 }
 
+// 发布者下架自己的帖子（软下架）
+function closePost(id) {
+  return request({ url: '/api/posts/' + id + '/close', method: 'POST', showLoading: true })
+}
+
 module.exports = {
   list,
   detail,
   create,
-  mine
+  mine,
+  closePost
 }

@@ -24,7 +24,7 @@
 .label {
   display: block;
   margin-bottom: 12rpx;
-  color: #5f6c80;
+  color: var(--muted);
   font-weight: 650;
 }
 
@@ -32,10 +32,10 @@
   min-height: 76rpx;
   padding: 0 20rpx;
   border-radius: 10rpx;
-  background: #f6f8fb;
+  background: var(--field);
   display: flex;
   align-items: center;
-  color: #253044;
+  color: var(--ink);
 }
 
 .date-row {
@@ -46,4 +46,19 @@
 
 .publish-btn {
   margin-top: 22rpx;
+}
+
+.warn-tip {
+  margin-top: 12rpx;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 23rpx;
+  line-height: 1.5;
+  border-radius: 12rpx;
+  padding: 12rpx 18rpx;
+}
+
+.warn-link {
+  color: var(--brand);
+  font-weight: 600;
 }

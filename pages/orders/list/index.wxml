@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeCls}}">
   <view wx:if="{{!loggedIn}}" class="card guest">
     <view class="guest-title">登录后查看订单</view>
     <button class="btn guest-btn" bindtap="goLogin">去登录</button>
@@ -14,11 +14,16 @@
     <view class="toolbar section">
       <view class="search-box">
         <view class="search-icon"></view>
-        <input class="search-input" placeholder="搜索标题、对方或状态" value="{{keyword}}" bindinput="onSearchInput" />
+        <input class="search-input" placeholder="搜索标题、对方或状态" value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" bindfocus="onSearchFocus" bindblur="onSearchBlur" />
       </view>
       <picker range="{{sorts}}" range-key="label" value="{{sortIndex}}" bindchange="onSortChange">
         <view class="sort-entry">{{sorts[sortIndex].label}}<text class="sort-caret">▾</text></view>
       </picker>
+    </view>
+
+    <view wx:if="{{searchFocus && !keyword && searchHistory.length > 0}}" class="hist-row">
+      <view wx:for="{{searchHistory}}" wx:key="*this" class="hist-chip" catchtap="onHistTap" data-term="{{item}}">{{item}}</view>
+      <view class="hist-clear" catchtap="onHistClear">清空</view>
     </view>
 
     <skeleton wx:if="{{loading && orders.length === 0}}" count="3" />
@@ -45,6 +50,7 @@
       </view>
 
       <view wx:if="{{item.waitingText}}" class="waiting-tip">{{item.waitingText}}</view>
+      <view wx:if="{{item.disputeText}}" class="waiting-tip">{{item.disputeText}}</view>
 
       <view class="actions">
         <button class="btn ghost small" data-chat="{{item.order.chatId}}" catchtap="goChat">会话</button>
@@ -52,7 +58,10 @@
         <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" catchtap="cancelOrder">取消</button>
         <button wx:if="{{item.canConfirm}}" class="btn small" data-index="{{index}}" catchtap="confirmOrder">确认完成</button>
         <button wx:if="{{item.canReview}}" class="btn secondary small" data-index="{{index}}" catchtap="goReview">评价</button>
-        <view wx:if="{{item.canDelete}}" class="order-del" data-id="{{item.order.id}}" catchtap="deleteOrder" aria-role="button" aria-label="删除记录">✕</view>
+        <button wx:if="{{item.canDispute}}" class="btn ghost small" data-id="{{item.order.id}}" catchtap="disputeOrder">申诉</button>
+        <view wx:if="{{item.canDelete}}" class="order-del-hit" data-id="{{item.order.id}}" catchtap="deleteOrder" aria-role="button" aria-label="删除记录">
+          <view class="order-del">✕</view>
+        </view>
       </view>
     </view>
   </block>
