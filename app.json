@@ -17,7 +17,8 @@
     "pages/orders/detail/index",
     "pages/user/profile/index",
     "pages/user/edit/index",
-    "pages/reviews/list/index"
+    "pages/reviews/list/index",
+    "pages/chat/settings/index"
   ],
   "window": {
     "navigationBarTextStyle": "black",

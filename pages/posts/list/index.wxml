@@ -19,23 +19,6 @@
   </view>
 
   <view class="hall-body">
-    <scroll-view class="chips-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
-      <view class="chips">
-        <view
-          class="chip {{category === '' ? 'on' : ''}}"
-          bindtap="onCategoryTap"
-          data-value=""
-        >全部</view>
-        <view
-          wx:for="{{categories}}"
-          wx:key="value"
-          class="chip {{category === item.value ? 'on' : ''}}"
-          bindtap="onCategoryTap"
-          data-value="{{item.value}}"
-        >{{item.label}}</view>
-      </view>
-    </scroll-view>
-
     <view class="filter-row">
       <view class="seg">
         <view
@@ -49,6 +32,14 @@
       <picker range="{{sorts}}" range-key="label" value="{{sortIndex}}" bindchange="onSortChange">
         <view class="sort-entry">{{sorts[sortIndex].label}}<text class="sort-caret">▾</text></view>
       </picker>
+      <view class="filter-entry" hover-class="btn-hover" bindtap="openFilter" aria-role="button" aria-label="分类筛选">
+        <view class="f-bars">
+          <view class="f-bar b1"></view>
+          <view class="f-bar b2"></view>
+          <view class="f-bar b3"></view>
+        </view>
+        <view wx:if="{{selectedCount > 0}}" class="f-dot">{{selectedCount}}</view>
+      </view>
     </view>
 
     <view wx:if="{{!loggedIn}}" class="login-banner">
@@ -98,5 +89,23 @@
 
     <view wx:if="{{hasMore}}" class="list-end">加载中…</view>
     <view wx:elif="{{posts.length > 0}}" class="list-end">— 到底啦 —</view>
+  </view>
+
+  <view wx:if="{{sheetShow}}" class="sheet-mask" bindtap="closeFilter"></view>
+  <view wx:if="{{sheetShow}}" class="filter-sheet">
+    <view class="sheet-title">按分类筛选<text class="sheet-sub">可多选</text></view>
+    <view class="sheet-tags">
+      <view
+        wx:for="{{categories}}"
+        wx:key="value"
+        class="sheet-tag {{tempMap[item.value] ? 'on' : ''}}"
+        bindtap="toggleTempCat"
+        data-value="{{item.value}}"
+      >{{item.label}}</view>
+    </view>
+    <view class="sheet-actions">
+      <view class="btn ghost sheet-btn" hover-class="btn-hover" bindtap="resetTemp">重置</view>
+      <view class="btn sheet-btn" hover-class="btn-hover" bindtap="applyFilter">确定{{tempCount > 0 ? '（' + tempCount + '）' : ''}}</view>
+    </view>
   </view>
 </view>

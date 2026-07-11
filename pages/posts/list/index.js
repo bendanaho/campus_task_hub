@@ -18,7 +18,10 @@ Page({
     keyword: '',
     sideIndex: 0,
     sortIndex: 0,
-    category: '',
+    sheetShow: false,
+    tempMap: {},
+    tempCount: 0,
+    selectedCount: 0,
     sides: constants.sideOptions,
     sorts: constants.sortOptions,
     categories: constants.categoryOptions,
@@ -74,12 +77,40 @@ Page({
     this.loadPosts()
   },
 
-  onCategoryTap(e) {
-    const value = e.currentTarget.dataset.value || ''
-    if (value === this.data.category) {
-      return
+  openFilter() {
+    const tempMap = {}
+    ;(this.selectedCats || []).forEach(function (v) {
+      tempMap[v] = true
+    })
+    this.setData({
+      sheetShow: true,
+      tempMap: tempMap,
+      tempCount: (this.selectedCats || []).length
+    })
+  },
+
+  closeFilter() {
+    this.setData({ sheetShow: false })
+  },
+
+  toggleTempCat(e) {
+    const value = e.currentTarget.dataset.value
+    const map = Object.assign({}, this.data.tempMap)
+    if (map[value]) {
+      delete map[value]
+    } else {
+      map[value] = true
     }
-    this.setData({ category: value })
+    this.setData({ tempMap: map, tempCount: Object.keys(map).length })
+  },
+
+  resetTemp() {
+    this.setData({ tempMap: {}, tempCount: 0 })
+  },
+
+  applyFilter() {
+    this.selectedCats = Object.keys(this.data.tempMap)
+    this.setData({ sheetShow: false, selectedCount: this.selectedCats.length })
     this.loadPosts()
   },
 
@@ -96,7 +127,7 @@ Page({
     return {
       side: this.data.sides[this.data.sideIndex].value,
       sort: this.data.sorts[this.data.sortIndex].value,
-      categories: this.data.category,
+      categories: (this.selectedCats || []).join(','),
       keyword: this.data.keyword,
       page: page,
       size: PAGE_SIZE

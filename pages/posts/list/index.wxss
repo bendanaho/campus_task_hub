@@ -108,38 +108,116 @@
   padding: 20rpx 24rpx calc(160rpx + env(safe-area-inset-bottom));
 }
 
-.chips-scroll {
-  width: 100%;
-}
-
-.chips {
-  display: inline-flex;
-  align-items: center;
-  gap: 14rpx;
-  padding: 4rpx 0 18rpx;
-}
-
-.chip {
-  flex: 0 0 auto;
-  font-size: 25rpx;
-  padding: 12rpx 26rpx;
-  border-radius: 999rpx;
-  background: #ffffff;
-  color: var(--muted);
-  box-shadow: 0 2rpx 10rpx rgba(23, 35, 61, 0.05);
-}
-
-.chip.on {
-  background: var(--ink);
-  color: #ffffff;
-  font-weight: 600;
-}
-
 .filter-row {
   display: flex;
   align-items: center;
   gap: 16rpx;
+  margin-top: 4rpx;
   margin-bottom: 20rpx;
+}
+
+.filter-entry {
+  flex: 0 0 auto;
+  position: relative;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2rpx 10rpx rgba(23, 35, 61, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7rpx;
+}
+
+.f-bar {
+  height: 5rpx;
+  border-radius: 3rpx;
+  background: var(--muted);
+}
+
+.f-bar.b1 { width: 30rpx; }
+.f-bar.b2 { width: 20rpx; }
+.f-bar.b3 { width: 10rpx; }
+
+.f-dot {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* 分类筛选半屏面板 */
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 35, 61, 0.45);
+  z-index: 200;
+}
+
+.filter-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 201;
+  background: var(--surface);
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 36rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.sheet-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.sheet-sub {
+  margin-left: 14rpx;
+  font-size: 23rpx;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.sheet-tags {
+  margin-top: 26rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+}
+
+.sheet-tag {
+  font-size: 26rpx;
+  padding: 16rpx 34rpx;
+  border-radius: 999rpx;
+  background: var(--field);
+  color: var(--muted);
+}
+
+.sheet-tag.on {
+  background: var(--brand);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sheet-actions {
+  margin-top: 36rpx;
+  display: flex;
+  gap: 20rpx;
+}
+
+.sheet-btn {
+  flex: 1;
 }
 
 .seg {

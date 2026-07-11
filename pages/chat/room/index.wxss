@@ -82,6 +82,31 @@
   margin-bottom: 20rpx;
 }
 
+.msg.system-msg {
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.system-tip {
+  background: #EDF1F7;
+  color: var(--muted);
+  font-size: 23rpx;
+  line-height: 1.5;
+  border-radius: 999rpx;
+  padding: 10rpx 26rpx;
+  max-width: 86%;
+  text-align: center;
+}
+
+/* 聊天字号（消息设置里可调） */
+.messages.font-small .bubble {
+  font-size: 24rpx;
+}
+
+.messages.font-large .bubble {
+  font-size: 34rpx;
+}
+
 .msg-time {
   margin-bottom: 8rpx;
   color: #9aa4b4;

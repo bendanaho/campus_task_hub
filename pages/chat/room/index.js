@@ -4,6 +4,9 @@ const orderService = require('../../../services/orders')
 const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
 const confirm = require('../../../utils/confirm').confirm
+const settings = require('../../../utils/settings')
+
+const SYS_PREFIX = 'sys-notify-'
 
 const WITHDRAW_WINDOW = 120 * 1000
 
@@ -55,21 +58,39 @@ Page({
     emojis: EMOJIS,
     tradeDone: false,
     canReview: false,
-    hasNewReview: false
+    hasNewReview: false,
+    isSystemChat: false,
+    fontClass: ''
   },
 
   onLoad(options) {
+    const chatId = decodeURIComponent(options.chatId || '')
+    const isSystemChat = chatId.indexOf(SYS_PREFIX) === 0
     this.setData({
-      chatId: decodeURIComponent(options.chatId || '')
+      chatId: chatId,
+      isSystemChat: isSystemChat
     })
+    if (isSystemChat) {
+      wx.setNavigationBarTitle({ title: '系统通知' })
+    }
   },
 
   onShow() {
     if (!auth.requireLogin()) {
       return
     }
-    this.setData({ user: auth.getUser() })
-    this.loadContext()
+    const prefs = settings.getSettings()
+    this.autoRead = prefs.autoRead
+    this.setData({
+      user: auth.getUser(),
+      fontClass: 'font-' + prefs.fontSize
+    })
+    if (this.data.isSystemChat) {
+      this.setData({ partnerName: '系统通知' })
+      this.loadMessages()
+    } else {
+      this.loadContext()
+    }
     this.stopPolling()
     this.pollTimer = setInterval(() => this.loadMessages(true), 4000)
   },
@@ -173,8 +194,9 @@ Page({
       const uid = user ? String(user.id) : ''
       const mapped = (list || []).map(function (item) {
         const payment = parsePayment(item.payment)
-        const isMine = String(item.senderId) === uid
+        const isMine = item.senderId != null && String(item.senderId) === uid
         return Object.assign({}, item, {
+          isSystem: item.type === 'system',
           isMine: isMine,
           bubbleClass: isMine ? 'mine' : 'other',
           timeText: format.formatTime(item.time),
@@ -212,7 +234,9 @@ Page({
         patch.intoView = 'msg-' + lastNew.id
       }
       this.setData(patch)
-      chatService.markRead(this.data.chatId).catch(function () {})
+      if (this.autoRead !== false) {
+        chatService.markRead(this.data.chatId).catch(function () {})
+      }
     }).catch(() => {
       if (!silent) {
         this.setData({ loading: false })

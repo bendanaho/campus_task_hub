@@ -5,22 +5,23 @@
       <text wx:if="{{tradeDone}}" class="mini-tag">交易成功</text>
       <text wx:if="{{hasNewReview}}" class="mini-tag" bindtap="goMyReviews">有新评价 ›</text>
     </view>
-    <view class="muted">{{taskTitle || '未关联帖子'}}</view>
+    <view wx:if="{{!isSystemChat}}" class="muted">{{taskTitle || '未关联帖子'}}</view>
     <view wx:if="{{activeOrder}}" class="order-line">
       订单：{{activeOrder.statusText}} / ¥{{activeOrder.amountText}}
     </view>
-    <view class="head-actions">
+    <view wx:if="{{!isSystemChat}}" class="head-actions">
       <view class="order-entry" bindtap="openOrderDetail">{{activeOrder ? '订单详情 ›' : '历史订单 ›'}}</view>
       <view wx:if="{{canReview}}" class="review-btn" hover-class="btn-hover" bindtap="goReview">去评价对方</view>
     </view>
   </view>
 
-  <scroll-view class="messages section" scroll-y scroll-into-view="{{intoView}}" enhanced show-scrollbar="{{false}}">
+  <scroll-view class="messages section {{fontClass}}" scroll-y scroll-into-view="{{intoView}}" enhanced show-scrollbar="{{false}}">
     <view wx:if="{{loading}}" class="empty">正在加载消息...</view>
     <view wx:elif="{{messages.length == 0}}" class="empty">暂无消息</view>
-    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.withdrawn ? 'withdrawn-msg' : item.bubbleClass}}">
+    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.withdrawn ? 'withdrawn-msg' : (item.isSystem ? 'system-msg' : item.bubbleClass)}}">
       <view class="msg-time">{{item.timeText}}</view>
       <view wx:if="{{item.withdrawn}}" class="withdrawn-tip">消息已撤回</view>
+      <view wx:elif="{{item.isSystem}}" class="system-tip">{{item.content}}</view>
       <view wx:else class="bubble-row">
         <view wx:if="{{item.failed}}" class="failed-badge" data-id="{{item.id}}" bindtap="resendLocal">!</view>
         <view class="bubble {{item.pending ? 'pending' : ''}}" data-id="{{item.id}}" bindlongpress="onBubbleLongpress">
@@ -41,7 +42,7 @@
     </view>
   </scroll-view>
 
-  <view class="card section pay-box">
+  <view wx:if="{{!isSystemChat}}" class="card section pay-box">
     <view class="pay-title">支付卡片</view>
     <view class="pay-row">
       <picker range="{{paymentKinds}}" range-key="label" value="{{paymentKindIndex}}" bindchange="onKindChange">
@@ -52,13 +53,13 @@
     </view>
   </view>
 
-  <view class="input-bar">
+  <view wx:if="{{!isSystemChat}}" class="input-bar">
     <view class="emoji-toggle" hover-class="btn-hover" bindtap="toggleEmoji">😊</view>
     <input class="message-input" placeholder="输入消息（长按气泡可撤回）" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="sendText" />
     <button class="btn small" bindtap="sendText">发送</button>
   </view>
 
-  <view wx:if="{{showEmoji}}" class="emoji-panel">
+  <view wx:if="{{showEmoji && !isSystemChat}}" class="emoji-panel">
     <view
       wx:for="{{emojis}}"
       wx:key="*this"

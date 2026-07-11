@@ -1,3 +1,78 @@
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 20rpx;
+}
+
+.chat-title {
+  font-size: 48rpx;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.chat-tools {
+  display: flex;
+  gap: 16rpx;
+}
+
+.tool-btn {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-size: 34rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  background: var(--surface);
+  border-radius: 999rpx;
+  padding: 0 26rpx;
+  height: 76rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.search-icon {
+  width: 24rpx;
+  height: 24rpx;
+  border: 4rpx solid var(--faint);
+  border-radius: 50%;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.search-icon::after {
+  content: '';
+  position: absolute;
+  width: 4rpx;
+  height: 12rpx;
+  background: var(--faint);
+  border-radius: 2rpx;
+  left: 20rpx;
+  top: 18rpx;
+  transform: rotate(-45deg);
+}
+
+.search-input {
+  flex: 1;
+  font-size: 27rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+}
+
+.sys-avatar {
+  background: var(--amber-soft);
+  font-size: 38rpx;
+}
+
 .guest {
   margin-top: 90rpx;
   text-align: center;

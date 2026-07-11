@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="card section">
+    <view class="setting-title">聊天字号</view>
+    <view class="setting-sub">聊天气泡文字的显示大小</view>
+    <view class="font-options">
+      <view
+        wx:for="{{fontOptions}}"
+        wx:key="value"
+        class="font-option {{fontSize === item.value ? 'on' : ''}}"
+        bindtap="onFontTap"
+        data-value="{{item.value}}"
+      >{{item.label}}</view>
+    </view>
+  </view>
+
+  <view class="card section">
+    <view class="setting-row">
+      <view>
+        <view class="setting-title">未读消息角标</view>
+        <view class="setting-sub">在底部「消息」上显示未读数量红点</view>
+      </view>
+      <switch checked="{{badgeEnabled}}" color="#2E6BFF" bindchange="onBadgeChange" />
+    </view>
+  </view>
+
+  <view class="card section">
+    <view class="setting-row">
+      <view>
+        <view class="setting-title">进入会话自动已读</view>
+        <view class="setting-sub">关闭后需手动使用消息页的清除未读</view>
+      </view>
+      <switch checked="{{autoRead}}" color="#2E6BFF" bindchange="onAutoReadChange" />
+    </view>
+  </view>
+
+  <view class="tips">设置仅保存在本机，不会同步到其他设备。</view>
+</view>

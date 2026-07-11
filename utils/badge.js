@@ -1,5 +1,6 @@
 const auth = require('./auth')
 const chatService = require('../services/chat')
+const settings = require('./settings')
 
 function setTabBadge(page, total) {
   try {
@@ -16,7 +17,7 @@ function setTabBadge(page, total) {
 }
 
 function refreshUnread(page) {
-  if (!auth.isLoggedIn()) {
+  if (!auth.isLoggedIn() || !settings.getSettings().badgeEnabled) {
     setTabBadge(page, 0)
     return Promise.resolve(0)
   }
