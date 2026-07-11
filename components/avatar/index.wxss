@@ -1,0 +1,13 @@
+.ua {
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: block;
+}
+
+.ua-color {
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}

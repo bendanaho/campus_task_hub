@@ -1,0 +1,12 @@
+<image
+  wx:if="{{d.kind === 'image'}}"
+  class="ua"
+  style="width: {{size}}rpx; height: {{size}}rpx;"
+  src="{{d.src}}"
+  mode="aspectFill"
+/>
+<view
+  wx:else
+  class="ua ua-color"
+  style="width: {{size}}rpx; height: {{size}}rpx; background: {{d.color}}; font-size: {{size * 0.38}}rpx;"
+>{{d.char}}</view>

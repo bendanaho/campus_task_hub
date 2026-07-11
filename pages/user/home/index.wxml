@@ -7,7 +7,7 @@
 
   <block wx:else>
     <view class="profile card section">
-      <view class="avatar">{{user.avatarText}}</view>
+      <ua-avatar avatar="{{user.avatarShow}}" name="{{user.username}}" uid="{{user.id}}" size="{{100}}" />
       <view class="profile-main">
         <view class="name">{{user.username}}</view>
         <view class="muted">信用分 {{user.creditScore}}</view>

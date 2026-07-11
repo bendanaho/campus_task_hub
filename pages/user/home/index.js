@@ -3,12 +3,14 @@ const authService = require('../../../services/auth')
 const userService = require('../../../services/user')
 const confirmUtil = require('../../../utils/confirm')
 const badge = require('../../../utils/badge')
+const avatarUtil = require('../../../utils/avatar')
 
 function decorateUser(user) {
   if (!user) {
     return null
   }
   return Object.assign({}, user, {
+    avatarShow: avatarUtil.getMyAvatar() || user.avatar || '',
     avatarText: user.username ? user.username.slice(0, 1) : '我',
     verifyText: user.authStatus === 'verified' ? '已实名认证' : '未实名认证',
     verifyClass: user.authStatus === 'verified' ? 'ok' : '',

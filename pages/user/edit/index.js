@@ -1,5 +1,7 @@
 const auth = require('../../../utils/auth')
 const userService = require('../../../services/user')
+const avatarUtil = require('../../../utils/avatar')
+const imageUtil = require('../../../utils/image')
 
 const PHONE_REG = /^1\d{10}$/
 const EMAIL_REG = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
@@ -34,7 +36,12 @@ Page({
     phone: '',
     email: '',
     verified: false,
-    submitting: false
+    submitting: false,
+    username: '',
+    uid: 0,
+    avatarValue: '',
+    hasCustomAvatar: false,
+    colors: avatarUtil.COLORS
   },
 
   onShow() {
@@ -42,11 +49,41 @@ Page({
       return
     }
     const user = auth.getUser() || {}
+    const my = avatarUtil.getMyAvatar()
     this.setData({
       phoneMasked: maskPhone(user.phone),
       emailMasked: maskEmail(user.email),
-      verified: user.authStatus === 'verified'
+      verified: user.authStatus === 'verified',
+      username: user.username || '',
+      uid: user.id || 0,
+      avatarValue: my || user.avatar || '',
+      hasCustomAvatar: !!my
     })
+  },
+
+  pickAvatarImage() {
+    imageUtil.chooseImages(1).then((list) => {
+      if (!list.length) {
+        return
+      }
+      avatarUtil.setMyAvatar(list[0])
+      this.setData({ avatarValue: list[0], hasCustomAvatar: true })
+      wx.showToast({ title: '头像已更新', icon: 'success' })
+    }).catch(function () {
+      wx.showToast({ title: '选图失败', icon: 'none' })
+    })
+  },
+
+  pickColor(e) {
+    const value = 'color:' + e.currentTarget.dataset.color
+    avatarUtil.setMyAvatar(value)
+    this.setData({ avatarValue: value, hasCustomAvatar: true })
+  },
+
+  resetAvatar() {
+    avatarUtil.setMyAvatar('')
+    const user = auth.getUser() || {}
+    this.setData({ avatarValue: user.avatar || '', hasCustomAvatar: false })
   },
 
   onInput(e) {

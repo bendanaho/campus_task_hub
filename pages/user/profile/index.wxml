@@ -3,7 +3,7 @@
 
   <block wx:elif="{{profile}}">
     <view class="card profile section">
-      <view class="avatar">{{profile.avatarText}}</view>
+      <ua-avatar avatar="{{profile.avatarShow}}" name="{{profile.username}}" uid="{{profile.id}}" size="{{110}}" />
       <view class="profile-main">
         <view class="name-row">
           <text class="name">{{profile.username}}</text>

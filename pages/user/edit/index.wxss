@@ -30,3 +30,56 @@
   font-size: 26rpx;
   font-weight: 600;
 }
+
+.avatar-row {
+  margin-top: 18rpx;
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.avatar-ops {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.avatar-btn {
+  min-height: 60rpx;
+}
+
+.avatar-reset {
+  font-size: 24rpx;
+  color: var(--faint);
+}
+
+.swatch-label {
+  margin-top: 28rpx;
+}
+
+.swatches {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.swatch {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  border: 4rpx solid transparent;
+  box-sizing: border-box;
+}
+
+.swatch.on {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4rpx var(--surface) inset;
+}
+
+.avatar-tip {
+  margin-top: 24rpx;
+  font-size: 22rpx;
+  color: var(--faint);
+}

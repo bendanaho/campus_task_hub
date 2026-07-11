@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "个人主页",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "ua-avatar": "/components/avatar/index"
+  }
 }

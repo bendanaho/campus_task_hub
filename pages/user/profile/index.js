@@ -2,6 +2,7 @@ const auth = require('../../../utils/auth')
 const userService = require('../../../services/user')
 const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
+const avatarUtil = require('../../../utils/avatar')
 
 // 只保留可公开展示的字段，绝不透出 phone/email/realName/studentId
 function safeProfile(user) {
@@ -68,11 +69,19 @@ Page({
           timeText: format.formatTime(item.time)
         })
       })
+      const isSelf = !!(me && String(me.id) === String(id))
+      const profile = safeProfile(user)
+      if (profile) {
+        // 头像可公开展示；本机自定义头像只对自己生效
+        profile.avatarShow = isSelf
+          ? (avatarUtil.getMyAvatar() || (user && user.avatar) || '')
+          : ((user && user.avatar) || '')
+      }
       this.setData({
-        profile: safeProfile(user),
+        profile: profile,
         reviews: list.slice(0, 3),
         reviewsTotal: list.length,
-        isSelf: !!(me && String(me.id) === String(id))
+        isSelf: isSelf
       })
     }).catch(function () {
     }).finally(() => {

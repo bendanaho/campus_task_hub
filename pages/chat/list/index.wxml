@@ -51,7 +51,7 @@
         bindtouchend="onConvTouchEnd"
         hover-class="card-hover"
       >
-        <view class="avatar">{{item.avatarText}}</view>
+        <ua-avatar avatar="{{item.partnerAvatar}}" name="{{item.partnerName}}" uid="{{item.partnerId}}" size="{{86}}" />
         <view class="main">
           <view class="space-between">
             <text class="name">{{item.partnerName}}</text>

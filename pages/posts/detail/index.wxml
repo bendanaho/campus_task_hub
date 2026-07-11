@@ -51,7 +51,7 @@
     <view class="card section" hover-class="card-hover" bindtap="goPublisherProfile">
       <view class="publisher-title">发布者信息</view>
       <view class="publisher">
-        <view class="avatar">{{publisher.avatarText}}</view>
+        <ua-avatar avatar="{{publisher.avatar}}" name="{{publisher.username || task.publisherName}}" uid="{{publisher.id}}" size="{{84}}" />
         <view>
           <view class="strong">{{publisher.username || task.publisherName}}</view>
           <view class="muted">信用分 {{publisher.creditScore || task.publisherCredit}}</view>
