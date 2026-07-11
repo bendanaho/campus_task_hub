@@ -3,12 +3,30 @@
 ## 前置条件
 
 - MySQL 8.0+ 已安装并运行
-- Maven 3.8+
-- JDK 17+
+- JDK 17+（Maven 由项目自带 `mvnw` 提供，无需全局安装）
 
 ---
 
-## 快速启动步骤
+## 一键脚本（推荐，Windows）
+
+项目根目录（`backend/`）下有两个 `.bat`，双击即用，已实测跑通：
+
+| 脚本 | 作用 |
+|------|------|
+| `start-backend.bat` | 启动后端（prod/MySQL），访问 http://localhost:8080 |
+| `reset-db.bat` | 重置数据库 + 重新导入演示数据（交互输入 MySQL 密码） |
+
+**首次使用流程**：
+1. 确认 `Keshe_backend/src/main/resources/application-prod.yml` 已配好（密码等）。
+2. 双击 `reset-db.bat` → 输入 MySQL 密码 → 建库 + 导入演示数据。
+3. 双击 `start-backend.bat` → 等待 `Started KesheBackendApplication` → 用演示账号登录测试。
+
+> 演示账号：`xiaoming` / `xiaohong` / `xiaowang` / `admin`，密码均为 `123456`。
+> 停止后端：直接关闭 .bat 窗口或 Ctrl+C。
+
+---
+
+## 快速启动步骤（手动命令行）
 
 ### 1. 创建数据库
 
