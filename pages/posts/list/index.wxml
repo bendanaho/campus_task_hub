@@ -1,5 +1,5 @@
 <view class="hall">
-  <view class="hall-header" style="padding-top: {{statusBarHeight}}px;">
+  <view class="hall-header {{collapsed ? 'collapsed' : ''}}" style="padding-top: {{statusBarHeight}}px;">
     <view class="hall-nav"></view>
     <view class="hall-title">校园互助</view>
     <view class="hall-subtitle">帮你找到愿意搭把手的同学</view>

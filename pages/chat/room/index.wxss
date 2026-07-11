@@ -18,11 +18,41 @@
   font-size: 24rpx;
 }
 
+.head-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.mini-tag {
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 20rpx;
+  font-weight: 700;
+  border-radius: 999rpx;
+  padding: 4rpx 14rpx;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .order-entry {
-  align-self: flex-start;
   color: var(--brand);
   font-size: 26rpx;
   font-weight: 600;
+}
+
+.review-btn {
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  padding: 10rpx 26rpx;
 }
 
 .messages {
@@ -161,9 +191,40 @@
 .input-bar {
   flex: none;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112rpx;
+  grid-template-columns: 68rpx minmax(0, 1fr) 112rpx;
   gap: 12rpx;
   align-items: center;
+}
+
+.emoji-toggle {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1rpx solid #dfe4ec;
+  font-size: 38rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emoji-panel {
+  flex: none;
+  margin-top: 14rpx;
+  background: #ffffff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.emoji-item {
+  width: 12.5%;
+  text-align: center;
+  font-size: 44rpx;
+  line-height: 1;
+  padding: 14rpx 0;
 }
 
 .message-input {

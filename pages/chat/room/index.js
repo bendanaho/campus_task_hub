@@ -1,10 +1,18 @@
 const auth = require('../../../utils/auth')
 const chatService = require('../../../services/chat')
 const orderService = require('../../../services/orders')
+const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
 const confirm = require('../../../utils/confirm').confirm
 
 const WITHDRAW_WINDOW = 120 * 1000
+
+const EMOJIS = [
+  '😀', '😄', '😂', '🤣', '😊', '😍', '😉', '🤔',
+  '😅', '😭', '😳', '😴', '🙏', '👍', '👎', '👌',
+  '🤝', '💪', '🎉', '❤️', '🔥', '⭐', '🌹', '🍀',
+  '🍜', '☕', '📚', '🏃', '⚽', '🎮', '🚴', '📦'
+]
 
 function parsePayment(raw) {
   if (!raw) return null
@@ -42,7 +50,12 @@ Page({
       { label: '转账', value: 'transfer' }
     ],
     activeOrder: null,
-    intoView: ''
+    intoView: '',
+    showEmoji: false,
+    emojis: EMOJIS,
+    tradeDone: false,
+    canReview: false,
+    hasNewReview: false
   },
 
   onLoad(options) {
@@ -93,10 +106,65 @@ Page({
           amountText: format.formatMoney(activeOrder.amount)
         }) : null
       })
+      this.refreshOrderExtras(activeOrder)
       this.loadMessages()
     }).catch(() => {
       this.loadMessages()
     })
+  },
+
+  // 订单完成后的附加状态：交易成功标记、是否可评价、对方是否已评价我
+  refreshOrderExtras(order) {
+    if (!order || order.status !== 'completed') {
+      this.setData({ tradeDone: false, canReview: false, hasNewReview: false })
+      return
+    }
+    this.setData({ tradeDone: true })
+    reviewService.hasReviewed(order.id).then((data) => {
+      this.setData({ canReview: !(data && data.hasReviewed) })
+    }).catch(function () {
+    })
+    const me = auth.getUser()
+    if (me && me.id) {
+      reviewService.list(me.id).then((reviews) => {
+        const mine = (reviews || []).some(function (r) {
+          return String(r.orderId) === String(order.id)
+        })
+        this.setData({ hasNewReview: mine })
+      }).catch(function () {
+      })
+    }
+  },
+
+  goReview() {
+    const order = this.data.activeOrder
+    if (!order) {
+      return
+    }
+    wx.navigateTo({
+      url: '/pages/reviews/create/index?orderId=' + order.id +
+        '&toUserId=' + this.data.partnerId +
+        '&toUserName=' + encodeURIComponent(this.data.partnerName || '对方')
+    })
+  },
+
+  goMyReviews() {
+    const me = auth.getUser()
+    if (!me || !me.id) {
+      return
+    }
+    wx.navigateTo({
+      url: '/pages/reviews/list/index?userId=' + me.id + '&name=' + encodeURIComponent(me.username || '')
+    })
+  },
+
+  toggleEmoji() {
+    this.setData({ showEmoji: !this.data.showEmoji })
+  },
+
+  onEmojiTap(e) {
+    const emoji = e.currentTarget.dataset.emoji || ''
+    this.setData({ input: this.data.input + emoji })
   },
 
   loadMessages(silent) {
@@ -161,7 +229,7 @@ Page({
     if (!content) {
       return
     }
-    this.setData({ input: '' })
+    this.setData({ input: '', showEmoji: false })
     this.pushLocalAndSend(content)
   },
 

@@ -1,11 +1,18 @@
 <view class="page room">
   <view class="card section chat-head">
-    <view class="strong">{{partnerName || '会话'}}</view>
+    <view class="head-row">
+      <view class="strong">{{partnerName || '会话'}}</view>
+      <text wx:if="{{tradeDone}}" class="mini-tag">交易成功</text>
+      <text wx:if="{{hasNewReview}}" class="mini-tag" bindtap="goMyReviews">有新评价 ›</text>
+    </view>
     <view class="muted">{{taskTitle || '未关联帖子'}}</view>
     <view wx:if="{{activeOrder}}" class="order-line">
       订单：{{activeOrder.statusText}} / ¥{{activeOrder.amountText}}
     </view>
-    <view class="order-entry" bindtap="openOrderDetail">{{activeOrder ? '订单详情 ›' : '历史订单 ›'}}</view>
+    <view class="head-actions">
+      <view class="order-entry" bindtap="openOrderDetail">{{activeOrder ? '订单详情 ›' : '历史订单 ›'}}</view>
+      <view wx:if="{{canReview}}" class="review-btn" hover-class="btn-hover" bindtap="goReview">去评价对方</view>
+    </view>
   </view>
 
   <scroll-view class="messages section" scroll-y scroll-into-view="{{intoView}}" enhanced show-scrollbar="{{false}}">
@@ -46,7 +53,19 @@
   </view>
 
   <view class="input-bar">
-    <input class="message-input" placeholder="输入消息" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="sendText" />
+    <view class="emoji-toggle" hover-class="btn-hover" bindtap="toggleEmoji">😊</view>
+    <input class="message-input" placeholder="输入消息（长按气泡可撤回）" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="sendText" />
     <button class="btn small" bindtap="sendText">发送</button>
+  </view>
+
+  <view wx:if="{{showEmoji}}" class="emoji-panel">
+    <view
+      wx:for="{{emojis}}"
+      wx:key="*this"
+      class="emoji-item"
+      hover-class="btn-hover"
+      bindtap="onEmojiTap"
+      data-emoji="{{item}}"
+    >{{item}}</view>
   </view>
 </view>

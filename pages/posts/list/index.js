@@ -25,7 +25,15 @@ Page({
     posts: [],
     hasMore: false,
     loading: false,
-    loggedIn: false
+    loggedIn: false,
+    collapsed: false
+  },
+
+  onPageScroll(e) {
+    const collapsed = e.scrollTop > 40
+    if (collapsed !== this.data.collapsed) {
+      this.setData({ collapsed: collapsed })
+    }
   },
 
   onLoad() {

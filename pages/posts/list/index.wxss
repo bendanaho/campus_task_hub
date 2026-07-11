@@ -2,12 +2,12 @@
   min-height: 100vh;
 }
 
-/* 头部：随页面上滑收起标题区，胶囊搜索吸顶 */
+/* 头部：吸顶；上滑后标题/副标题收起，只留搜索框 */
 .hall-header {
   position: sticky;
-  top: -190rpx;
+  top: 0;
   z-index: 50;
-  background: linear-gradient(155deg, #3D7BFF 0%, #2E6BFF 45%, #1746C7 100%);
+  background: linear-gradient(155deg, #7EA6FF 0%, #5B8CFF 45%, #3B6FE0 100%);
   padding-left: 28rpx;
   padding-right: 28rpx;
   padding-bottom: 26rpx;
@@ -21,16 +21,31 @@
 .hall-title {
   font-size: 44rpx;
   line-height: 60rpx;
+  max-height: 60rpx;
   font-weight: 800;
   color: #ffffff;
   letter-spacing: 1rpx;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
 }
 
 .hall-subtitle {
   margin-top: 8rpx;
   font-size: 24rpx;
   line-height: 34rpx;
+  max-height: 34rpx;
   color: rgba(255, 255, 255, 0.78);
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
+}
+
+.hall-header.collapsed .hall-title,
+.hall-header.collapsed .hall-subtitle {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
 }
 
 .hall-search {
