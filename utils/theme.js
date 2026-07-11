@@ -48,7 +48,10 @@ function applyPage(page) {
   try {
     const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
     if (tabBar) {
-      tabBar.setData({ themeCls: t.mode === 'dark' ? 'theme-dark' : '' })
+      tabBar.setData({
+        themeCls: t.mode === 'dark' ? 'theme-dark' : '',
+        accent: t.mode === 'dark' ? 'dark' : t.bg
+      })
     }
   } catch (e) {
   }

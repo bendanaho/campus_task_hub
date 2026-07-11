@@ -3,16 +3,19 @@ Component({
     selected: 0,
     unreadTotal: 0,
     themeCls: '',
+    accent: 'b1',
     list: [
       {
         pagePath: '/pages/posts/list/index',
         text: '大厅',
+        base: 'hall',
         icon: '/assets/tabbar/hall.png',
         iconActive: '/assets/tabbar/hall-active.png'
       },
       {
         pagePath: '/pages/chat/list/index',
         text: '消息',
+        base: 'chat',
         icon: '/assets/tabbar/chat.png',
         iconActive: '/assets/tabbar/chat-active.png'
       },
@@ -24,12 +27,14 @@ Component({
       {
         pagePath: '/pages/orders/list/index',
         text: '订单',
+        base: 'order',
         icon: '/assets/tabbar/order.png',
         iconActive: '/assets/tabbar/order-active.png'
       },
       {
         pagePath: '/pages/user/home/index',
         text: '我的',
+        base: 'user',
         icon: '/assets/tabbar/user.png',
         iconActive: '/assets/tabbar/user-active.png'
       }

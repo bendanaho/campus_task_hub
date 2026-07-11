@@ -110,3 +110,36 @@
   --line: #2A3346;
   --faint: #77839A;
 }
+
+
+/* 选中态与发布加号跟随外观色系 */
+.tab-bar.accent-b2 .tab-item.on .tab-text { color: #E39A45; }
+.tab-bar.accent-b3 .tab-item.on .tab-text { color: #3EB27F; }
+.tab-bar.accent-b4 .tab-item.on .tab-text { color: #4396F2; }
+.tab-bar.accent-b5 .tab-item.on .tab-text { color: #EC7AA4; }
+.tab-bar.accent-dark .tab-item.on .tab-text { color: #5B8CFF; }
+
+.tab-bar.accent-b2 .publish-fab {
+  background: linear-gradient(160deg, #EFB769, #CE7F2E);
+  box-shadow: 0 10rpx 24rpx rgba(206, 127, 46, 0.4);
+}
+
+.tab-bar.accent-b3 .publish-fab {
+  background: linear-gradient(160deg, #6FCBA0, #22946A);
+  box-shadow: 0 10rpx 24rpx rgba(34, 148, 106, 0.4);
+}
+
+.tab-bar.accent-b4 .publish-fab {
+  background: linear-gradient(160deg, #6FB6FF, #2E78D9);
+  box-shadow: 0 10rpx 24rpx rgba(46, 120, 217, 0.4);
+}
+
+.tab-bar.accent-b5 .publish-fab {
+  background: linear-gradient(160deg, #F49BBB, #D95C8C);
+  box-shadow: 0 10rpx 24rpx rgba(217, 92, 140, 0.4);
+}
+
+.tab-bar.accent-dark .publish-fab {
+  background: linear-gradient(160deg, #5B8CFF, #2E4E9E);
+  box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.5);
+}

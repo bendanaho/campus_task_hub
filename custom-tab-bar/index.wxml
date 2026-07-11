@@ -1,4 +1,4 @@
-<view class="tab-bar {{themeCls}}">
+<view class="tab-bar {{themeCls}} accent-{{accent}}">
   <view
     wx:for="{{list}}"
     wx:key="pagePath"
@@ -15,7 +15,7 @@
       <view class="tab-text">{{item.text}}</view>
     </block>
     <block wx:else>
-      <image class="tab-icon" src="{{selected === index ? item.iconActive : item.icon}}" mode="aspectFit" />
+      <image class="tab-icon" src="{{selected === index ? (accent === 'b1' ? item.iconActive : '/assets/tabbar/' + item.base + '-active-' + accent + '.png') : item.icon}}" mode="aspectFit" />
       <view wx:if="{{index === 1 && unreadTotal > 0}}" class="tab-badge">{{unreadTotal > 99 ? '99+' : unreadTotal}}</view>
       <view class="tab-text">{{item.text}}</view>
     </block>
