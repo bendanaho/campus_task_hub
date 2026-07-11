@@ -99,7 +99,8 @@ Page({
           canCancel: order.status === 'pending',
           canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
           canReview: order.status === 'completed',
-          canDelete: FINISHED.indexOf(order.status) > -1,
+          canDelete: true,
+          isFinished: FINISHED.indexOf(order.status) > -1,
           canDispute: order.status === 'in_progress',
           disputeText: order.status === 'disputed' && order.disputeReason
             ? '申诉理由：' + order.disputeReason
@@ -201,12 +202,16 @@ Page({
     })
   },
 
-  // 已结束订单可从列表移除（仅本地隐藏，不影响后台记录）
+  // 任意订单可从列表移除（仅本地隐藏，不影响订单本身与后台记录）
   deleteOrder(e) {
     const id = e.currentTarget.dataset.id
+    const item = (this.allOrders || []).find(function (o) { return o.order && o.order.id === id })
+    const active = item && !item.isFinished
     confirmUtil.confirm({
       title: '删除记录',
-      content: '仅从你的订单列表移除，不影响对方和平台记录'
+      content: active
+        ? '该订单仍在进行中：移除只影响你的列表显示，订单会照常进行与结算。确定移除？'
+        : '仅从你的订单列表移除，不影响对方和平台记录'
     }).then((ok) => {
       if (!ok) return
       const hidden = wx.getStorageSync(HIDDEN_KEY) || {}
