@@ -48,6 +48,27 @@
   margin-top: 0;
 }
 
+/* 头部渐变跟随外观设置的背景色换色系（白字可读性均已校准） */
+.theme-light.bg-b2 .hall-header {
+  background: linear-gradient(155deg, #EFB769 0%, #E39A45 45%, #CE7F2E 100%);
+}
+
+.theme-light.bg-b3 .hall-header {
+  background: linear-gradient(155deg, #6FCBA0 0%, #3EB27F 45%, #22946A 100%);
+}
+
+.theme-light.bg-b4 .hall-header {
+  background: linear-gradient(155deg, #6FB6FF 0%, #4396F2 45%, #2E78D9 100%);
+}
+
+.theme-light.bg-b5 .hall-header {
+  background: linear-gradient(155deg, #F49BBB 0%, #EC7AA4 45%, #D95C8C 100%);
+}
+
+.theme-dark .hall-header {
+  background: linear-gradient(155deg, #3A4C7A 0%, #2A3A63 45%, #1C2947 100%);
+}
+
 .hall-search {
   margin-top: 24rpx;
   background: var(--surface);
