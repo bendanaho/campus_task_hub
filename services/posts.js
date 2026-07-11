@@ -1,5 +1,6 @@
 const request = require('../utils/request')
 
+// 返回分页对象 {list, hasMore, total, page, size}（后端 dd0594e 起大厅分页）
 function list(params) {
   const query = []
   const data = params || {}

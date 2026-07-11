@@ -84,51 +84,61 @@ Page({
     this.loadPosts()
   },
 
-  loadPosts() {
-    const side = this.data.sides[this.data.sideIndex].value
-    const sort = this.data.sorts[this.data.sortIndex].value
-    this.setData({ loading: true })
-    return postService.list({
-      side: side,
-      sort: sort,
+  buildQuery(page) {
+    return {
+      side: this.data.sides[this.data.sideIndex].value,
+      sort: this.data.sorts[this.data.sortIndex].value,
       categories: this.data.category,
-      keyword: this.data.keyword
-    }).then((list) => {
-      // setData 单次上限 1MB，base64 图片不能整包带进列表：
-      // 缩略图只保留网络地址或小图，且累计不超过预算；完整图片由详情页单独拉取
-      let thumbBudget = 600 * 1024
-      const posts = (list || []).map(function (item) {
-        const hasPrice = Number(item.rewardValue) > 0
-        const first = (item.images && item.images.length) ? item.images[0] : ''
-        let thumb = ''
-        if (first) {
-          if (first.indexOf('data:') !== 0) {
-            thumb = first
-          } else if (first.length <= 150 * 1024 && thumbBudget >= first.length) {
-            thumb = first
-            thumbBudget -= first.length
-          }
+      keyword: this.data.keyword,
+      page: page,
+      size: PAGE_SIZE
+    }
+  },
+
+  decorateList(list) {
+    // setData 单次上限 1MB：缩略图只保留网络地址或小图，且累计不超过预算；
+    // 新版后端 images 为 [{full, thumb}]，旧版为字符串数组，两种都兼容
+    let thumbBudget = 600 * 1024
+    return (list || []).map(function (item) {
+      const hasPrice = Number(item.rewardValue) > 0
+      const first = (item.images && item.images.length) ? item.images[0] : ''
+      const thumbSrc = !first ? '' : (typeof first === 'string' ? first : (first.thumb || first.full || ''))
+      let thumb = ''
+      if (thumbSrc) {
+        if (thumbSrc.indexOf('data:') !== 0) {
+          thumb = thumbSrc
+        } else if (thumbSrc.length <= 150 * 1024 && thumbBudget >= thumbSrc.length) {
+          thumb = thumbSrc
+          thumbBudget -= thumbSrc.length
         }
-        return Object.assign({}, item, {
-          images: [],
-          sideText: format.sideLabel(item.publisherSide),
-          sideClass: SIDE_CLASS[item.publisherSide] || 'service',
-          publishText: format.relativeTime(item.publishTime),
-          deadlineText: item.publisherSide === 'payer' ? format.shortTime(item.deadline) : '',
-          moneyText: format.formatMoney(item.rewardValue),
-          hasPrice: hasPrice,
-          priceAlt: item.publisherSide === 'none' ? '免费互助' : (item.reward || '面议'),
-          avatarChar: item.publisherName ? item.publisherName.slice(0, 1) : '同',
-          avatarColor: AVATAR_COLORS[(Number(item.publisherId) || 0) % AVATAR_COLORS.length],
-          creditText: Number(item.publisherCredit || 0).toFixed(1),
-          thumb: thumb
-        })
+      }
+      return Object.assign({}, item, {
+        images: [],
+        sideText: format.sideLabel(item.publisherSide),
+        sideClass: SIDE_CLASS[item.publisherSide] || 'service',
+        publishText: format.relativeTime(item.publishTime),
+        deadlineText: item.publisherSide === 'payer' ? format.shortTime(item.deadline) : '',
+        moneyText: format.formatMoney(item.rewardValue),
+        hasPrice: hasPrice,
+        priceAlt: item.publisherSide === 'none' ? '免费互助' : (item.reward || '面议'),
+        avatarChar: item.publisherName ? item.publisherName.slice(0, 1) : '同',
+        avatarColor: AVATAR_COLORS[(Number(item.publisherId) || 0) % AVATAR_COLORS.length],
+        creditText: Number(item.publisherCredit || 0).toFixed(1),
+        thumb: thumb
       })
-      // 本地分批渲染：全量存实例属性，data 里只放当前批次
-      this.allPosts = posts
+    })
+  },
+
+  loadPosts() {
+    this.pageNum = 0
+    this.setData({ loading: true })
+    return postService.list(this.buildQuery(0)).then((res) => {
+      // 新版后端返回分页对象 {list, hasMore}；兼容旧版直接返回数组
+      const isPaged = res && !Array.isArray(res)
+      const posts = this.decorateList(isPaged ? res.list : res)
       this.setData({
-        posts: posts.slice(0, PAGE_SIZE),
-        hasMore: posts.length > PAGE_SIZE
+        posts: posts,
+        hasMore: isPaged ? !!res.hasMore : false
       })
     }).catch(function () {
     }).finally(() => {
@@ -137,20 +147,25 @@ Page({
   },
 
   onReachBottom() {
-    const all = this.allPosts || []
-    const current = this.data.posts.length
-    if (current >= all.length) {
-      if (this.data.hasMore) {
-        this.setData({ hasMore: false })
-      }
+    if (this.loadingMore || !this.data.hasMore) {
       return
     }
-    const end = Math.min(current + PAGE_SIZE, all.length)
-    const patch = { hasMore: end < all.length }
-    for (let i = current; i < end; i += 1) {
-      patch['posts[' + i + ']'] = all[i]
-    }
-    this.setData(patch)
+    this.loadingMore = true
+    const next = (this.pageNum || 0) + 1
+    postService.list(this.buildQuery(next)).then((res) => {
+      const data = (res && !Array.isArray(res)) ? res : { list: [], hasMore: false }
+      const items = this.decorateList(data.list)
+      this.pageNum = next
+      const start = this.data.posts.length
+      const patch = { hasMore: !!data.hasMore }
+      items.forEach(function (item, i) {
+        patch['posts[' + (start + i) + ']'] = item
+      })
+      this.setData(patch)
+    }).catch(function () {
+    }).finally(() => {
+      this.loadingMore = false
+    })
   },
 
   openDetail(e) {

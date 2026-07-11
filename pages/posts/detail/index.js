@@ -56,7 +56,15 @@ Page({
       task.publishText = format.formatTime(task.publishTime)
       task.deadlineText = format.formatTime(task.deadline)
       task.moneyText = format.formatMoney(task.rewardValue)
-      task.images = Array.isArray(task.images) ? task.images : []
+      // 新版后端 images 为 [{full, thumb}]，旧版为字符串数组：
+      // 页面网格渲染 thumb（体积小），原图存实例属性供预览，不进 setData
+      const rawImages = Array.isArray(task.images) ? task.images : []
+      this.fullImages = rawImages.map(function (img) {
+        return typeof img === 'string' ? img : (img.full || img.thumb || '')
+      }).filter(Boolean)
+      task.images = rawImages.map(function (img) {
+        return typeof img === 'string' ? img : (img.thumb || img.full || '')
+      }).filter(Boolean)
       publisher.avatarText = publisher.username ? publisher.username.slice(0, 1) : '同'
       this.setData({
         task: task,
@@ -83,7 +91,8 @@ Page({
   },
 
   previewImage(e) {
-    imageUtil.preview(this.data.task.images, Number(e.currentTarget.dataset.index))
+    const full = this.fullImages && this.fullImages.length ? this.fullImages : this.data.task.images
+    imageUtil.preview(full, Number(e.currentTarget.dataset.index))
   },
 
   goPublisherProfile() {
