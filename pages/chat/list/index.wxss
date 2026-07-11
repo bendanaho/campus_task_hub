@@ -87,6 +87,38 @@
   margin-top: 28rpx;
 }
 
+.swipe-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+}
+
+.swipe-del {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 140rpx;
+  background: #E84F3D;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+}
+
+.swipe-content {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.2s ease;
+}
+
+.swipe-content.open {
+  transform: translateX(-140rpx);
+}
+
 .conversation {
   display: flex;
   align-items: center;

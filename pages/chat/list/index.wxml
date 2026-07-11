@@ -41,17 +41,27 @@
     />
     <view wx:elif="{{conversations.length == 0 && keyword}}" class="empty">没有匹配「{{keyword}}」的会话</view>
 
-    <view wx:for="{{conversations}}" wx:key="id" class="conversation card section" data-id="{{item.id}}" bindtap="openRoom" hover-class="card-hover">
-      <view class="avatar">{{item.avatarText}}</view>
-      <view class="main">
-        <view class="space-between">
-          <text class="name">{{item.partnerName}}</text>
-          <text class="muted time">{{item.lastTimeText}}</text>
+    <view wx:for="{{conversations}}" wx:key="id" class="swipe-item section">
+      <view class="swipe-del" data-id="{{item.id}}" catchtap="deleteConv">删除</view>
+      <view
+        class="conversation card swipe-content {{swipeId === item.id ? 'open' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="openRoom"
+        bindtouchstart="onConvTouchStart"
+        bindtouchend="onConvTouchEnd"
+        hover-class="card-hover"
+      >
+        <view class="avatar">{{item.avatarText}}</view>
+        <view class="main">
+          <view class="space-between">
+            <text class="name">{{item.partnerName}}</text>
+            <text class="muted time">{{item.lastTimeText}}</text>
+          </view>
+          <view class="task">{{item.taskTitle || '普通会话'}}</view>
+          <view class="last">{{item.lastMessage || '还没有消息'}}</view>
         </view>
-        <view class="task">{{item.taskTitle || '普通会话'}}</view>
-        <view class="last">{{item.lastMessage || '还没有消息'}}</view>
+        <view wx:if="{{item.unreadCount > 0}}" class="badge">{{item.unreadCount}}</view>
       </view>
-      <view wx:if="{{item.unreadCount > 0}}" class="badge">{{item.unreadCount}}</view>
     </view>
   </block>
 </view>

@@ -81,17 +81,15 @@ Page({
     this.loadPosts()
   },
 
-  // chips 行上的快捷多选：点一下加入/移出筛选集合并立即生效
+  // chips 行是单选：点中即只筛该分类，再点一次取消回到全部；多选走「﹀」面板
   toggleCat(e) {
     const value = e.currentTarget.dataset.value
-    const cats = (this.selectedCats || []).slice()
-    const idx = cats.indexOf(value)
-    if (idx > -1) {
-      cats.splice(idx, 1)
+    const cats = this.selectedCats || []
+    if (cats.length === 1 && cats[0] === value) {
+      this.commitCats([])
     } else {
-      cats.push(value)
+      this.commitCats([value])
     }
-    this.commitCats(cats)
   },
 
   clearCats() {
