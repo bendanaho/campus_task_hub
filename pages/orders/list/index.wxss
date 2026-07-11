@@ -60,6 +60,30 @@
 .actions {
   margin-top: 22rpx;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 14rpx;
+}
+
+/* 原生 button 默认撑满整行，这里压回弹性等分，横向一排 */
+.actions .btn {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.order-del {
+  flex: 0 0 auto;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: var(--reward-soft);
+  color: #E14D0B;
+  font-size: 26rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

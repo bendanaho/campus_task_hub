@@ -4,6 +4,9 @@ const format = require('../../../utils/format')
 const confirmUtil = require('../../../utils/confirm')
 const badge = require('../../../utils/badge')
 
+const HIDDEN_KEY = 'campus_hidden_orders'
+const FINISHED = ['completed', 'cancelled', 'closed']
+
 Page({
   data: {
     tabs: [
@@ -45,7 +48,10 @@ Page({
     this.setData({ loading: true })
     return orderService.mine(role).then((list) => {
       const currentId = user ? String(user.id) : ''
-      const orders = (list || []).map(function (item) {
+      const hidden = wx.getStorageSync(HIDDEN_KEY) || {}
+      const orders = (list || []).filter(function (item) {
+        return !(item.order && hidden[item.order.id])
+      }).map(function (item) {
         const order = item.order || {}
         const post = item.post || {}
         const isPublisher = post.publisherId && String(post.publisherId) === currentId
@@ -67,6 +73,7 @@ Page({
           canCancel: order.status === 'pending',
           canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
           canReview: order.status === 'completed',
+          canDelete: FINISHED.indexOf(order.status) > -1,
           partnerId: partnerId,
           partnerName: partnerName
         })
@@ -75,6 +82,21 @@ Page({
     }).catch(function () {
     }).finally(() => {
       this.setData({ loading: false })
+    })
+  },
+
+  // 已结束订单可从列表移除（仅本地隐藏，不影响后台记录）
+  deleteOrder(e) {
+    const id = e.currentTarget.dataset.id
+    confirmUtil.confirm({
+      title: '删除记录',
+      content: '仅从你的订单列表移除，不影响对方和平台记录'
+    }).then((ok) => {
+      if (!ok) return
+      const hidden = wx.getStorageSync(HIDDEN_KEY) || {}
+      hidden[id] = true
+      wx.setStorageSync(HIDDEN_KEY, hidden)
+      this.loadOrders()
     })
   },
 

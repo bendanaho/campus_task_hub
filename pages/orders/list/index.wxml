@@ -40,6 +40,7 @@
         <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" catchtap="cancelOrder">取消</button>
         <button wx:if="{{item.canConfirm}}" class="btn small" data-index="{{index}}" catchtap="confirmOrder">确认完成</button>
         <button wx:if="{{item.canReview}}" class="btn secondary small" data-index="{{index}}" catchtap="goReview">评价</button>
+        <view wx:if="{{item.canDelete}}" class="order-del" data-id="{{item.order.id}}" catchtap="deleteOrder" aria-role="button" aria-label="删除记录">✕</view>
       </view>
     </view>
   </block>
