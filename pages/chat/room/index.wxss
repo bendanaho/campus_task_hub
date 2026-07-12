@@ -1,5 +1,8 @@
 .room {
-  min-height: 100vh;
+  /* 真机上弹性列容器必须是"确定高度"，否则 flex:1 的消息滚动区会塌成 0 高、消息不可见。
+     min-height 不算确定高度（DevTools 能容忍、真机不行），这里用 height。 */
+  height: 100vh;
+  box-sizing: border-box;
   padding: 24rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
