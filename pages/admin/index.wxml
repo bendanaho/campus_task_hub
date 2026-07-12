@@ -1,0 +1,54 @@
+<view class="page {{themeCls}}">
+  <view class="tabs section">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="*this"
+      class="tab {{tabIndex === index ? 'active' : ''}}"
+      bindtap="onTabTap"
+      data-index="{{index}}"
+    >{{item}}</view>
+  </view>
+
+  <skeleton wx:if="{{loading && disputes.length === 0 && reports.length === 0}}" count="2" />
+
+  <block wx:elif="{{tabIndex === 0}}">
+    <empty-state wx:if="{{disputes.length === 0}}" emoji="⚖️" title="暂无待仲裁的争议" />
+    <view wx:for="{{disputes}}" wx:key="id" class="card section">
+      <view class="space-between">
+        <view class="tag amber">申诉处理中</view>
+        <view class="amount">¥{{item.amountText}}</view>
+      </view>
+      <view class="d-title">{{item.postTitle}}</view>
+      <view class="d-meta">
+        <text>付款方：{{item.payerName}}</text>
+        <text>收款方：{{item.earnerName}}</text>
+      </view>
+      <view class="d-meta">
+        <text>申诉人：{{item.disputedByName}}</text>
+        <text>{{item.timeText}}</text>
+      </view>
+      <view class="d-reason">{{item.disputeReason}}</view>
+      <button class="btn" hover-class="btn-hover" data-id="{{item.id}}" bindtap="resolve">裁决</button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <empty-state wx:if="{{reports.length === 0}}" emoji="🛡️" title="暂无待处理的举报" />
+    <view wx:for="{{reports}}" wx:key="postId" class="card section">
+      <view class="space-between">
+        <view class="tag orange">被举报 {{item.reportCount}} 次</view>
+        <view class="tag {{item.status === 'open' ? 'green' : ''}}">{{item.statusText}}</view>
+      </view>
+      <view class="d-title" bindtap="openPost" data-id="{{item.postId}}">{{item.title}} ›</view>
+      <view class="d-meta"><text>发布者：{{item.publisherName}}</text></view>
+      <view wx:for="{{item.reasons}}" wx:for-item="r" wx:key="timeText" class="r-item">
+        <text class="r-name">{{r.reporterName}}：</text>{{r.reason}}
+        <text class="r-time">{{r.timeText}}</text>
+      </view>
+      <view class="d-actions">
+        <button wx:if="{{item.status === 'open'}}" class="btn warn small" hover-class="btn-hover" data-id="{{item.postId}}" bindtap="takedown">下架</button>
+        <button class="btn ghost small" hover-class="btn-hover" data-id="{{item.postId}}" bindtap="removePost">删除</button>
+      </view>
+    </view>
+  </block>
+</view>

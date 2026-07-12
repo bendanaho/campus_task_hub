@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "管理后台",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "skeleton": "/components/skeleton/index",
+    "empty-state": "/components/empty-state/index"
+  }
+}

@@ -68,6 +68,7 @@
       <button wx:if="{{task.status === 'open'}}" class="btn warn" bindtap="closeMyPost">下架帖子</button>
       <button class="btn secondary" bindtap="repost">再发一单</button>
     </view>
+    <view wx:if="{{!isMine}}" class="report-link" hover-class="btn-hover" bindtap="reportPost">对内容有疑问？举报该帖子</view>
 
     <view class="card section">
       <view class="publisher-title">收到的评价</view>

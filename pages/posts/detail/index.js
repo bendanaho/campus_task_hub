@@ -144,6 +144,46 @@ Page({
     wx.switchTab({ url: '/pages/posts/publish/index' })
   },
 
+  reportPost() {
+    if (!auth.requireLogin()) {
+      return
+    }
+    const task = this.data.task
+    if (!task) return
+    const reasons = ['虚假信息', '违规内容', '疑似诈骗', '其他']
+    wx.showActionSheet({
+      itemList: reasons,
+      success: (res) => {
+        if (reasons[res.tapIndex] !== '其他') {
+          this.submitReport(task.id, reasons[res.tapIndex])
+          return
+        }
+        wx.showModal({
+          title: '举报理由',
+          editable: true,
+          placeholderText: '请描述具体问题',
+          confirmText: '提交',
+          success: (m) => {
+            if (!m.confirm) return
+            const reason = (m.content || '').trim()
+            if (!reason) {
+              wx.showToast({ title: '请填写举报理由', icon: 'none' })
+              return
+            }
+            this.submitReport(task.id, reason)
+          }
+        })
+      }
+    })
+  },
+
+  submitReport(id, reason) {
+    postService.report(id, reason).then(function () {
+      wx.showToast({ title: '已举报，等待平台处理', icon: 'none' })
+    }).catch(function () {
+    })
+  },
+
   goPublisherProfile() {
     const publisher = this.data.publisher
     if (!publisher || !publisher.id) {

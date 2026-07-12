@@ -102,6 +102,10 @@ Page({
     }
   },
 
+  goAdmin() {
+    wx.navigateTo({ url: '/pages/admin/index' })
+  },
+
   goMine() {
     if (auth.requireLogin()) {
       wx.navigateTo({ url: '/pages/posts/mine/index' })

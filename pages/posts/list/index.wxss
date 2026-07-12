@@ -130,7 +130,7 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
-  background: var(--ink);
+  background: var(--brand);
   color: #ffffff;
   font-size: 24rpx;
   font-weight: 600;
@@ -179,7 +179,7 @@
 }
 
 .chip.on {
-  background: var(--ink);
+  background: var(--brand);
   color: #ffffff;
   font-weight: 600;
 }
@@ -316,7 +316,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, #EAF1FF, #F3F7FF);
+  background: var(--brand-soft);
   border-radius: 20rpx;
   padding: 20rpx 28rpx;
   margin-bottom: 20rpx;
@@ -324,7 +324,7 @@
 
 .login-banner-text {
   font-size: 25rpx;
-  color: #3D5FB8;
+  color: var(--brand-deep);
 }
 
 .login-banner-btn {
@@ -364,8 +364,8 @@
 }
 
 .side-tag.service {
-  background: var(--brand-soft);
-  color: var(--brand);
+  background: var(--service-soft);
+  color: var(--service);
 }
 
 .side-tag.mutual {

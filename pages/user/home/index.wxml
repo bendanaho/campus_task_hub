@@ -47,6 +47,10 @@
     </view>
 
     <view class="card menu section">
+      <view wx:if="{{user.role === 1}}" class="menu-item admin-item" bindtap="goAdmin">
+        <text>🛡️ 管理后台</text>
+        <text class="muted">仲裁 / 举报</text>
+      </view>
       <view class="menu-item" bindtap="goMine">
         <text>我的发布</text>
         <text class="muted">查看</text>

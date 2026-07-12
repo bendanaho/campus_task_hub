@@ -9,6 +9,8 @@ page {
   --surface: #FFFFFF;
   --line: #E7ECF4;
   --field: #F2F5FA;
+  --service: #2E6BFF;
+  --service-soft: #EAF1FF;
   --reward: #F5570B;
   --reward-soft: #FFF0E8;
   --green: #0FB77A;
@@ -238,10 +240,34 @@ button::after {
 }
 
 .theme-light.bg-b1 { --paper: #F4F6FA; }
-.theme-light.bg-b2 { --paper: #FAF6EF; }
-.theme-light.bg-b3 { --paper: #EFF7F1; }
-.theme-light.bg-b4 { --paper: #EFF4FE; }
-.theme-light.bg-b5 { --paper: #FBF3F5; }
+
+.theme-light.bg-b2 {
+  --paper: #FAF6EF;
+  --brand: #DB8D33;
+  --brand-deep: #B36F1F;
+  --brand-soft: #FBEFDD;
+}
+
+.theme-light.bg-b3 {
+  --paper: #EFF7F1;
+  --brand: #2FA574;
+  --brand-deep: #1F7D56;
+  --brand-soft: #E3F4EC;
+}
+
+.theme-light.bg-b4 {
+  --paper: #EFF4FE;
+  --brand: #3D8BE8;
+  --brand-deep: #2564C4;
+  --brand-soft: #E7F1FE;
+}
+
+.theme-light.bg-b5 {
+  --paper: #FBF3F5;
+  --brand: #E2699A;
+  --brand-deep: #C24677;
+  --brand-soft: #FCE9F1;
+}
 
 .theme-dark {
   --paper: #12161F;
@@ -255,6 +281,10 @@ button::after {
   --reward-soft: #3A2318;
   --green-soft: #12312A;
   --amber-soft: #33270F;
+  --brand: #5B8CFF;
+  --brand-deep: #2E4E9E;
+  --service: #5B8CFF;
+  --service-soft: #20304F;
   --shadow-card: 0 6rpx 24rpx rgba(0, 0, 0, 0.4);
   background: var(--paper);
   min-height: 100vh;

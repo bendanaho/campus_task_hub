@@ -50,8 +50,8 @@
 }
 
 .side-tag.service {
-  background: var(--brand-soft);
-  color: var(--brand);
+  background: var(--service-soft);
+  color: var(--service);
 }
 
 .side-tag.mutual {

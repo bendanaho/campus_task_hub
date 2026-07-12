@@ -32,12 +32,23 @@ function mine() {
   return request({ url: '/api/posts/mine', method: 'GET' })
 }
 
+// 举报帖子（登录用户，同人同帖仅一次待处理举报）
+function report(id, reason) {
+  return request({
+    url: '/api/posts/' + id + '/report',
+    method: 'POST',
+    data: { reason: reason },
+    showLoading: true
+  })
+}
+
 // 发布者下架自己的帖子（软下架）
 function closePost(id) {
   return request({ url: '/api/posts/' + id + '/close', method: 'POST', showLoading: true })
 }
 
 module.exports = {
+  report,
   list,
   detail,
   create,
