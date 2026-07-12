@@ -174,4 +174,5 @@ mysql -uroot -p campus_task_hub < db/test-data.sql   # 演示数据（可选）
 - **[CODE_DOCUMENTATION.md](CODE_DOCUMENTATION.md)** - 完整 API 文档、数据模型、订单状态机、争议仲裁、信用分计算、设计决策
 - **[DATABASE.md](Keshe_backend/DATABASE.md)** - 数据库设计完整说明
 - **[db/QUICKSTART.md](db/QUICKSTART.md)** - MySQL 快速启动 + 测试用例
-- **《部署速查单》.md** - 服务器部署
+- **[部署指南.md](部署指南.md)** - 服务器部署（宝塔 MySQL 5.7 + systemd + Nginx）
+- **[测试账号.md](测试账号.md)** - 测试账号、功能测试清单、常见问题
