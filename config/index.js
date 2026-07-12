@@ -6,12 +6,14 @@
 //
 // 注意：http/ws 明文地址在开发者工具和"打开调试"的真机上可用；
 // 正式发布需 https/wss + 备案域名并在微信公众平台配置合法域名。
-const ENV = 'local'
+const ENV = 'remote'
 
 const HOSTS = {
   local: 'http://localhost:8080',
   lan: 'http://192.168.1.100:8080',
-  remote: 'http://请填队友给的服务器地址:8080'
+  // 线上：Nginx 统一入口（/api 与 /ws 已反代，WebSocket 已验证可用）
+  // 线上是 MySQL 持久库，账号 xiaoming/xiaohong/xiaowang/admin，密码均 123456
+  remote: 'http://182.92.133.163:8081'
 }
 
 module.exports = {
