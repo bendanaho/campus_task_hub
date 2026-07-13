@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务大厅 · 互助校园</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <script src="../js/utils.js" defer></script>
+  <script src="../js/mock-data.js" defer></script>
+  <script src="../js/api.js" defer></script>
+  <script src="../js/main.js" defer></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            coral: '#e8553a',
+            'coral-deep': '#d4442c',
+            cream: '#fff9f2',
+            ink: '#1e3a5f',
+            'ink-soft': '#3d5a80',
+            sun: '#f5b942',
+          },
+          fontFamily: {
+            display: ['Nunito', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .font-display { font-family: 'Nunito', system-ui, sans-serif; }
+    .dot-pattern-coral {
+      background-image: radial-gradient(circle, rgba(232,85,58,0.14) 1.5px, transparent 1.5px);
+      background-size: 22px 22px;
+    }
+    .dot-pattern-white {
+      background-image: radial-gradient(circle, rgba(255,255,255,0.4) 1.5px, transparent 1.5px);
+      background-size: 20px 20px;
+    }
+    .card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+    .card-hover:hover { transform: translateY(-6px); box-shadow: 0 18px 40px -12px rgba(30,58,95,0.18); }
+    input:focus { outline: none; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .card-hover:hover { transform: none; }
+    }
+  </style>
+</head>
+<body class="bg-cream text-ink min-h-screen">
+
+  <!-- ===== 顶部导航 ===== -->
+  <header class="sticky top-0 z-30 bg-cream/90 backdrop-blur border-b border-ink/5">
+    <div class="max-w-6xl mx-auto px-4 lg:px-8 py-4">
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <!-- Logo -->
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-coral flex items-center justify-center text-xl">🤲</div>
+          <span class="font-display font-extrabold text-xl">互助校园</span>
+        </div>
+        <!-- 搜索框 -->
+        <div class="flex-1 min-w-[160px] max-w-md order-3 lg:order-2 w-full lg:w-auto">
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink/40 text-sm">🔍</span>
+            <input id="taskSearch" type="text" placeholder="搜任务、找同学…"
+              class="w-full pl-11 pr-4 py-2.5 rounded-full border-2 border-ink/10 bg-white focus:border-coral focus:ring-4 focus:ring-coral/10 transition text-sm text-ink placeholder:text-ink/30">
+          </div>
+        </div>
+        <!-- 用户区 -->
+        <div class="order-2 lg:order-3 flex items-center gap-3">
+          <button class="w-10 h-10 rounded-full bg-white border-2 border-ink/10 flex items-center justify-center hover:border-coral transition relative">
+            <span>🔔</span>
+            <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-coral"></span>
+          </button>
+          <div class="w-10 h-10 rounded-full bg-sun flex items-center justify-center font-display font-extrabold text-ink">A</div>
+        </div>
+      </div>
+
+      <!-- 分类 Tab -->
+      <nav class="flex gap-2 mt-4 overflow-x-auto pb-1" id="taskTabs">
+        <button id="tabAll" class="px-5 py-2 rounded-full bg-coral text-white font-bold text-sm whitespace-nowrap shadow-sm shadow-coral/30">✨ 全部</button>
+        <button id="tabBounty" class="px-5 py-2 rounded-full bg-white border-2 border-ink/10 text-ink-soft font-bold text-sm whitespace-nowrap hover:border-coral hover:text-coral transition">💰 悬赏</button>
+        <button id="tabService" class="px-5 py-2 rounded-full bg-white border-2 border-ink/10 text-ink-soft font-bold text-sm whitespace-nowrap hover:border-coral hover:text-coral transition">🛠️ 服务</button>
+        <button id="tabHelp" class="px-5 py-2 rounded-full bg-white border-2 border-ink/10 text-ink-soft font-bold text-sm whitespace-nowrap hover:border-coral hover:text-coral transition">🤝 互助</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== Hero 横幅 ===== -->
+  <section class="max-w-6xl mx-auto px-4 lg:px-8 pt-6">
+    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-coral to-coral-deep text-white p-6 lg:p-8">
+      <div class="absolute inset-0 dot-pattern-white opacity-40"></div>
+      <div class="absolute -right-6 -bottom-10 text-[9rem] leading-none opacity-20 select-none">🌈</div>
+      <div class="relative z-10">
+        <h1 class="font-display font-extrabold text-2xl lg:text-3xl">今天，想帮谁一把？</h1>
+        <p class="text-white/85 mt-1.5 text-sm lg:text-base">46 个同学正在等待搭把手 · 本周已促成 128 次互助</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 任务列表 ===== -->
+  <main class="max-w-6xl mx-auto px-4 lg:px-8 py-8">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="font-display font-extrabold text-xl flex items-center gap-2">
+        最新任务
+        <svg width="80" height="10" viewBox="0 0 80 10" fill="none" aria-hidden="true">
+          <path d="M3 6 Q 14 1, 28 5 T 56 6 T 77 5" stroke="#f5b942" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </h2>
+      <span class="text-sm text-ink-soft">共 6 条</span>
+    </div>
+
+    <div id="taskList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+      <!-- 卡片 1：代取快递 · 悬赏(payer) · 有图 -->
+      <article class="card-hover bg-white rounded-3xl shadow-sm shadow-ink/5 overflow-hidden border border-ink/5 flex flex-col">
+        <div class="relative h-40 overflow-hidden">
+          <img src="https://picsum.photos/seed/parcel/400/300" alt="快递" class="w-full h-full object-cover">
+          <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-coral text-white text-xs font-bold shadow-md">悬赏</span>
+        </div>
+        <div class="p-5 flex flex-col flex-1">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-ink-soft mb-2">
+            <span class="text-base">📦</span> 代取快递
+          </div>
+          <h3 class="font-display font-extrabold text-lg leading-snug">帮取菜鸟驿站快递</h3>
+          <p class="text-sm text-ink-soft mt-1.5 line-clamp-2">件有点重，从南区驿站搬到北区7栋，今天下午方便的同学来一下～</p>
+          <div class="flex items-center gap-2 mt-3 text-xs text-ink-soft">
+            <div class="w-6 h-6 rounded-full bg-coral/15 flex items-center justify-center font-bold text-coral">陈</div>
+            <span class="font-bold text-ink">小陈</span>
+            <span class="text-ink/30">·</span>
+            <span>10 分钟前</span>
+          </div>
+          <div class="flex items-end justify-between mt-4 pt-3 border-t border-ink/5">
+            <span class="text-xs text-ink-soft">悬赏报酬</span>
+            <span class="font-display font-extrabold text-xl text-coral">¥8</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 2：学习辅导 · 服务(earner) · 有图 -->
+      <article class="card-hover bg-white rounded-3xl shadow-sm shadow-ink/5 overflow-hidden border border-ink/5 flex flex-col">
+        <div class="relative h-40 overflow-hidden">
+          <img src="https://picsum.photos/seed/tutor/400/300" alt="辅导" class="w-full h-full object-cover">
+          <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-sun text-ink text-xs font-bold shadow-md">服务</span>
+        </div>
+        <div class="p-5 flex flex-col flex-1">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-ink-soft mb-2">
+            <span class="text-base">📚</span> 学习辅导
+          </div>
+          <h3 class="font-display font-extrabold text-lg leading-snug">高数期中冲刺辅导</h3>
+          <p class="text-sm text-ink-soft mt-1.5 line-clamp-2">大三数学专业，带过三届辅导，线上线下都行，讲到你懂为止。</p>
+          <div class="flex items-center gap-2 mt-3 text-xs text-ink-soft">
+            <div class="w-6 h-6 rounded-full bg-sun/30 flex items-center justify-center font-bold text-ink">明</div>
+            <span class="font-bold text-ink">学长阿明</span>
+            <span class="text-ink/30">·</span>
+            <span>1 小时前</span>
+          </div>
+          <div class="flex items-end justify-between mt-4 pt-3 border-t border-ink/5">
+            <span class="text-xs text-ink-soft">服务报价</span>
+            <span class="font-display font-extrabold text-xl text-coral">¥50<span class="text-sm font-bold text-ink-soft">/小时</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 3：二手交易 · 互助(none) · 有图 -->
+      <article class="card-hover bg-white rounded-3xl shadow-sm shadow-ink/5 overflow-hidden border border-ink/5 flex flex-col">
+        <div class="relative h-40 overflow-hidden">
+          <img src="https://picsum.photos/seed/secondhand/400/300" alt="二手" class="w-full h-full object-cover">
+          <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-ink text-white text-xs font-bold shadow-md">互助</span>
+        </div>
+        <div class="p-5 flex flex-col flex-1">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-ink-soft mb-2">
+            <span class="text-base">🛍️</span> 二手交易
+          </div>
+          <h3 class="font-display font-extrabold text-lg leading-snug">九成新蓝牙音箱转让</h3>
+          <p class="text-sm text-ink-soft mt-1.5 line-clamp-2">毕业带不走，JBL Flip5，无磕碰声音很顶，原价 500，学姐诚信出。</p>
+          <div class="flex items-center gap-2 mt-3 text-xs text-ink-soft">
+            <div class="w-6 h-6 rounded-full bg-ink/10 flex items-center justify-center font-bold text-ink">5</div>
+            <span class="font-bold text-ink">宿舍305</span>
+            <span class="text-ink/30">·</span>
+            <span>3 小时前</span>
+          </div>
+          <div class="flex items-end justify-between mt-4 pt-3 border-t border-ink/5">
+            <span class="text-xs text-ink-soft">转让价</span>
+            <span class="font-display font-extrabold text-xl text-coral">¥60</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 4：组队互助 · 互助(none) · 无图 -->
+      <article class="card-hover bg-white rounded-3xl shadow-sm shadow-ink/5 overflow-hidden border border-ink/5 flex flex-col">
+        <div class="relative h-32 bg-sun/15 flex items-center justify-center overflow-hidden">
+          <div class="absolute inset-0 dot-pattern-coral opacity-60"></div>
+          <span class="text-6xl relative z-10">🤝</span>
+          <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-ink text-white text-xs font-bold shadow-md">互助</span>
+        </div>
+        <div class="p-5 flex flex-col flex-1">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-ink-soft mb-2">
+            <span class="text-base">🤝</span> 组队互助
+          </div>
+          <h3 class="font-display font-extrabold text-lg leading-snug">互联网+大赛求组队</h3>
+          <p class="text-sm text-ink-soft mt-1.5 line-clamp-2">缺一个前端和一个写文案的，已有指导老师，方向是助老出行。</p>
+          <div class="flex items-center gap-2 mt-3 text-xs text-ink-soft">
+            <div class="w-6 h-6 rounded-full bg-sun/30 flex items-center justify-center font-bold text-ink">张</div>
+            <span class="font-bold text-ink">创业小张</span>
+            <span class="text-ink/30">·</span>
+            <span>昨天</span>
+          </div>
+          <div class="flex items-end justify-between mt-4 pt-3 border-t border-ink/5">
+            <span class="text-xs text-ink-soft">互助方式</span>
+            <span class="font-display font-extrabold text-base text-ink">组队 · 共同获奖</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 5：技术服务 · 服务(earner) · 无图 -->
+      <article class="card-hover bg-white rounded-3xl shadow-sm shadow-ink/5 overflow-hidden border border-ink/5 flex flex-col">
+        <div class="relative h-32 bg-ink/5 flex items-center justify-center overflow-hidden">
+          <div class="absolute inset-0 dot-pattern-coral opacity-50"></div>
+          <span class="text-6xl relative z-10">💻</span>
+          <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-sun text-ink text-xs font-bold shadow-md">服务</span>
+        </div>
+        <div class="p-5 flex flex-col flex-1">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-ink-soft mb-2">
+            <span class="text-base">💻</span> 技术服务
+          </div>
+          <h3 class="font-display font-extrabold text-lg leading-snug">代做课程设计小程序</h3>
+          <p class="text-sm text-ink-soft mt-1.5 line-clamp-2">熟练 uni-app / Vue，可包答辩讲解，本周内交付，诚信第一。</p>
+          <div class="flex items-center gap-2 mt-3 text-xs text-ink-soft">
+            <div class="w-6 h-6 rounded-full bg-ink/10 flex items-center justify-center font-bold text-ink">王</div>
+            <span class="font-bold text-ink">计科老王</span>
+            <span class="text-ink/30">·</span>
+            <span>2 天前</span>
+          </div>
+          <div class="flex items-end justify-between mt-4 pt-3 border-t border-ink/5">
+            <span class="text-xs text-ink-soft">服务报价</span>
+            <span class="font-display font-extrabold text-xl text-coral">¥200<span class="text-sm font-bold text-ink-soft">起</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 6：生活服务 · 悬赏(payer) · 无图 -->
+      <article class="card-hover bg-white rounded-3xl shadow-sm shadow-ink/5 overflow-hidden border border-ink/5 flex flex-col">
+        <div class="relative h-32 bg-coral/10 flex items-center justify-center overflow-hidden">
+          <div class="absolute inset-0 dot-pattern-coral opacity-60"></div>
+          <span class="text-6xl relative z-10">🏃</span>
+          <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-coral text-white text-xs font-bold shadow-md">悬赏</span>
+        </div>
+        <div class="p-5 flex flex-col flex-1">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-ink-soft mb-2">
+            <span class="text-base">🏃</span> 生活服务
+          </div>
+          <h3 class="font-display font-extrabold text-lg leading-snug">代排队二食堂麻辣香锅</h3>
+          <p class="text-sm text-ink-soft mt-1.5 line-clamp-2">12 点下课冲过去肯定排不到，求一位 11 点半能到的同学！</p>
+          <div class="flex items-center gap-2 mt-3 text-xs text-ink-soft">
+            <div class="w-6 h-6 rounded-full bg-coral/15 flex items-center justify-center font-bold text-coral">李</div>
+            <span class="font-bold text-ink">馋嘴小李</span>
+            <span class="text-ink/30">·</span>
+            <span>30 分钟前</span>
+          </div>
+          <div class="flex items-end justify-between mt-4 pt-3 border-t border-ink/5">
+            <span class="text-xs text-ink-soft">悬赏报酬</span>
+            <span class="font-display font-extrabold text-xl text-coral">¥15</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </main>
+
+  <!-- ===== 底部 ===== -->
+  <footer class="max-w-6xl mx-auto px-4 lg:px-8 py-8 text-center">
+    <div class="flex items-center justify-center gap-2 text-ink-soft text-sm">
+      <span class="text-lg">🤲</span>
+      <span class="font-display font-bold">互助校园</span>
+      <span class="text-ink/30">·</span>
+      <span>同学帮同学，校园更暖</span>
+    </div>
+  </footer>
+
+</body>
+</html>

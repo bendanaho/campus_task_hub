@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 校园互助</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            forest: { DEFAULT: '#2d5a3d', dark: '#234631', light: '#3a7050', deep: '#1d3a2a' },
+            cream: '#faf6ef',
+            amber: { DEFAULT: '#c2620a', light: '#d97a26', soft: '#e8a05a' },
+            ink: '#1a1a1a',
+            mist: '#e3eae4',
+            mistline: '#cfd8d2'
+          },
+          fontFamily: {
+            serif: ['Georgia', '"Songti SC"', '"Noto Serif SC"', 'serif'],
+            sans: ['system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <script src="../js/utils.js" defer></script>
+  <script src="../js/mock-data.js" defer></script>
+  <script src="../js/api.js" defer></script>
+  <script src="../js/main.js" defer></script>
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .font-acad { font-family: Georgia, "Songti SC", "Noto Serif SC", serif; }
+
+    /* 签名元素：互助网络节点的呼吸 */
+    @keyframes nodePulse {
+      0%, 100% { opacity: 0.45; }
+      50% { opacity: 1; }
+    }
+    @keyframes amberGlow {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    @keyframes drawLine {
+      from { stroke-dashoffset: 140; }
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes hubBreath {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+
+    .node-pulse { animation: nodePulse 4.5s ease-in-out infinite; }
+    .amber-glow { animation: amberGlow 3.2s ease-in-out infinite; }
+    .net-line { stroke-dasharray: 140; animation: drawLine 5s ease-out forwards; }
+    .hub { animation: hubBreath 5s ease-in-out infinite; }
+    .fade-up { animation: fadeUp 0.7s ease-out both; }
+
+    /* 克制的下划线式输入 */
+    .input-line {
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid #cfd8d2;
+      border-radius: 0;
+      transition: border-color .25s ease, box-shadow .25s ease;
+    }
+    .input-line:focus {
+      outline: none;
+      border-bottom-color: #2d5a3d;
+      box-shadow: 0 1.5px 0 0 #2d5a3d;
+    }
+    .input-line::placeholder { color: rgba(26,26,26,0.3); }
+
+    /* 暗化文字区，保证衬线 slogan 对比度 */
+    .panel-shade {
+      background: linear-gradient(115deg, rgba(29,58,42,0.78) 0%, rgba(29,58,42,0.25) 45%, rgba(29,58,42,0) 70%);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+      .net-line { stroke-dashoffset: 0 !important; }
+      .fade-up { opacity: 1 !important; transform: none !important; }
+      .node-pulse, .amber-glow, .hub { opacity: 0.85 !important; }
+    }
+  </style>
+</head>
+<body class="bg-cream text-ink min-h-screen">
+
+  <main class="min-h-screen flex flex-col lg:flex-row">
+
+    <!-- ===== 左侧 墨绿品牌区 + 签名节点网络 ===== -->
+    <section class="relative overflow-hidden bg-forest text-cream lg:w-1/2 min-h-[44vh] lg:min-h-screen flex flex-col justify-between p-8 sm:p-12 lg:p-16">
+
+      <!-- 签名元素：学生互助节点网络 SVG -->
+      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 480 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <!-- 连线 -->
+        <g stroke="#faf6ef" stroke-opacity="0.18" stroke-width="1" fill="none">
+          <line class="net-line" x1="340" y1="170" x2="250" y2="110"/>
+          <line class="net-line" x1="340" y1="170" x2="420" y2="100"/>
+          <line class="net-line" x1="340" y1="170" x2="450" y2="230"/>
+          <line class="net-line" x1="340" y1="170" x2="300" y2="255"/>
+          <line class="net-line" x1="340" y1="170" x2="195" y2="195"/>
+          <line class="net-line" x1="340" y1="170" x2="385" y2="310"/>
+          <line class="net-line" x1="250" y1="110" x2="150" y2="85"/>
+          <line class="net-line" x1="250" y1="110" x2="195" y2="195"/>
+          <line class="net-line" x1="450" y1="230" x2="385" y2="310"/>
+          <line class="net-line" x1="300" y1="255" x2="195" y2="195"/>
+          <line class="net-line" x1="300" y1="255" x2="385" y2="310"/>
+          <line class="net-line" x1="195" y1="195" x2="115" y2="205"/>
+          <line class="net-line" x1="150" y1="85" x2="115" y2="205"/>
+          <line class="net-line" x1="420" y1="100" x2="450" y2="230"/>
+          <line class="net-line" x1="385" y1="310" x2="385" y2="455"/>
+          <line class="net-line" x1="385" y1="455" x2="300" y2="525"/>
+          <line class="net-line" x1="385" y1="455" x2="450" y2="395"/>
+          <line class="net-line" x1="300" y1="525" x2="250" y2="440"/>
+          <line class="net-line" x1="300" y1="255" x2="250" y2="440"/>
+        </g>
+        <!-- 普通节点 -->
+        <g fill="#3a7050">
+          <circle class="node-pulse" cx="250" cy="110" r="5" style="animation-delay:.4s"/>
+          <circle class="node-pulse" cx="420" cy="100" r="5" style="animation-delay:.8s"/>
+          <circle class="node-pulse" cx="450" cy="230" r="6" style="animation-delay:1.2s"/>
+          <circle class="node-pulse" cx="300" cy="255" r="5" style="animation-delay:.6s"/>
+          <circle class="node-pulse" cx="195" cy="195" r="4" style="animation-delay:1s"/>
+          <circle class="node-pulse" cx="385" cy="310" r="4" style="animation-delay:1.4s"/>
+          <circle class="node-pulse" cx="150" cy="85" r="4" style="animation-delay:1.8s"/>
+          <circle class="node-pulse" cx="115" cy="205" r="4" style="animation-delay:2.2s"/>
+          <circle class="node-pulse" cx="385" cy="455" r="5" style="animation-delay:.5s"/>
+          <circle class="node-pulse" cx="300" cy="525" r="4" style="animation-delay:.9s"/>
+          <circle class="node-pulse" cx="450" cy="395" r="4" style="animation-delay:1.3s"/>
+          <circle class="node-pulse" cx="250" cy="440" r="4" style="animation-delay:1.7s"/>
+        </g>
+        <!-- 中心枢纽节点 -->
+        <circle class="hub" cx="340" cy="170" r="9" fill="#faf6ef" stroke="#3a7050" stroke-width="2"/>
+        <circle cx="340" cy="170" r="14" fill="none" stroke="#faf6ef" stroke-opacity="0.25" stroke-width="1"/>
+        <!-- 琥珀点缀：传递的善意 -->
+        <g fill="#c2620a">
+          <circle class="amber-glow" cx="295" cy="140" r="3" style="animation-delay:.3s"/>
+          <circle class="amber-glow" cx="320" cy="212" r="3" style="animation-delay:.7s"/>
+          <circle class="amber-glow" cx="362" cy="240" r="3" style="animation-delay:1.1s"/>
+          <circle class="amber-glow" cx="342" cy="490" r="3" style="animation-delay:1.5s"/>
+          <circle class="amber-glow" cx="385" cy="382" r="3" style="animation-delay:1.9s"/>
+        </g>
+      </svg>
+
+      <!-- 暗化层，提升文字对比 -->
+      <div class="absolute inset-0 panel-shade"></div>
+
+      <!-- 顶部 wordmark -->
+      <div class="relative z-10 flex items-center gap-3 fade-up">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber"></span>
+        <span class="font-acad text-lg tracking-wide">校园互助</span>
+        <span class="text-cream/40 text-xs tracking-[0.25em] hidden sm:inline">ACADEMIA</span>
+      </div>
+
+      <!-- 中部 Slogan -->
+      <div class="relative z-10 max-w-md fade-up" style="animation-delay:.15s">
+        <h1 class="font-acad text-4xl sm:text-5xl leading-[1.15]">
+          一句求助，<br>整座校园回应。
+        </h1>
+        <div class="mt-5 h-px w-16 bg-amber/70"></div>
+        <p class="mt-5 text-cream/75 text-sm leading-relaxed tracking-wide">
+          跑腿代取 · 学习辅导 · 二手交易 · 组队互助 · 技术服务<br>
+          把零散的善意，连成一张彼此回应的网。
+        </p>
+      </div>
+
+      <!-- 底部脚注 -->
+      <div class="relative z-10 text-cream/50 text-xs tracking-[0.2em] fade-up" style="animation-delay:.3s">
+        EST. 2024 · 同学之间的信任网络
+      </div>
+    </section>
+
+    <!-- ===== 右侧 表单区（克制） ===== -->
+    <section class="flex-1 flex items-center justify-center px-6 py-12 lg:p-16 bg-cream">
+      <div class="w-full max-w-sm fade-up" style="animation-delay:.2s">
+
+        <!-- 移动端 Logo -->
+        <div class="lg:hidden flex items-center gap-2.5 mb-10 justify-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber"></span>
+          <span class="font-acad text-xl text-forest">校园互助</span>
+        </div>
+
+        <header class="mb-10">
+          <p class="font-acad text-amber text-xs tracking-[0.35em] uppercase">Sign In</p>
+          <h2 class="font-acad text-3xl text-ink mt-2">回到互助大厅</h2>
+          <p class="text-ink/55 text-sm mt-2">登录后查看你附近的校园任务</p>
+        </header>
+
+        <form id="loginForm" class="space-y-7">
+          <div>
+            <label for="loginAccount" class="block text-xs tracking-[0.2em] text-ink/55 mb-2 uppercase">学号 / 账号</label>
+            <input id="loginAccount" name="account" type="text" autocomplete="username" placeholder="输入学号或账号"
+              class="input-line w-full py-2.5 text-ink text-base">
+          </div>
+          <div>
+            <label for="loginPassword" class="block text-xs tracking-[0.2em] text-ink/55 mb-2 uppercase">密码</label>
+            <input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="输入登录密码"
+              class="input-line w-full py-2.5 text-ink text-base">
+          </div>
+
+          <div class="flex items-center justify-between pt-1 text-sm">
+            <label class="flex items-center gap-2 text-ink/60 cursor-pointer select-none">
+              <input type="checkbox" class="accent-forest w-4 h-4"> 记住我
+            </label>
+            <a href="#" class="text-amber hover:underline">忘记密码？</a>
+          </div>
+
+          <button type="submit"
+            class="w-full bg-forest hover:bg-forest-dark text-cream font-medium tracking-[0.2em] py-3 rounded-lg transition-colors mt-2">
+            登 录
+          </button>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-mistline flex items-center justify-between text-sm">
+          <span class="text-ink/55">还没有账号？</span>
+          <a href="../register.html" class="text-forest font-medium hover:text-amber transition-colors">去注册 →</a>
+        </div>
+
+        <!-- 演示账号提示 -->
+        <p class="mt-10 text-center text-xs text-ink/40 tracking-wide">
+          演示账号 · <span class="font-acad text-ink/60">admin</span> / <span class="font-acad text-ink/60">123456</span>
+        </p>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

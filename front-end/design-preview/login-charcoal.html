@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>登录 · 校园互助平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        charcoal: '#18181b',
+                        'charcoal-soft': '#1f1f23',
+                        cream: '#f5f5f0',
+                        coral: '#ff5a4d',
+                        muted: '#a1a1aa',
+                        line: '#27272a',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <script src="../js/utils.js" defer></script>
+    <script src="../js/mock-data.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/main.js" defer></script>
+    <style>
+        html, body { background-color: #18181b; }
+        ::selection { background: #ff5a4d; color: #ffffff; }
+
+        /* 底线输入：克制，仅 1px 下边框，聚焦转珊瑚 */
+        .field-line { border-bottom: 1px solid #3f3f46; transition: border-color .28s ease; }
+        .field-line:focus-within { border-color: #ff5a4d; }
+        .field-input { background: transparent; outline: none; }
+        .field-input::placeholder { color: #52525b; font-weight: 300; }
+
+        .coral-btn { transition: background-color .2s ease, transform .15s ease, box-shadow .2s ease; }
+        .coral-btn:hover { background-color: #ff4738; }
+        .coral-btn:active { transform: translateY(1px); }
+
+        /* 入场：仅一次，轻而克制 */
+        .reveal { opacity: 0; transform: translateY(14px); animation: reveal .8s cubic-bezier(.2,.7,.2,1) forwards; }
+        .reveal-2 { animation-delay: .14s; }
+        .reveal-3 { animation-delay: .28s; }
+        @keyframes reveal { to { opacity: 1; transform: none; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reveal { opacity: 1; transform: none; animation: none; }
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body class="font-sans text-white antialiased">
+    <div class="min-h-screen grid lg:grid-cols-12">
+
+        <!-- 左 / 上：巨大标题排版（签名元素） -->
+        <section class="relative flex flex-col justify-between gap-12 p-8 sm:p-12 lg:p-16 xl:p-20 border-b border-line lg:border-b-0 lg:border-r lg:col-span-7">
+            <!-- 顶部小标签 -->
+            <div class="reveal flex items-center gap-3 text-[11px] tracking-[0.34em] uppercase text-muted">
+                <span class="inline-block w-7 h-px bg-muted"></span>
+                Campus Task Hub
+            </div>
+
+            <!-- 超大标题 -->
+            <div class="reveal reveal-2">
+                <h1 class="font-black tracking-tight leading-[0.8] text-[26vw] sm:text-[19vw] lg:text-[12.5vw] xl:text-[9.5rem]">
+                    互助<span class="text-[#3f3f46]">。</span>
+                </h1>
+                <p class="mt-7 lg:mt-9 max-w-md text-base sm:text-lg font-light text-muted leading-relaxed">
+                    跑腿代取、学习辅导、二手闲置、组队互助——<br class="hidden sm:block" />校园里的事，彼此托一把。
+                </p>
+            </div>
+
+            <!-- 底部元信息 -->
+            <div class="reveal reveal-3 flex items-end justify-between gap-4 text-[11px] text-muted">
+                <span class="tracking-[0.28em] uppercase">Est. 2026 · 学生互助社区</span>
+                <span class="hidden sm:inline font-light">v1.0 preview</span>
+            </div>
+        </section>
+
+        <!-- 右 / 下：表单 -->
+        <section class="flex items-center justify-center p-8 sm:p-12 lg:p-16 lg:col-span-5">
+            <div class="w-full max-w-sm reveal reveal-2">
+                <h2 class="text-2xl font-extrabold tracking-tight">欢迎回来</h2>
+                <p class="mt-2 text-sm font-light text-muted">登录后，回到你的互助大厅。</p>
+
+                <form id="loginForm" class="mt-10 space-y-9" novalidate>
+                    <div class="field-line pb-2">
+                        <label for="loginAccount" class="block text-[10px] tracking-[0.28em] uppercase text-muted mb-2.5">账号</label>
+                        <input id="loginAccount" type="text" autocomplete="username"
+                            placeholder="用户名 / 手机号 / 邮箱"
+                            class="field-input w-full text-base font-light text-white" />
+                    </div>
+
+                    <div class="field-line pb-2">
+                        <label for="loginPassword" class="block text-[10px] tracking-[0.28em] uppercase text-muted mb-2.5">密码</label>
+                        <input id="loginPassword" type="password" autocomplete="current-password"
+                            placeholder="请输入密码"
+                            class="field-input w-full text-base font-light text-white" />
+                    </div>
+
+                    <button type="submit" class="coral-btn w-full bg-coral text-white font-bold tracking-[0.3em] py-3.5 rounded-md text-sm uppercase">
+                        登 录
+                    </button>
+                </form>
+
+                <div class="mt-8 flex items-center justify-between text-sm">
+                    <span class="font-light text-muted">还没有账号？</span>
+                    <a href="../register.html" class="font-medium text-white border-b border-white/40 hover:border-coral hover:text-coral pb-0.5 transition-colors">去注册 →</a>
+                </div>
+
+                <div class="mt-12 pt-6 border-t border-line text-xs text-muted font-light leading-relaxed">
+                    演示账号 <span class="text-cream font-normal">admin</span> / <span class="text-cream font-normal">123456</span><br />
+                    登录状态保存在本地浏览器中。
+                </div>
+            </div>
+        </section>
+
+    </div>
+</body>
+</html>

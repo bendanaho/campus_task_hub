@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务大厅 · 校园互助</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            forest: { DEFAULT: '#2d5a3d', dark: '#234631', light: '#3a7050', deep: '#1d3a2a' },
+            cream: '#faf6ef',
+            amber: { DEFAULT: '#c2620a', light: '#d97a26', soft: '#e8a05a' },
+            ink: '#1a1a1a',
+            mist: '#e3eae4',
+            mistline: '#cfd8d2'
+          },
+          fontFamily: {
+            serif: ['Georgia', '"Songti SC"', '"Noto Serif SC"', 'serif'],
+            sans: ['system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <script src="../js/utils.js" defer></script>
+  <script src="../js/mock-data.js" defer></script>
+  <script src="../js/api.js" defer></script>
+  <script src="../js/main.js" defer></script>
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .font-acad { font-family: Georgia, "Songti SC", "Noto Serif SC", serif; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.6s ease-out both; }
+
+    /* tab 下划线 */
+    .tab { position: relative; padding-bottom: 6px; color: rgba(26,26,26,0.5); transition: color .2s ease; }
+    .tab:hover { color: #2d5a3d; }
+    .tab.active { color: #2d5a3d; }
+    .tab.active::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+      height: 2px; background: #c2620a; border-radius: 2px;
+    }
+
+    .card { transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease; }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 36px -16px rgba(45,90,61,0.28);
+      border-color: #cfd8d2;
+    }
+    .card-img { transition: transform .5s ease; }
+    .card:hover .card-img { transform: scale(1.05); }
+
+    .search-input:focus { outline: none; border-color: #2d5a3d; box-shadow: 0 0 0 3px rgba(45,90,61,0.1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+      .fade-up { opacity: 1 !important; transform: none !important; }
+      .card:hover { transform: none !important; }
+      .card:hover .card-img { transform: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-cream text-ink min-h-screen">
+
+  <!-- ===== 顶部导航 ===== -->
+  <header class="sticky top-0 z-30 bg-cream/95 backdrop-blur-sm border-b border-mistline">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+
+      <!-- Logo -->
+      <div class="flex items-center gap-3">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber"></span>
+        <span class="font-acad text-xl text-forest">校园互助</span>
+        <span class="text-ink/35 text-xs tracking-[0.25em] hidden sm:inline">/ 任务大厅</span>
+      </div>
+
+      <!-- 导航 tab -->
+      <nav class="flex items-center gap-7 text-sm font-medium">
+        <a href="#" class="tab active">全部</a>
+        <a href="#" class="tab">悬赏</a>
+        <a href="#" class="tab">服务</a>
+        <a href="#" class="tab">互助</a>
+      </nav>
+
+      <!-- 搜索 + 发布 -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex-1 lg:flex-none">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/35" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2" stroke-linecap="round"/>
+          </svg>
+          <input type="text" placeholder="搜索任务、同学、分类…"
+            class="search-input w-full lg:w-64 pl-9 pr-3 py-2 rounded-lg border border-mistline bg-white text-sm placeholder:text-ink/35 transition">
+        </div>
+        <button class="shrink-0 bg-forest hover:bg-forest-dark text-cream text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+          发布任务
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== 标题区 ===== -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-6 fade-up">
+    <div class="flex items-end justify-between flex-wrap gap-2">
+      <div>
+        <h1 class="font-acad text-3xl sm:text-4xl text-ink">校园里正在发生</h1>
+        <p class="text-ink/55 text-sm mt-2">6 条进行中的任务 · 同学之间，彼此回应</p>
+      </div>
+      <div class="flex items-center gap-4 text-xs text-ink/45 tracking-wide">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber"></span>悬赏</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-forest"></span>服务</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-mistline border border-mistline"></span>互助</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 任务卡片网格 ===== -->
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <!-- 1. 代取快递 · 悬赏 · 有图 -->
+      <article class="card fade-up bg-white rounded-xl border border-mistline overflow-hidden flex flex-col" style="animation-delay:.05s">
+        <div class="relative h-40 overflow-hidden">
+          <img src="https://picsum.photos/seed/parcel/400/300" alt="" class="card-img w-full h-full object-cover">
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-amber text-cream text-xs font-medium tracking-wide">悬赏</span>
+        </div>
+        <div class="p-5 flex flex-col gap-3 flex-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="px-2 py-0.5 rounded bg-mist text-forest-deep">跑腿</span>
+            <span class="text-ink/45">今日 18:00 前</span>
+          </div>
+          <h3 class="font-acad text-lg leading-snug text-ink">代取菜鸟驿站快递</h3>
+          <p class="text-ink/50 text-sm leading-relaxed -mt-1">3号楼，两个小件，顺路带回即可</p>
+          <div class="flex items-center justify-between pt-3 mt-auto border-t border-mist">
+            <span class="text-ink/55 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber"></span>林同学 · 信用 4.7
+            </span>
+            <span class="font-acad text-amber text-xl">¥8</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2. 学习辅导 · 服务 · 无图 -->
+      <article class="card fade-up bg-white rounded-xl border border-mistline overflow-hidden flex flex-col" style="animation-delay:.1s">
+        <div class="relative h-40 bg-gradient-to-br from-forest/12 to-mist flex items-center justify-center">
+          <span class="font-acad text-sm tracking-[0.4em] text-forest/45">STUDY</span>
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-forest text-cream text-xs font-medium tracking-wide">服务</span>
+        </div>
+        <div class="p-5 flex flex-col gap-3 flex-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="px-2 py-0.5 rounded bg-mist text-forest-deep">学习</span>
+            <span class="text-ink/45">可约周末</span>
+          </div>
+          <h3 class="font-acad text-lg leading-snug text-ink">高等数学期末辅导</h3>
+          <p class="text-ink/50 text-sm leading-relaxed -mt-1">数学系大三，擅长微积分与线性代数</p>
+          <div class="flex items-center justify-between pt-3 mt-auto border-t border-mist">
+            <span class="text-ink/55 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-forest"></span>陈学长 · 信用 4.9
+            </span>
+            <span class="font-acad text-forest text-xl">¥50<span class="text-sm text-ink/45">/时</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 3. 二手交易 · 服务 · 有图 -->
+      <article class="card fade-up bg-white rounded-xl border border-mistline overflow-hidden flex flex-col" style="animation-delay:.15s">
+        <div class="relative h-40 overflow-hidden">
+          <img src="https://picsum.photos/seed/lamp/400/300" alt="" class="card-img w-full h-full object-cover">
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-forest text-cream text-xs font-medium tracking-wide">服务</span>
+        </div>
+        <div class="p-5 flex flex-col gap-3 flex-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="px-2 py-0.5 rounded bg-mist text-forest-deep">二手</span>
+            <span class="text-ink/45">随时</span>
+          </div>
+          <h3 class="font-acad text-lg leading-snug text-ink">九成新护眼台灯转让</h3>
+          <p class="text-ink/50 text-sm leading-relaxed -mt-1">毕业低价转，自提，宿舍面交</p>
+          <div class="flex items-center justify-between pt-3 mt-auto border-t border-mist">
+            <span class="text-ink/55 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-forest"></span>王同学 · 信用 4.6
+            </span>
+            <span class="font-acad text-forest text-xl">¥45</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4. 组队互助 · 互助 · 无图 -->
+      <article class="card fade-up bg-white rounded-xl border border-mistline overflow-hidden flex flex-col" style="animation-delay:.2s">
+        <div class="relative h-40 bg-gradient-to-br from-mist to-cream flex items-center justify-center">
+          <span class="font-acad text-sm tracking-[0.4em] text-forest/40">TEAM</span>
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-mist text-forest-deep border border-mistline text-xs font-medium tracking-wide">互助</span>
+        </div>
+        <div class="p-5 flex flex-col gap-3 flex-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="px-2 py-0.5 rounded bg-mist text-forest-deep">组队</span>
+            <span class="text-ink/45">报名截止 7.20</span>
+          </div>
+          <h3 class="font-acad text-lg leading-snug text-ink">互联网+大赛组队 缺前端</h3>
+          <p class="text-ink/50 text-sm leading-relaxed -mt-1">已有后端与策划，寻前端同学共创</p>
+          <div class="flex items-center justify-between pt-3 mt-auto border-t border-mist">
+            <span class="text-ink/55 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-mistline"></span>赵同学 · 信用 4.8
+            </span>
+            <span class="font-acad text-forest/70 text-base">公益互助</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 5. 技术服务 · 服务 · 有图 -->
+      <article class="card fade-up bg-white rounded-xl border border-mistline overflow-hidden flex flex-col" style="animation-delay:.25s">
+        <div class="relative h-40 overflow-hidden">
+          <img src="https://picsum.photos/seed/laptop/400/300" alt="" class="card-img w-full h-full object-cover">
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-forest text-cream text-xs font-medium tracking-wide">服务</span>
+        </div>
+        <div class="p-5 flex flex-col gap-3 flex-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="px-2 py-0.5 rounded bg-mist text-forest-deep">技术</span>
+            <span class="text-ink/45">上门服务</span>
+          </div>
+          <h3 class="font-acad text-lg leading-snug text-ink">电脑系统安装 / 清灰维护</h3>
+          <p class="text-ink/50 text-sm leading-relaxed -mt-1">Win / Mac 均可，预约后上门</p>
+          <div class="flex items-center justify-between pt-3 mt-auto border-t border-mist">
+            <span class="text-ink/55 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-forest"></span>周师傅 · 信用 4.9
+            </span>
+            <span class="font-acad text-forest text-xl">¥30<span class="text-sm text-ink/45">起</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 6. 生活服务 · 悬赏 · 无图 -->
+      <article class="card fade-up bg-white rounded-xl border border-mistline overflow-hidden flex flex-col" style="animation-delay:.3s">
+        <div class="relative h-40 bg-gradient-to-br from-amber/12 to-cream flex items-center justify-center">
+          <span class="font-acad text-sm tracking-[0.4em] text-amber/50">LIFE</span>
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-amber text-cream text-xs font-medium tracking-wide">悬赏</span>
+        </div>
+        <div class="p-5 flex flex-col gap-3 flex-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="px-2 py-0.5 rounded bg-mist text-forest-deep">生活</span>
+            <span class="text-ink/45">明日 14:00</span>
+          </div>
+          <h3 class="font-acad text-lg leading-snug text-ink">代取生日蛋糕 北门店</h3>
+          <p class="text-ink/50 text-sm leading-relaxed -mt-1">需冷藏运输，麻烦顺路同学帮带</p>
+          <div class="flex items-center justify-between pt-3 mt-auto border-t border-mist">
+            <span class="text-ink/55 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber"></span>吴同学 · 信用 4.5
+            </span>
+            <span class="font-acad text-amber text-xl">¥15</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </main>
+
+  <!-- ===== 页脚 ===== -->
+  <footer class="border-t border-mistline bg-cream">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-ink/50">
+      <span class="font-acad">校园互助 · 一句求助，整座校园回应</span>
+      <span class="tracking-wide">© 2024 · 学院互助网络</span>
+    </div>
+  </footer>
+
+</body>
+</html>

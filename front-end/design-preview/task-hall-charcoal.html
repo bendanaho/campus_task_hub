@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>互助大厅 · 校园互助平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        charcoal: '#18181b',
+                        'charcoal-soft': '#1f1f23',
+                        cream: '#f5f5f0',
+                        coral: '#ff5a4d',
+                        muted: '#a1a1aa',
+                        line: '#27272a',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <script src="../js/utils.js" defer></script>
+    <script src="../js/mock-data.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/main.js" defer></script>
+    <style>
+        html, body { background-color: #18181b; }
+        ::selection { background: #ff5a4d; color: #ffffff; }
+
+        .search-line { border-bottom: 1px solid #3f3f46; transition: border-color .28s ease; }
+        .search-line:focus-within { border-color: #ff5a4d; }
+        .search-input { background: transparent; outline: none; }
+        .search-input::placeholder { color: #52525b; font-weight: 300; }
+
+        /* tab：下划线 active，非 pill */
+        .tab { border-bottom: 2px solid transparent; transition: color .2s ease, border-color .2s ease; }
+        .tab.active { color: #ffffff; border-bottom-color: #ff5a4d; }
+        .tab:not(.active):hover { color: #e4e4e7; }
+
+        /* 列表行：hairline 分隔，悬停珊瑚左指示条 */
+        .task-row { transition: background-color .2s ease; }
+        .task-row:hover { background-color: #1f1f23; }
+        .task-row .indicator { opacity: 0; transition: opacity .2s ease; }
+        .task-row:hover .indicator { opacity: 1; }
+
+        .reveal { opacity: 0; transform: translateY(12px); animation: reveal .7s cubic-bezier(.2,.7,.2,1) forwards; }
+        .reveal-2 { animation-delay: .1s; }
+        .reveal-3 { animation-delay: .2s; }
+        .reveal-4 { animation-delay: .3s; }
+        .reveal-5 { animation-delay: .4s; }
+        .reveal-6 { animation-delay: .5s; }
+        @keyframes reveal { to { opacity: 1; transform: none; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reveal { opacity: 1; transform: none; animation: none; }
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body class="font-sans text-white antialiased">
+
+    <!-- 顶栏：字标 + 搜索 + 发布 -->
+    <header class="sticky top-0 z-20 bg-charcoal/95 backdrop-blur border-b border-line">
+        <div class="max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 py-4 flex items-center justify-between gap-6">
+            <!-- 字标 -->
+            <a href="#" class="flex items-center gap-2.5 shrink-0">
+                <span class="w-2.5 h-2.5 bg-coral"></span>
+                <span class="font-black text-xl tracking-tight">互助</span>
+            </a>
+
+            <!-- 搜索（桌面） -->
+            <div class="hidden md:flex flex-1 max-w-xs items-center gap-2.5 search-line pb-1.5">
+                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" stroke-linecap="round" />
+                </svg>
+                <input id="searchInput" type="text" placeholder="搜索任务、技能、物品…"
+                    class="search-input w-full text-sm font-light text-white" />
+            </div>
+
+            <!-- 发布 -->
+            <a href="#" class="text-sm font-medium text-white border-b border-white/40 hover:border-coral hover:text-coral pb-0.5 transition-colors shrink-0">发布</a>
+        </div>
+
+        <!-- 导航 tab -->
+        <div class="border-t border-line">
+            <div class="max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 flex items-center gap-8 overflow-x-auto">
+                <button class="tab active py-3.5 text-sm font-medium whitespace-nowrap" data-tab="all">全部</button>
+                <button class="tab py-3.5 text-sm font-medium text-muted whitespace-nowrap" data-tab="payer">悬赏</button>
+                <button class="tab py-3.5 text-sm font-medium text-muted whitespace-nowrap" data-tab="earner">服务</button>
+                <button class="tab py-3.5 text-sm font-medium text-muted whitespace-nowrap" data-tab="none">互助</button>
+            </div>
+        </div>
+
+        <!-- 搜索（移动端） -->
+        <div class="md:hidden border-t border-line">
+            <div class="max-w-6xl mx-auto px-5 py-3 flex items-center gap-2.5 search-line pb-2">
+                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" stroke-linecap="round" />
+                </svg>
+                <input type="text" placeholder="搜索任务、技能、物品…"
+                    class="search-input w-full text-sm font-light text-white" />
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 pt-10 lg:pt-14 pb-20">
+
+        <!-- 区段标题 -->
+        <div class="reveal flex items-end justify-between gap-4 pb-8">
+            <div>
+                <div class="text-[11px] tracking-[0.34em] uppercase text-muted">Task Hall</div>
+                <h1 class="text-3xl lg:text-4xl font-black tracking-tight mt-2">最新任务</h1>
+            </div>
+            <span class="text-sm text-muted font-light whitespace-nowrap">共 6 条 · 实时更新</span>
+        </div>
+
+        <!-- 任务列表 -->
+        <div id="taskList" class="border-t border-line">
+
+            <!-- 1. 代取快递 · 悬赏 · 有图 -->
+            <a href="#" class="task-row reveal group relative block -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 py-7 lg:py-8 border-b border-line">
+                <span class="indicator absolute left-0 top-0 bottom-0 w-[3px] bg-coral"></span>
+                <div class="flex gap-5 lg:gap-8">
+                    <img src="https://picsum.photos/seed/parcel/400/300" alt="快递" class="w-20 h-20 lg:w-24 lg:h-24 object-cover rounded-md shrink-0" />
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2.5 mb-2">
+                                    <span class="text-[11px] font-medium tracking-wider px-1.5 py-0.5 border border-coral/40 text-coral">悬赏</span>
+                                    <span class="text-[11px] tracking-wider text-muted">代取快递</span>
+                                </div>
+                                <h3 class="text-lg lg:text-xl font-bold tracking-tight text-white line-clamp-2">代取菜鸟驿站快递，5 点前</h3>
+                                <p class="mt-1.5 text-sm font-light text-muted line-clamp-1">西区驿站，两个小件，送到 12 号楼</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-xl lg:text-2xl font-black text-coral leading-none">¥8</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs font-light text-muted">张同学 · 10 分钟前</div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- 2. 学习辅导 · 服务 · 有图 -->
+            <a href="#" class="task-row reveal reveal-2 group relative block -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 py-7 lg:py-8 border-b border-line">
+                <span class="indicator absolute left-0 top-0 bottom-0 w-[3px] bg-coral"></span>
+                <div class="flex gap-5 lg:gap-8">
+                    <img src="https://picsum.photos/seed/study/400/300" alt="学习" class="w-20 h-20 lg:w-24 lg:h-24 object-cover rounded-md shrink-0" />
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2.5 mb-2">
+                                    <span class="text-[11px] font-medium tracking-wider px-1.5 py-0.5 border border-line text-muted">服务</span>
+                                    <span class="text-[11px] tracking-wider text-muted">学习辅导</span>
+                                </div>
+                                <h3 class="text-lg lg:text-xl font-bold tracking-tight text-white line-clamp-2">高数期末辅导，可上门</h3>
+                                <p class="mt-1.5 text-sm font-light text-muted line-clamp-1">数学专业，带过三届，讲思路不讲答案</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-xl lg:text-2xl font-black text-coral leading-none">¥50<span class="text-sm font-medium text-muted">/次</span></div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs font-light text-muted">李学长 · 1 小时前</div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- 3. 二手交易 · 悬赏 · 有图 -->
+            <a href="#" class="task-row reveal reveal-3 group relative block -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 py-7 lg:py-8 border-b border-line">
+                <span class="indicator absolute left-0 top-0 bottom-0 w-[3px] bg-coral"></span>
+                <div class="flex gap-5 lg:gap-8">
+                    <img src="https://picsum.photos/seed/bike/400/300" alt="自行车" class="w-20 h-20 lg:w-24 lg:h-24 object-cover rounded-md shrink-0" />
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2.5 mb-2">
+                                    <span class="text-[11px] font-medium tracking-wider px-1.5 py-0.5 border border-coral/40 text-coral">悬赏</span>
+                                    <span class="text-[11px] tracking-wider text-muted">二手交易</span>
+                                </div>
+                                <h3 class="text-lg lg:text-xl font-bold tracking-tight text-white line-clamp-2">出九成新山地车，毕业甩卖</h3>
+                                <p class="mt-1.5 text-sm font-light text-muted line-clamp-1">美利达，骑了一年，无大磕碰，自提</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-xl lg:text-2xl font-black text-coral leading-none">¥120</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs font-light text-muted">王同学 · 3 小时前</div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- 4. 组队互助 · 互助 · 无图 -->
+            <a href="#" class="task-row reveal reveal-3 group relative block -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 py-7 lg:py-8 border-b border-line">
+                <span class="indicator absolute left-0 top-0 bottom-0 w-[3px] bg-coral"></span>
+                <div class="flex gap-5 lg:gap-8">
+                    <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-md border border-line flex items-center justify-center shrink-0">
+                        <span class="text-2xl lg:text-3xl font-light text-muted/60">组</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2.5 mb-2">
+                                    <span class="text-[11px] font-medium tracking-wider px-1.5 py-0.5 border border-line text-cream/70">互助</span>
+                                    <span class="text-[11px] tracking-wider text-muted">组队互助</span>
+                                </div>
+                                <h3 class="text-lg lg:text-xl font-bold tracking-tight text-white line-clamp-2">互联网+大赛招队友，缺技术开发</h3>
+                                <p class="mt-1.5 text-sm font-light text-muted line-clamp-1">已有商科两人，前端后端各一名，下周开题</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-sm font-light text-muted">互助共赢</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs font-light text-muted">陈同学 · 5 小时前</div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- 5. 技术服务 · 服务 · 无图 -->
+            <a href="#" class="task-row reveal reveal-4 group relative block -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 py-7 lg:py-8 border-b border-line">
+                <span class="indicator absolute left-0 top-0 bottom-0 w-[3px] bg-coral"></span>
+                <div class="flex gap-5 lg:gap-8">
+                    <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-md border border-line flex items-center justify-center shrink-0">
+                        <span class="text-2xl lg:text-3xl font-light text-muted/60">技</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2.5 mb-2">
+                                    <span class="text-[11px] font-medium tracking-wider px-1.5 py-0.5 border border-line text-muted">服务</span>
+                                    <span class="text-[11px] tracking-wider text-muted">技术服务</span>
+                                </div>
+                                <h3 class="text-lg lg:text-xl font-bold tracking-tight text-white line-clamp-2">代做课程设计，Java / Python</h3>
+                                <p class="mt-1.5 text-sm font-light text-muted line-clamp-1">计科专业，可调试可讲解，包答疑</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-xl lg:text-2xl font-black text-coral leading-none">¥200</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs font-light text-muted">周学长 · 昨天</div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- 6. 生活服务 · 悬赏 · 无图 -->
+            <a href="#" class="task-row reveal reveal-5 group relative block -mx-5 sm:-mx-8 lg:-mx-10 px-5 sm:px-8 lg:px-10 py-7 lg:py-8 border-b border-line">
+                <span class="indicator absolute left-0 top-0 bottom-0 w-[3px] bg-coral"></span>
+                <div class="flex gap-5 lg:gap-8">
+                    <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-md border border-line flex items-center justify-center shrink-0">
+                        <span class="text-2xl lg:text-3xl font-light text-muted/60">活</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2.5 mb-2">
+                                    <span class="text-[11px] font-medium tracking-wider px-1.5 py-0.5 border border-coral/40 text-coral">悬赏</span>
+                                    <span class="text-[11px] tracking-wider text-muted">生活服务</span>
+                                </div>
+                                <h3 class="text-lg lg:text-xl font-bold tracking-tight text-white line-clamp-2">求带饭，东三食堂到图书馆</h3>
+                                <p class="mt-1.5 text-sm font-light text-muted line-clamp-1">中午 12 点，加辣，不要香菜</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-xl lg:text-2xl font-black text-coral leading-none">¥15</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs font-light text-muted">林同学 · 2 小时前</div>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+
+        <!-- 空态占位钩子（JS 可填充） -->
+        <div id="emptyState" class="hidden py-24 text-center">
+            <p class="text-sm font-light text-muted">暂无相关任务</p>
+        </div>
+
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="border-t border-line">
+        <div class="max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-muted font-light">
+            <span class="tracking-[0.2em] uppercase">校园互助平台 · 学生互助社区</span>
+            <span>视觉预览 · 数据均为示例</span>
+        </div>
+    </footer>
+
+</body>
+</html>
