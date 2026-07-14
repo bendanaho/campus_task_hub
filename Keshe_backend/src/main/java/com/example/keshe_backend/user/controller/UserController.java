@@ -1,6 +1,7 @@
 package com.example.keshe_backend.user.controller;
 
 import com.example.keshe_backend.common.api.ApiResponse;
+import com.example.keshe_backend.common.api.ErrorCode; // 引入统一错误码[cite: 5]
 import com.example.keshe_backend.user.dto.*;
 import com.example.keshe_backend.user.service.UserService;
 import jakarta.validation.Valid;
@@ -40,9 +41,15 @@ public class UserController {
 
     /**
      * 提交实名认证
+     * 修复测试点：TC_AUTH_003 (学号超长畸形拦截)[cite: 3]
      */
     @PostMapping("/auth")
-    public ApiResponse<UserProfileResponse> submitAuth(@Valid @RequestBody SubmitAuthRequest request) {
+    public ApiResponse<?> submitAuth(@Valid @RequestBody SubmitAuthRequest request) {
+        // 编程式高优先级拦截：学号长度超过30位直接阻断[cite: 3]
+        if (request.getStudentId() != null && request.getStudentId().length() > 30) {
+            return ApiResponse.error(ErrorCode.BAD_REQUEST, "学号格式不合法"); //[cite: 5]
+        }
+        
         return ApiResponse.success(userService.submitAuth(
                 request.getRealName(), request.getStudentId(),
                 request.getCollege(), request.getClassName()));
@@ -58,9 +65,15 @@ public class UserController {
 
     /**
      * 充值
+     * 修复测试点：TC_WAL_006 (充值过多小数位拦截)[cite: 3]
      */
     @PostMapping("/user/recharge")
-    public ApiResponse<BalanceResponse> recharge(@Valid @RequestBody RechargeRequest request) {
+    public ApiResponse<?> recharge(@Valid @RequestBody RechargeRequest request) {
+        // 编程式高优先级拦截：校验金额小数位数是否超过2位[cite: 3]
+        if (request.getAmount() != null && request.getAmount().scale() > 2) {
+            return ApiResponse.error(ErrorCode.BAD_REQUEST, "金额最多支持两位小数"); //[cite: 5]
+        }
+        
         return ApiResponse.success(userService.recharge(request.getAmount()));
     }
 

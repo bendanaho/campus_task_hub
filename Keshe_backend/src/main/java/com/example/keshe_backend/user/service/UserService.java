@@ -79,6 +79,11 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 
+        // 核心修复点：前置拦截学号超长畸形数据 (对应测试用例: TC_AUTH_003)
+        if (studentId != null && studentId.length() > 30) {
+            throw new BusinessException(ErrorCode.AUTH_REQUIRED, "学号格式不合法");
+        }
+
         user.setRealName(realName);
         user.setStudentId(studentId);
         user.setCollege(college);
@@ -109,6 +114,11 @@ public class UserService {
         if (amount == null || amount.compareTo(new BigDecimal("0.01")) < 0
                 || amount.compareTo(new BigDecimal("100000")) > 0) {
             throw new BusinessException(ErrorCode.RECHARGE_AMOUNT_INVALID);
+        }
+
+        // 核心修复点：前置拦截充值过多小数位漏洞 (对应测试用例: TC_WAL_006)
+        if (amount.scale() > 2) {
+            throw new BusinessException(ErrorCode.RECHARGE_AMOUNT_INVALID, "金额最多支持两位小数");
         }
 
         Long userId = SecurityUtils.getCurrentUserId();
