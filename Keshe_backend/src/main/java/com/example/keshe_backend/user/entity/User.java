@@ -53,7 +53,7 @@ public class User {
 
     private String avatar;
 
-    @Column(name = "credit_score", nullable = false)
+    @Column(name = "credit_score", nullable = false, precision = 3, scale = 1)
     private BigDecimal creditScore = new BigDecimal("5.0");
 
     /**

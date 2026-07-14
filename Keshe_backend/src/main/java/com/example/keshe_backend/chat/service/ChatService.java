@@ -125,6 +125,14 @@ public class ChatService {
         conv.setLastTime(now);
         conv.setLastMessageSenderId(userId);
         conversationRepository.save(conv);
+
+        // 通知会话另一方实时刷新聊天页（不推给自己）
+        try {
+            com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(
+                    receiverId, "{\"type\":\"CHAT_UPDATE\",\"chatId\":\"" + chatId + "\"}");
+        } catch (Exception e) {
+            log.warn("WebSocket CHAT_UPDATE 推送失败 chatId={}", chatId, e);
+        }
         return MessageDTO.from(msg);
     }
 
@@ -167,6 +175,19 @@ public class ChatService {
             conv.setLastTime(now);
             conv.setLastMessageSenderId(null);
             conversationRepository.save(conv);
+
+            // 通知会话双方实时刷新聊天页（订单状态变更的系统消息）
+            String updateMsg = "{\"type\":\"CHAT_UPDATE\",\"chatId\":\"" + chatId + "\"}";
+            try {
+                if (conv.getUser1Id() != null) {
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(conv.getUser1Id(), updateMsg);
+                }
+                if (conv.getUser2Id() != null) {
+                    com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(conv.getUser2Id(), updateMsg);
+                }
+            } catch (Exception e) {
+                log.warn("WebSocket CHAT_UPDATE 推送失败 chatId={}", chatId, e);
+            }
         });
     }
 
@@ -310,6 +331,14 @@ public class ChatService {
             conv.setLastMessageSenderId(userId);
             conversationRepository.save(conv);
         }
+
+        // 通知对方实时刷新聊天页（收款/转账卡片状态变更）
+        try {
+            com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(
+                    request.getPartnerId(), "{\"type\":\"CHAT_UPDATE\",\"chatId\":\"" + chatId + "\"}");
+        } catch (Exception e) {
+            log.warn("WebSocket CHAT_UPDATE 推送失败 chatId={}", chatId, e);
+        }
         return MessageDTO.from(msg);
     }
 
@@ -369,6 +398,14 @@ public class ChatService {
         payment.put("paidAt", now.toString());
         msg.setPayment(toJson(payment));
         msg = messageRepository.save(msg);
+
+        // 通知收款方实时刷新聊天页（卡片变已支付）
+        try {
+            com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(
+                    receiverId, "{\"type\":\"CHAT_UPDATE\",\"chatId\":\"" + msg.getChatId() + "\"}");
+        } catch (Exception e) {
+            log.warn("WebSocket CHAT_UPDATE 推送失败 chatId={}", msg.getChatId(), e);
+        }
         return MessageDTO.from(msg);
     }
 
@@ -391,6 +428,15 @@ public class ChatService {
         payment.put("status", "cancelled");
         msg.setPayment(toJson(payment));
         msg = messageRepository.save(msg);
+
+        // 通知付款方实时刷新聊天页（卡片被取消）
+        try {
+            Long payerId = toLong(payment.get("payerId"));
+            com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(
+                    payerId, "{\"type\":\"CHAT_UPDATE\",\"chatId\":\"" + msg.getChatId() + "\"}");
+        } catch (Exception e) {
+            log.warn("WebSocket CHAT_UPDATE 推送失败 chatId={}", msg.getChatId(), e);
+        }
         return MessageDTO.from(msg);
     }
 

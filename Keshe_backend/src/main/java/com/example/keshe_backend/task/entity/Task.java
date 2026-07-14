@@ -38,7 +38,7 @@ public class Task {
     @Column(name = "publisher_name", nullable = false, length = 50)
     private String publisherName;
 
-    @Column(name = "publisher_credit", nullable = false)
+    @Column(name = "publisher_credit", nullable = false, precision = 3, scale = 1)
     private BigDecimal publisherCredit;
 
     @Column(nullable = false, length = 50)
@@ -60,7 +60,7 @@ public class Task {
 
     private String contact;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String images;
 
     // ===== 新字段 =====

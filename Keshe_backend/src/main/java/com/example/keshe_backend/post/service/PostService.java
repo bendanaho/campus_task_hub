@@ -3,7 +3,10 @@ package com.example.keshe_backend.post.service;
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
+import com.example.keshe_backend.common.util.ImageUtil;
 import com.example.keshe_backend.chat.service.ChatService;
+import com.example.keshe_backend.order.entity.Order;
+import com.example.keshe_backend.order.repository.OrderRepository;
 import com.example.keshe_backend.post.dto.*;
 import com.example.keshe_backend.report.service.ReportService;
 import com.example.keshe_backend.task.entity.Task;
@@ -11,9 +14,15 @@ import com.example.keshe_backend.task.repository.TaskRepository;
 import com.example.keshe_backend.user.entity.User;
 import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -27,53 +36,65 @@ public class PostService {
     private final UserRepository userRepository;
     private final ReportService reportService;
     private final ChatService chatService;
+    private final OrderRepository orderRepository;
 
     /**
-     * 帖子列表（支持筛选和排序）
+     * 帖子列表（大厅，支持筛选、排序、分页）
      */
-    public List<PostDTO> listPosts(String side, String categories, String keyword, String sort) {
-        List<Task> tasks = taskRepository.findByDeletedAtIsNullOrderByPublishTimeDesc();
-
+    public PostPageResponse listPosts(String side, String categories, String keyword, String sort, int page, int size) {
         LocalDateTime now = LocalDateTime.now();
 
-        return tasks.stream()
-                // 只显示 open 的帖子
-                .filter(t -> "open".equals(t.getStatus()))
-                // 过滤过期悬赏帖
-                .filter(t -> !("payer".equals(t.getPublisherSide())
-                        && t.getDeadline() != null && t.getDeadline().isBefore(now)))
-                // 按 side 筛选
-                .filter(t -> side == null || side.isEmpty() || "all".equals(side)
-                        || side.equals(t.getPublisherSide()))
-                // 按分类筛选
-                .filter(t -> categories == null || categories.isEmpty()
-                        || Arrays.asList(categories.split(",")).contains(t.getCategory()))
-                // 按关键词搜索
-                .filter(t -> keyword == null || keyword.isEmpty()
-                        || matchesKeyword(t, keyword))
-                // 排序
-                .sorted((a, b) -> compareBySort(a, b, sort))
+        Specification<Task> spec = (root, query, cb) -> {
+            List<Predicate> preds = new ArrayList<>();
+            preds.add(cb.isNull(root.get("deletedAt")));
+            preds.add(cb.equal(root.get("status"), "open"));
+            // 排除过期悬赏帖：非 payer 或 deadline 为空 或 deadline >= now
+            preds.add(cb.or(
+                    cb.notEqual(root.get("publisherSide"), "payer"),
+                    cb.isNull(root.get("deadline")),
+                    cb.greaterThanOrEqualTo(root.get("deadline"), now)
+            ));
+            if (side != null && !side.isEmpty() && !"all".equals(side)) {
+                preds.add(cb.equal(root.get("publisherSide"), side));
+            }
+            if (categories != null && !categories.isEmpty()) {
+                preds.add(root.get("category").in(Arrays.asList(categories.split(","))));
+            }
+            if (keyword != null && !keyword.isEmpty()) {
+                String like = "%" + keyword.toLowerCase() + "%";
+                preds.add(cb.or(
+                        cb.like(cb.lower(root.get("title")), like),
+                        cb.like(cb.lower(root.get("description")), like),
+                        cb.like(cb.lower(root.get("publisherName")), like)
+                ));
+            }
+            return cb.and(preds.toArray(new Predicate[0]));
+        };
+
+        Pageable pageable = PageRequest.of(page, size, buildSort(sort));
+        Page<Task> taskPage = taskRepository.findAll(spec, pageable);
+        List<PostDTO> list = taskPage.getContent().stream()
                 .map(PostDTO::from)
                 .collect(Collectors.toList());
+        return PostPageResponse.builder()
+                .list(list)
+                .hasMore(taskPage.hasNext())
+                .total(taskPage.getTotalElements())
+                .page(page)
+                .size(size)
+                .build();
     }
 
-    private boolean matchesKeyword(Task t, String keyword) {
-        String lower = keyword.toLowerCase();
-        return (t.getTitle() != null && t.getTitle().toLowerCase().contains(lower))
-                || (t.getDescription() != null && t.getDescription().toLowerCase().contains(lower))
-                || (t.getPublisherName() != null && t.getPublisherName().contains(keyword));
-    }
-
-    private int compareBySort(Task a, Task b, String sort) {
-        if (sort == null) sort = "time_desc";
+    private Sort buildSort(String sort) {
+        if (sort == null || sort.isBlank()) sort = "time_desc";
         return switch (sort) {
-            case "time_asc" -> a.getPublishTime().compareTo(b.getPublishTime());
-            case "time_desc" -> b.getPublishTime().compareTo(a.getPublishTime());
-            case "reward_asc" -> a.getRewardValue().compareTo(b.getRewardValue());
-            case "reward_desc" -> b.getRewardValue().compareTo(a.getRewardValue());
-            case "credit_asc" -> a.getPublisherCredit().compareTo(b.getPublisherCredit());
-            case "credit_desc" -> b.getPublisherCredit().compareTo(a.getPublisherCredit());
-            default -> b.getPublishTime().compareTo(a.getPublishTime());
+            case "time_asc" -> Sort.by(Sort.Direction.ASC, "publishTime");
+            case "time_desc" -> Sort.by(Sort.Direction.DESC, "publishTime");
+            case "reward_asc" -> Sort.by(Sort.Direction.ASC, "rewardValue");
+            case "reward_desc" -> Sort.by(Sort.Direction.DESC, "rewardValue");
+            case "credit_asc" -> Sort.by(Sort.Direction.ASC, "publisherCredit");
+            case "credit_desc" -> Sort.by(Sort.Direction.DESC, "publisherCredit");
+            default -> Sort.by(Sort.Direction.DESC, "publishTime");
         };
     }
 
@@ -152,9 +173,9 @@ public class PostService {
             task.setServiceTime(request.getServiceTime());
         }
 
-        // 处理 images 列表转 JSON
+        // 处理 images：每张原图生成缩略图，存 [{"full":"...","thumb":"..."}]（一张图保存两份）
         if (request.getImages() != null && !request.getImages().isEmpty()) {
-            task.setImages(toJsonArray(request.getImages()));
+            task.setImages(toImageJsonArray(request.getImages()));
         }
 
         task = taskRepository.save(task);
@@ -221,15 +242,56 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-    // 序列化为 JSON 数组。写入端本身是正确的：esc() 会转义引号/反斜杠/控制字符，
-    // 字符串内部的逗号原样保留——问题只在旧的读回端 PostDTO.parseImages 用 split(",") 切坏。
-    private String toJsonArray(List<String> urls) {
+    /**
+     * 发布者撤回自己的帖子（软下架）：大厅不再显示；取消该帖所有 pending 申请；
+     * in_progress 订单不动（继续走完结算）。仅 status=open 可撤回。
+     */
+    @Transactional
+    public PostDTO ownerClosePost(Long postId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        Task task = taskRepository.findById(postId)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
+        if (!task.getPublisherId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发布者可以撤回");
+        }
+        if (!"open".equals(task.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该帖子已不可撤回");
+        }
+        task.setStatus("closed");
+        taskRepository.save(task);
+
+        // 取消该帖所有 pending 订单（in_progress 不动，继续走完结算），并通知申请方
+        List<Order> pendings = orderRepository.findByPostIdAndStatusIn(postId, Arrays.asList("pending"));
+        for (Order o : pendings) {
+            o.setStatus("cancelled");
+            orderRepository.save(o);
+            Long applicantId = o.getPayerId().equals(userId) ? o.getEarnerId() : o.getPayerId();
+            chatService.addSystemMessage(o.getChatId(),
+                    "发布者撤回了互助「" + task.getTitle() + "」，订单已取消",
+                    String.valueOf(task.getId()), task.getTitle());
+            try {
+                com.example.keshe_backend.common.websocket.NotificationWSServer.sendToUser(applicantId,
+                        "{\"type\":\"PERSONAL_NOTICE\",\"message\":\"您申请的互助『" + task.getTitle() + "』被发布者撤回，订单已取消。\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return PostDTO.from(task);
+    }
+
+
+    // 序列化为图片对象数组 [{"full":"...","thumb":"..."}]，写入端 esc() 转义引号/反斜杠/控制字符。
+    // 一张图保存两份：full=原图 data URL，thumb=缩略图 data URL（由 ImageUtil 生成）。
+    private String toImageJsonArray(List<String> fullUrls) {
         StringBuilder sb = new StringBuilder("[");
         boolean first = true;
-        for (String url : urls) {
+        for (String full : fullUrls) {
             if (!first) sb.append(",");
             first = false;
-            sb.append("\"").append(esc(url)).append("\"");
+            String[] ft = ImageUtil.toFullAndThumb(full);
+            sb.append("{\"full\":\"").append(esc(ft[0])).append("\",");
+            sb.append("\"thumb\":\"").append(esc(ft[1])).append("\"}");
         }
         sb.append("]");
         return sb.toString();

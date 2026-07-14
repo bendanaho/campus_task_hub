@@ -197,8 +197,11 @@ public class OrderService {
         orderRepository.save(order);
 
         try {
-                    String takenMsg = String.format("{\"type\":\"TASK_TAKEN\",\"postId\":%d}", post.getId());
-                    com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(takenMsg);
+                    // TASK_TAKEN 只对悬赏帖（payer，被接即 closed）广播：服务帖可复用，被接不影响他人，无需让大厅移除
+                    if ("payer".equals(post.getPublisherSide())) {
+                        String takenMsg = String.format("{\"type\":\"TASK_TAKEN\",\"postId\":%d}", post.getId());
+                        com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(takenMsg);
+                    }
 
                     Long applicantId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
                     String pNotice = String.format("{\"type\":\"PERSONAL_NOTICE\",\"message\":\"您对任务『%s』的订单申请已被对方接受，任务正式开始执行！\"}", post.getTitle());
@@ -539,9 +542,9 @@ public class OrderService {
     }
 
     /**
-     * 我的订单
+     * 我的订单（支持按关键词检索 + 状态筛选）
      */
-    public List<MyOrderResponse> getMyOrders(String role) {
+    public List<MyOrderResponse> getMyOrders(String role, String keyword, String status) {
         Long userId = SecurityUtils.getCurrentUserId();
 
         List<Order> orders;
@@ -553,8 +556,15 @@ public class OrderService {
             orders = orderRepository.findByPayerIdOrEarnerIdOrderByCreatedAtDesc(userId, userId);
         }
 
+        // 关键词归一化（null/空视为不筛选）；状态筛选（"all" 或空视为不筛选）
+        String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+        boolean filterStatus = status != null && !status.isBlank() && !"all".equals(status);
+
         List<MyOrderResponse> result = new ArrayList<>();
         for (Order order : orders) {
+            // 状态过滤
+            if (filterStatus && !status.equals(order.getStatus())) continue;
+
             Task post = taskRepository.findById(order.getPostId()).orElse(null);
             String myRole;
             Long partnerId;
@@ -570,11 +580,20 @@ public class OrderService {
 
             User partner = userRepository.findById(partnerId).orElse(null);
             partnerName = partner != null ? partner.getUsername() : "";
+            String title = post != null ? post.getTitle() : "";
+
+            // 关键词过滤：命中标题 / 对方用户名 / 订单号任一即可
+            if (!kw.isEmpty()) {
+                boolean hit = title.toLowerCase().contains(kw)
+                        || partnerName.toLowerCase().contains(kw)
+                        || String.valueOf(order.getId()).contains(kw);
+                if (!hit) continue;
+            }
 
             result.add(MyOrderResponse.builder()
                     .order(OrderDTO.from(order))
                     .post(post != null ? PostDTO.from(post) : null)
-                    .title(post != null ? post.getTitle() : "")
+                    .title(title)
                     .myRole(myRole)
                     .partnerId(partnerId)
                     .partnerName(partnerName)
