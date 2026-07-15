@@ -145,6 +145,38 @@ function requireAdmin() {
     return true;
 }
 
+// ==================== 图片上传前压缩 ====================
+// 把图片按最长边缩放到 maxDim 并以 JPEG 质量 quality 重编码，显著减小上传与入库体积
+// （手机原图动辄数 MB，压后通常几百 KB）。返回 Promise<dataURL>。压缩失败自动回退原图，保证可用。
+function compressImageFile(file, maxDim, quality) {
+    maxDim = maxDim || 1600;
+    quality = quality || 0.82;
+    return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function() { reject(new Error('读取图片失败')); };
+        reader.onload = function(ev) {
+            var image = new Image();
+            image.onerror = function() { resolve(ev.target.result); };
+            image.onload = function() {
+                var w = image.naturalWidth, h = image.naturalHeight;
+                if (!w || !h) { resolve(ev.target.result); return; }
+                var scale = Math.min(1, maxDim / Math.max(w, h));
+                var nw = Math.round(w * scale), nh = Math.round(h * scale);
+                var canvas = document.createElement('canvas');
+                canvas.width = nw; canvas.height = nh;
+                try {
+                    canvas.getContext('2d').drawImage(image, 0, 0, nw, nh);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                } catch (err) {
+                    resolve(ev.target.result); // 跨域/解码异常时回退原图
+                }
+            };
+            image.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 // ==================== 登录/注册 ====================
 
 function handleRegisterForm() {
@@ -428,8 +460,9 @@ function initHomePage() {
         }
         taskList.innerHTML = tasks.map(function(task) {
             var catName = CATEGORY_MAP[task.category] || task.category;
-            var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
-                return '<img src="' + (img.thumb || img) + '" data-full="' + (img.full || img) + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
+            var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img, idx) {
+                var thumbSrc = (img && img.thumb) ? img.thumb : ((img && img.full) ? img.full : img);
+                return '<img src="' + thumbSrc + '" data-postid="' + task.id + '" data-idx="' + idx + '" class="task-image-thumb" loading="lazy" onerror="this.style.display=\'none\'">';
             }).join('') + '</div>' : '';
             return '<div class="task-item">' +
                 '<div class="task-item-main">' +
@@ -669,15 +702,13 @@ function initPublishForm() {
             uploadedImages = [];
             previewArea.innerHTML = '';
             files.forEach(function(file) {
-                var reader = new FileReader();
-                reader.onload = function(ev) {
-                    uploadedImages.push(ev.target.result);
+                compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
+                    uploadedImages.push(dataUrl);
                     var img = document.createElement('img');
-                    img.src = ev.target.result;
+                    img.src = dataUrl;
                     img.className = 'preview-thumb';
                     previewArea.appendChild(img);
-                };
-                reader.readAsDataURL(file);
+                }).catch(function() { /* 单张读取失败则跳过 */ });
             });
         });
     }
@@ -751,11 +782,19 @@ function initPublishForm() {
             serviceTime: side === 'earner' ? document.getElementById('postServiceTime').value.trim() : ''
         };
 
+        // 防重复提交：提交即锁按钮并改文案，成功后跳转、失败时恢复
+        if (publishBtn.disabled) return;
+        publishBtn.disabled = true;
+        var _oldText = publishBtn.textContent;
+        publishBtn.textContent = '发布中…';
+
         publishPost(data).then(function() {
             alert('发布成功！');
             window.location.href = 'task-hall.html';
         }).catch(function(err) {
             alert(err.message || '发布失败');
+            publishBtn.disabled = false;
+            publishBtn.textContent = _oldText;
         });
     });
 }
@@ -1784,15 +1823,13 @@ function initReview() {
             uploadedImages = [];
             previewArea.innerHTML = '';
             files.forEach(function(file) {
-                var reader = new FileReader();
-                reader.onload = function(ev) {
-                    uploadedImages.push(ev.target.result);
+                compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
+                    uploadedImages.push(dataUrl);
                     var img = document.createElement('img');
-                    img.src = ev.target.result;
+                    img.src = dataUrl;
                     img.className = 'preview-thumb';
                     previewArea.appendChild(img);
-                };
-                reader.readAsDataURL(file);
+                }).catch(function() { /* 单张读取失败则跳过 */ });
             });
         });
     }
@@ -1916,8 +1953,22 @@ function initLightbox() {
             if (e.target.classList.contains('task-image-thumb')) {
                 e.stopPropagation();
                 var bigImg = overlay.querySelector('img');
-                bigImg.src = e.target.getAttribute('data-full') || e.target.src;
                 overlay.classList.add('active');
+                // 大厅列表不含原图，先用缩略图占位，再按 postId+idx 从详情接口按需加载原图
+                bigImg.src = e.target.src;
+                var directFull = e.target.getAttribute('data-full'); // 兼容旧渲染
+                if (directFull) { bigImg.src = directFull; return; }
+                var pid = e.target.getAttribute('data-postid');
+                var idx = parseInt(e.target.getAttribute('data-idx'), 10) || 0;
+                if (pid && typeof getTaskDetail === 'function') {
+                    getTaskDetail(pid).then(function(res) {
+                        var task = res && (res.task || res);
+                        var imgs = (task && task.images) ? task.images : [];
+                        var it = imgs[idx];
+                        var full = it && (it.full || it.thumb);
+                        if (full) bigImg.src = full;
+                    }).catch(function() { /* 拉取失败保留缩略图 */ });
+                }
             }
         });
     }

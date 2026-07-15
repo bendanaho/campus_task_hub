@@ -238,15 +238,28 @@ async function publishPost(data) {
     if (USE_MOCK) {
         return mockPublishPost(data);
     }
-    var res = await fetch(API_BASE + '/posts', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + getToken()
-        },
-        body: JSON.stringify(data)
-    });
-    return _handleRes(res);
+    // 加 60s 超时，避免弱网/大图时请求悬挂导致按钮一直卡在"发布中…"
+    var ctrl = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, 60000);
+    try {
+        var res = await fetch(API_BASE + '/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + getToken()
+            },
+            body: JSON.stringify(data),
+            signal: ctrl.signal
+        });
+        return await _handleRes(res);
+    } catch (e) {
+        if (e && e.name === 'AbortError') {
+            throw new Error('发布超时，请检查网络或减小图片后重试');
+        }
+        throw e;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 async function getMyPosts() {
