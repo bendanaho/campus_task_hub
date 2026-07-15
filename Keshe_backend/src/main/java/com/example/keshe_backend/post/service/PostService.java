@@ -118,9 +118,20 @@ public class PostService {
                     .build();
 
         return PostDetailResponse.builder()
-                .task(PostDTO.from(task))
+                .task(PostDTO.fromLite(task))   // 详情默认也不发原图,避免打开详情/订单页下载数 MB 原图
                 .publisher(pubDTO)
                 .build();
+    }
+
+    /**
+     * 按需获取某帖的原图列表 [{full, thumb}]，供前端"点击缩略图放大"时单独拉取。
+     * 与 getPostDetail 分离，保证详情/订单页本身加载轻快。
+     */
+    public List<PostDTO.ImageItem> getPostImages(Long id) {
+        Task task = taskRepository.findById(id)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
+        return PostDTO.from(task).getImages();
     }
 
     /**

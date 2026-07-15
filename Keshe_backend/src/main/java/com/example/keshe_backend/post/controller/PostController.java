@@ -44,11 +44,19 @@ public class PostController {
     }
 
     /**
-     * 帖子详情
+     * 帖子详情（不含原图，仅缩略图，保证加载轻快）
      */
     @GetMapping("/{id}")
     public ApiResponse<PostDetailResponse> getPostDetail(@PathVariable Long id) {
         return ApiResponse.success(postService.getPostDetail(id));
+    }
+
+    /**
+     * 按需获取某帖原图列表 [{full, thumb}]，供"点击缩略图放大"时单独拉取
+     */
+    @GetMapping("/{id}/images")
+    public ApiResponse<List<PostDTO.ImageItem>> getPostImages(@PathVariable Long id) {
+        return ApiResponse.success(postService.getPostImages(id));
     }
 
     /**
