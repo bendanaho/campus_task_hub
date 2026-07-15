@@ -602,7 +602,8 @@ public class ChatService {
             Long payerId = toLong(p.get("payerId"));
             Long receiverId = toLong(p.get("receiverId"));
             BigDecimal amt = new BigDecimal(String.valueOf(p.get("amount")));
-            walletService.release(payerId, receiverId, amt, "payment", m.getId().toString(), "转账到账（订单完成）");
+            String rel = p.get("orderId") != null ? String.valueOf(p.get("orderId")) : m.getId().toString();
+            walletService.release(payerId, receiverId, amt, "escrow_transfer", rel, "转账到账（订单完成）");
             p.put("status", "released");
             m.setPayment(toJson(p));
             messageRepository.save(m);
@@ -621,7 +622,8 @@ public class ChatService {
             if (p == null || !"escrowed".equals(p.get("status"))) continue;
             Long payerId = toLong(p.get("payerId"));
             BigDecimal amt = new BigDecimal(String.valueOf(p.get("amount")));
-            walletService.refund(payerId, amt, "escrow_refund", m.getId().toString(), "转账退回（订单未成）");
+            String rel = p.get("orderId") != null ? String.valueOf(p.get("orderId")) : m.getId().toString();
+            walletService.refund(payerId, amt, "escrow_refund", rel, "转账退回（订单未成）");
             p.put("status", "refunded");
             m.setPayment(toJson(p));
             messageRepository.save(m);
