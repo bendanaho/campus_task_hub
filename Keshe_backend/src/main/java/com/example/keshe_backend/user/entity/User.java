@@ -79,6 +79,13 @@ public class User {
     private BigDecimal balance = BigDecimal.ZERO;
 
     /**
+     * 冻结余额：订单托管中的金额（发布悬赏冻结的报酬 + 进行中订单的私信转账），
+     * 订单完成释放给对方、取消/退款退回本人。可用余额 balance 不含这部分。
+     */
+    @Column(name = "frozen_balance", nullable = false)
+    private BigDecimal frozenBalance = BigDecimal.ZERO;
+
+    /**
      * 0=user，1=admin
      */
     @Column(nullable = false)
@@ -106,6 +113,9 @@ public class User {
         }
         if (this.balance == null) {
             this.balance = BigDecimal.ZERO;
+        }
+        if (this.frozenBalance == null) {
+            this.frozenBalance = BigDecimal.ZERO;
         }
         if (this.authStatus == null) {
             this.authStatus = 0;

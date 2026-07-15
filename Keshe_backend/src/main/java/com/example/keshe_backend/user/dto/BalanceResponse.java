@@ -9,4 +9,5 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class BalanceResponse {
     private BigDecimal balance;
+    private BigDecimal frozenBalance;
 }

@@ -11,6 +11,7 @@ import com.example.keshe_backend.post.dto.*;
 import com.example.keshe_backend.report.service.ReportService;
 import com.example.keshe_backend.task.entity.Task;
 import com.example.keshe_backend.task.repository.TaskRepository;
+import com.example.keshe_backend.transaction.service.WalletService;
 import com.example.keshe_backend.user.entity.User;
 import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class PostService {
     private final ReportService reportService;
     private final ChatService chatService;
     private final OrderRepository orderRepository;
+    private final WalletService walletService;
 
     /**
      * 帖子列表（大厅，支持筛选、排序、分页）
@@ -198,6 +200,16 @@ public class PostService {
         }
 
         task = taskRepository.save(task);
+
+        // 发布"我出钱"(悬赏)：从可用余额冻结报酬做担保；余额不足 → 抛异常、整体回滚、无法发布
+        if ("payer".equals(side)) {
+            BigDecimal reward = task.getRewardValue() != null ? task.getRewardValue() : BigDecimal.ZERO;
+            if (reward.signum() > 0) {
+                walletService.hold(userId, reward, "escrow_freeze", String.valueOf(task.getId()),
+                        "发布悬赏冻结报酬：" + task.getTitle());
+            }
+        }
+
         try {
             String msg = String.format("{\"type\":\"NEW_TASK\",\"postId\":%d,\"title\":\"%s\"}", task.getId(), task.getTitle());
             com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(msg);
@@ -294,6 +306,15 @@ public class PostService {
                         "{\"type\":\"PERSONAL_NOTICE\",\"message\":\"您申请的互助『" + task.getTitle() + "』被发布者撤回，订单已取消。\"}");
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+
+        // 悬赏帖撤回：把发布时冻结的报酬退回发布者（仅 open 可撤回，此时未被接单，报酬仍全额冻结）
+        if ("payer".equals(task.getPublisherSide())) {
+            BigDecimal reward = task.getRewardValue() != null ? task.getRewardValue() : BigDecimal.ZERO;
+            if (reward.signum() > 0) {
+                walletService.refund(task.getPublisherId(), reward, "escrow_refund", String.valueOf(task.getId()),
+                        "撤回悬赏退回报酬：" + task.getTitle());
             }
         }
         return PostDTO.from(task);

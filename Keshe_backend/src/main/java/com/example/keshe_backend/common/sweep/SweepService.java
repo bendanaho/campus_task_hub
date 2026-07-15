@@ -36,6 +36,7 @@ public class SweepService {
     private final TransactionRepository transactionRepository;
     private final TaskRepository taskRepository;
     private final ReviewRepository reviewRepository;
+    private final com.example.keshe_backend.transaction.service.WalletService walletService;
     private final com.example.keshe_backend.chat.service.ChatService chatService;
     private final com.example.keshe_backend.review.service.ReviewService reviewService;
 
@@ -71,21 +72,13 @@ public class SweepService {
             String earnerName = "对方";
             if (amount.compareTo(BigDecimal.ZERO) > 0) {
                 User earner = userRepository.findById(order.getEarnerId()).orElse(null);
-                if (earner != null) {
-                    earnerName = earner.getUsername();
-                    earner.setBalance(earner.getBalance().add(amount));
-                    userRepository.save(earner);
-
-                    Transaction tx = new Transaction();
-                    tx.setUserId(order.getEarnerId());
-                    tx.setDirection("in");
-                    tx.setAmount(amount);
-                    tx.setCategory("order");
-                    tx.setRelatedId(order.getId().toString());
-                    tx.setNote("订单收入：" + swTitle + "（自动确认）");
-                    transactionRepository.save(tx);
-                }
+                if (earner != null) earnerName = earner.getUsername();
+                // 结算：释放冻结的报酬（付款方 frozen → 收款方 balance），保持资金守恒
+                walletService.release(order.getPayerId(), order.getEarnerId(), amount, "order",
+                        order.getId().toString(), "订单收入：" + swTitle + "（自动确认）");
             }
+            // 释放该会话托管中的私信转账给各自接收方
+            chatService.releaseEscrowedTransfers(order.getChatId());
 
             orderRepository.save(order);
 

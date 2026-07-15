@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
     class_name VARCHAR(255) DEFAULT NULL COMMENT '班级',
     bio VARCHAR(255) DEFAULT NULL COMMENT '个人简介',
     balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '账户余额',
+    frozen_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '冻结余额(订单托管中)',
     role INT NOT NULL DEFAULT 0 COMMENT '角色 0=普通用户 1=管理员',
     version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号（@Version，必须非空；直接 INSERT 种子数据时若漏填会取默认 0，避免 NULL 导致乐观锁 update 匹配 0 行）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

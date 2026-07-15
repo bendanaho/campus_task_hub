@@ -103,7 +103,7 @@ public class UserService {
         Long userId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
-        return new BalanceResponse(user.getBalance());
+        return new BalanceResponse(user.getBalance(), user.getFrozenBalance());
     }
 
     /**
@@ -137,7 +137,7 @@ public class UserService {
         tx.setNote("账户充值");
         transactionRepository.save(tx);
 
-        return new BalanceResponse(user.getBalance());
+        return new BalanceResponse(user.getBalance(), user.getFrozenBalance());
     }
 
     /**

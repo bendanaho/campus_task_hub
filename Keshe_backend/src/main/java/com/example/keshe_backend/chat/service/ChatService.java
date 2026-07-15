@@ -15,6 +15,7 @@ import com.example.keshe_backend.task.entity.Task;
 import com.example.keshe_backend.task.repository.TaskRepository;
 import com.example.keshe_backend.transaction.entity.Transaction;
 import com.example.keshe_backend.transaction.repository.TransactionRepository;
+import com.example.keshe_backend.transaction.service.WalletService;
 import com.example.keshe_backend.user.entity.User;
 import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class ChatService {
     private final OrderRepository orderRepository;
     private final TaskRepository taskRepository;
     private final ReviewRepository reviewRepository;
+    private final WalletService walletService;
 
     public List<ConversationDTO> getConversations() {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -359,33 +361,46 @@ public class ChatService {
             if (currentUser.getBalance().compareTo(amount) < 0) {
                 throw new BusinessException(ErrorCode.BALANCE_NOT_ENOUGH);
             }
-            currentUser.setBalance(currentUser.getBalance().subtract(amount));
-            partner.setBalance(partner.getBalance().add(amount));
-            userRepository.save(currentUser);
-            userRepository.save(partner);
+            // 该会话若存在进行中订单 → 转账托管(冻结至订单完成)，否则即时到账
+            Order activeOrder = orderRepository.findTopByChatIdOrderByCreatedAtDesc(chatId).orElse(null);
+            boolean escrow = activeOrder != null && "in_progress".equals(activeOrder.getStatus());
 
-            Transaction txOut = new Transaction();
-            txOut.setUserId(userId);
-            txOut.setDirection("out");
-            txOut.setAmount(amount);
-            txOut.setCategory("payment");
-            txOut.setNote("转账给 " + partner.getUsername());
-            transactionRepository.save(txOut);
-
-            Transaction txIn = new Transaction();
-            txIn.setUserId(partner.getId());
-            txIn.setDirection("in");
-            txIn.setAmount(amount);
-            txIn.setCategory("payment");
-            txIn.setNote(currentUser.getUsername() + " 的转账");
-            transactionRepository.save(txIn);
-
-            payment.put("status", "paid");
             payment.put("payerId", userId);
             payment.put("payerName", currentUser.getUsername());
             payment.put("receiverId", partner.getId());
             payment.put("receiverName", partner.getUsername());
-            payment.put("paidAt", now.toString());
+
+            if (escrow) {
+                // 冻结发送方：balance → frozen，待订单完成释放给对方 / 取消退回
+                walletService.hold(userId, amount, "escrow_transfer", activeOrder.getId().toString(),
+                        "转账托管给 " + partner.getUsername());
+                payment.put("status", "escrowed");
+                payment.put("orderId", activeOrder.getId());
+            } else {
+                currentUser.setBalance(currentUser.getBalance().subtract(amount));
+                partner.setBalance(partner.getBalance().add(amount));
+                userRepository.save(currentUser);
+                userRepository.save(partner);
+
+                Transaction txOut = new Transaction();
+                txOut.setUserId(userId);
+                txOut.setDirection("out");
+                txOut.setAmount(amount);
+                txOut.setCategory("payment");
+                txOut.setNote("转账给 " + partner.getUsername());
+                transactionRepository.save(txOut);
+
+                Transaction txIn = new Transaction();
+                txIn.setUserId(partner.getId());
+                txIn.setDirection("in");
+                txIn.setAmount(amount);
+                txIn.setCategory("payment");
+                txIn.setNote(currentUser.getUsername() + " 的转账");
+                transactionRepository.save(txIn);
+
+                payment.put("status", "paid");
+                payment.put("paidAt", now.toString());
+            }
         } else {
             payment.put("status", "pending");
             payment.put("payerId", partner.getId());
@@ -572,6 +587,45 @@ public class ChatService {
         }
         total += actionCount;
         return UnreadCountResponse.builder().total(total).byChat(byChat).build();
+    }
+
+    /**
+     * 释放该会话所有"托管中"(escrowed)的转账给各自接收方（订单完成/结算时调用）。
+     */
+    @Transactional
+    public void releaseEscrowedTransfers(String chatId) {
+        List<Message> msgs = messageRepository.findByChatIdOrderByTimeAsc(chatId);
+        for (Message m : msgs) {
+            if (!"payment".equals(m.getType())) continue;
+            Map<String, Object> p = parseJson(m.getPayment());
+            if (p == null || !"escrowed".equals(p.get("status"))) continue;
+            Long payerId = toLong(p.get("payerId"));
+            Long receiverId = toLong(p.get("receiverId"));
+            BigDecimal amt = new BigDecimal(String.valueOf(p.get("amount")));
+            walletService.release(payerId, receiverId, amt, "payment", m.getId().toString(), "转账到账（订单完成）");
+            p.put("status", "released");
+            m.setPayment(toJson(p));
+            messageRepository.save(m);
+        }
+    }
+
+    /**
+     * 退回该会话所有"托管中"(escrowed)的转账给各自发送方（订单取消/全额退款时调用）。
+     */
+    @Transactional
+    public void refundEscrowedTransfers(String chatId) {
+        List<Message> msgs = messageRepository.findByChatIdOrderByTimeAsc(chatId);
+        for (Message m : msgs) {
+            if (!"payment".equals(m.getType())) continue;
+            Map<String, Object> p = parseJson(m.getPayment());
+            if (p == null || !"escrowed".equals(p.get("status"))) continue;
+            Long payerId = toLong(p.get("payerId"));
+            BigDecimal amt = new BigDecimal(String.valueOf(p.get("amount")));
+            walletService.refund(payerId, amt, "escrow_refund", m.getId().toString(), "转账退回（订单未成）");
+            p.put("status", "refunded");
+            m.setPayment(toJson(p));
+            messageRepository.save(m);
+        }
     }
 
     // ===== 辅助 =====

@@ -14,6 +14,7 @@ import com.example.keshe_backend.task.entity.Task;
 import com.example.keshe_backend.task.repository.TaskRepository;
 import com.example.keshe_backend.transaction.entity.Transaction;
 import com.example.keshe_backend.transaction.repository.TransactionRepository;
+import com.example.keshe_backend.transaction.service.WalletService;
 import com.example.keshe_backend.user.entity.User;
 import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class OrderService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final WalletService walletService;
     private final com.example.keshe_backend.chat.service.ChatService chatService;
 
     // 金额格式化：25.00 → "25"，避免系统消息里出现多余小数
@@ -164,25 +166,11 @@ public class OrderService {
         BigDecimal amount = order.getAmount();
         LocalDateTime now = LocalDateTime.now();
 
-        // 冻结付款方余额（纯互助跳过）
-        if (amount.compareTo(BigDecimal.ZERO) > 0) {
-            User payer = userRepository.findById(order.getPayerId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "付款方不存在"));
-            if (payer.getBalance().compareTo(amount) < 0) {
-                throw new BusinessException(ErrorCode.BALANCE_NOT_ENOUGH);
-            }
-            payer.setBalance(payer.getBalance().subtract(amount));
-            userRepository.save(payer);
-
-            // 创建交易流水（支出）
-            Transaction tx = new Transaction();
-            tx.setUserId(order.getPayerId());
-            tx.setDirection("out");
-            tx.setAmount(amount);
-            tx.setCategory("order");
-            tx.setRelatedId(order.getId().toString());
-            tx.setNote("订单支付：" + post.getTitle());
-            transactionRepository.save(tx);
+        // 冻结付款方报酬（纯互助 amount=0 跳过）：
+        // 悬赏帖(payer)报酬在【发布时】已冻结，这里不重复冻；服务帖(earner)在【接单时】冻结付款方(接单者)。
+        if (amount.compareTo(BigDecimal.ZERO) > 0 && !"payer".equals(post.getPublisherSide())) {
+            walletService.hold(order.getPayerId(), amount, "escrow_freeze", order.getId().toString(),
+                    "订单冻结报酬：" + post.getTitle());
         }
 
         order.setStatus("in_progress");
@@ -295,24 +283,15 @@ public class OrderService {
             order.setCompletedAt(now);
             order.setReviewDeadline(now.plusDays(AUTO_DAYS));
 
-            // 结算给收款方
+            // 结算给收款方：释放冻结的报酬（付款方 frozen → 收款方 balance）
             BigDecimal amount = order.getAmount();
             if (amount.compareTo(BigDecimal.ZERO) > 0) {
-                User earner = userRepository.findById(order.getEarnerId())
-                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "收款方不存在"));
-                earner.setBalance(earner.getBalance().add(amount));
-                userRepository.save(earner);
-
                 Task post = taskRepository.findById(order.getPostId()).orElse(null);
-                Transaction tx = new Transaction();
-                tx.setUserId(order.getEarnerId());
-                tx.setDirection("in");
-                tx.setAmount(amount);
-                tx.setCategory("order");
-                tx.setRelatedId(order.getId().toString());
-                tx.setNote("订单收入：" + (post != null ? post.getTitle() : ""));
-                transactionRepository.save(tx);
+                walletService.release(order.getPayerId(), order.getEarnerId(), amount, "order",
+                        order.getId().toString(), "订单收入：" + (post != null ? post.getTitle() : ""));
             }
+            // 释放该会话托管中的私信转账给各自接收方
+            chatService.releaseEscrowedTransfers(order.getChatId());
             // 系统消息：双方确认，结算
             chatService.addSystemMessage(order.getChatId(), order.getAmount().compareTo(BigDecimal.ZERO) > 0
                     ? ("双方已确认，报酬 " + fmt(order.getAmount()) + " 元已结算给 " + nameOf(order.getEarnerId()))
@@ -449,35 +428,20 @@ public class OrderService {
 
         String title = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("");
 
+        // 报酬从付款方冻结中分配：退回付款方 payerGets、结算给收款方 earnerGets
         if (payerGets.compareTo(BigDecimal.ZERO) > 0) {
-            User payer = userRepository.findById(order.getPayerId()).orElse(null);
-            if (payer != null) {
-                payer.setBalance(payer.getBalance().add(payerGets));
-                userRepository.save(payer);
-                Transaction tx = new Transaction();
-                tx.setUserId(order.getPayerId());
-                tx.setDirection("in");
-                tx.setAmount(payerGets);
-                tx.setCategory("order");
-                tx.setRelatedId(order.getId().toString());
-                tx.setNote("仲裁退款：" + title);
-                transactionRepository.save(tx);
-            }
+            walletService.refund(order.getPayerId(), payerGets, "escrow_refund",
+                    order.getId().toString(), "仲裁退款：" + title);
         }
         if (earnerGets.compareTo(BigDecimal.ZERO) > 0) {
-            User earner = userRepository.findById(order.getEarnerId()).orElse(null);
-            if (earner != null) {
-                earner.setBalance(earner.getBalance().add(earnerGets));
-                userRepository.save(earner);
-                Transaction tx = new Transaction();
-                tx.setUserId(order.getEarnerId());
-                tx.setDirection("in");
-                tx.setAmount(earnerGets);
-                tx.setCategory("order");
-                tx.setRelatedId(order.getId().toString());
-                tx.setNote("订单收入（仲裁）：" + title);
-                transactionRepository.save(tx);
-            }
+            walletService.release(order.getPayerId(), order.getEarnerId(), earnerGets, "order",
+                    order.getId().toString(), "订单收入（仲裁）：" + title);
+        }
+        // 托管中的私信转账：全额退款 → 退回发送者；结算/部分 → 释放给接收方
+        if ("refund".equals(decision)) {
+            chatService.refundEscrowedTransfers(order.getChatId());
+        } else {
+            chatService.releaseEscrowedTransfers(order.getChatId());
         }
 
         order.setStatus("closed");
