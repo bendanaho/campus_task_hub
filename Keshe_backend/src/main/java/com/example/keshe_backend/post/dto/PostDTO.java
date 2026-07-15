@@ -59,6 +59,21 @@ public class PostDTO {
                 .build();
     }
 
+    /**
+     * 列表/大厅专用：在 {@link #from} 基础上剥离原图 full，只保留缩略图 thumb。
+     * 大厅一次返回多条帖子，若带 full 原图会让响应体积暴涨（实测曾达 ~19MB）；
+     * 列表只需缩略图，原图在用户点击后经 /api/posts/{id} 详情接口按需加载。
+     */
+    public static PostDTO fromLite(Task task) {
+        PostDTO dto = from(task);
+        if (dto.getImages() != null) {
+            for (ImageItem it : dto.getImages()) {
+                it.setFull(null);
+            }
+        }
+        return dto;
+    }
+
     // 解析图片 JSON。新格式 [{"full":"...","thumb":"..."}]；
     // 兼容旧格式 ["base64",...]（纯字符串数组，视为 full=thumb=旧值），保证种子/旧帖不崩。
     private static List<ImageItem> parseImages(String imagesJson) {

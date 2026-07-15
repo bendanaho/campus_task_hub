@@ -60,6 +60,9 @@ public class Task {
 
     private String contact;
 
+    // 原图 base64 体积大；标记懒加载，避免大厅/列表查询把整列原图读进内存。
+    // 列表 DTO(fromLite)也已剥离 full，双重保证大厅不加载原图。
+    @Basic(fetch = FetchType.LAZY)
     @Column(columnDefinition = "LONGTEXT")
     private String images;
 

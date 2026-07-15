@@ -74,7 +74,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size, buildSort(sort));
         Page<Task> taskPage = taskRepository.findAll(spec, pageable);
         List<PostDTO> list = taskPage.getContent().stream()
-                .map(PostDTO::from)
+                .map(PostDTO::fromLite)   // 大厅只返回缩略图，原图点开详情再取
                 .collect(Collectors.toList());
         return PostPageResponse.builder()
                 .list(list)
@@ -148,6 +148,14 @@ public class PostService {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "publisherSide 必须为 payer/earner/none");
         }
 
+        // 防重复提交：同一用户在 30 秒内发布过相同标题+描述的帖子，判定为重复点击/网络重试，直接拦截。
+        // 前端已加按钮锁，这里是服务端兜底，防多标签页 / 直接调接口 / 网络重发造成的重复入库。
+        LocalDateTime dupSince = LocalDateTime.now().minusSeconds(30);
+        if (taskRepository.countByPublisherIdAndTitleAndDescriptionAndDeletedAtIsNullAndPublishTimeAfter(
+                userId, request.getTitle(), request.getDescription(), dupSince) > 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "请勿重复提交，刚刚已发布过相同内容");
+        }
+
         // 悬赏帖截止时间不能早于当前时间
         if ("payer".equals(side) && request.getDeadline() != null
                 && request.getDeadline().isBefore(LocalDateTime.now())) {
@@ -193,7 +201,7 @@ public class PostService {
     /** 全部帖子（含已下架/关闭），按发布时间倒序 */
     public List<PostDTO> adminListPosts() {
         return taskRepository.findByDeletedAtIsNullOrderByPublishTimeDesc()
-                .stream().map(PostDTO::from).collect(Collectors.toList());
+                .stream().map(PostDTO::fromLite).collect(Collectors.toList());
     }
 
     /** 管理员下架帖子：status → closed，大厅不再显示、不可再下单；清该帖 pending 举报；系统通知发布者 */
@@ -238,7 +246,7 @@ public class PostService {
         Long userId = SecurityUtils.getCurrentUserId();
         return taskRepository.findByPublisherIdAndDeletedAtIsNullOrderByPublishTimeDesc(userId)
                 .stream()
-                .map(PostDTO::from)
+                .map(PostDTO::fromLite)
                 .collect(Collectors.toList());
     }
 
