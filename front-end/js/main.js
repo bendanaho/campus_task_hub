@@ -105,9 +105,9 @@ function requireVerified() {
     }
     var u = getCurrentUser();
     if (!u || u.authStatus !== 'verified') {
-        if (confirm('该操作需要先完成实名认证，是否前往认证？')) {
-            window.location.href = 'auth.html';
-        }
+        // 单按钮提示：点"确定"直接前往实名认证（去掉"取消"选项）
+        alert('该操作需要先完成实名认证，请先完成实名认证。');
+        window.location.href = 'auth.html';
         return false;
     }
     return true;
@@ -156,7 +156,7 @@ function compressImageFile(file, maxDim, quality) {
         reader.onerror = function() { reject(new Error('读取图片失败')); };
         reader.onload = function(ev) {
             var image = new Image();
-            image.onerror = function() { resolve(ev.target.result); };
+            image.onerror = function() { reject(new Error('不是有效的图片文件')); };
             image.onload = function() {
                 var w = image.naturalWidth, h = image.naturalHeight;
                 if (!w || !h) { resolve(ev.target.result); return; }
@@ -174,6 +174,51 @@ function compressImageFile(file, maxDim, quality) {
             image.src = ev.target.result;
         };
         reader.readAsDataURL(file);
+    });
+}
+
+// 通用图片上传器：拦非图片 + 累加(上限 max) + 逐张删除。
+// images 为外部数组(直接 push/splice，供提交时读取)；重复选择同一文件也可追加。
+function setupImageUploader(inputEl, previewEl, images, max) {
+    max = max || 3;
+    if (!inputEl || !previewEl) return;
+    function render() {
+        previewEl.innerHTML = '';
+        images.forEach(function(dataUrl, i) {
+            var wrap = document.createElement('span');
+            wrap.style.cssText = 'position:relative;display:inline-block;margin:4px;';
+            var img = document.createElement('img');
+            img.src = dataUrl;
+            img.className = 'preview-thumb';
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.textContent = '×';
+            del.title = '删除';
+            del.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;line-height:20px;padding:0;font-size:14px;';
+            del.addEventListener('click', function() { images.splice(i, 1); render(); });
+            wrap.appendChild(img);
+            wrap.appendChild(del);
+            previewEl.appendChild(wrap);
+        });
+    }
+    inputEl.addEventListener('change', function(e) {
+        var files = Array.from(e.target.files);
+        e.target.value = ''; // 清空 input，允许再次选择/追加（含同一文件）
+        files.forEach(function(file) {
+            if (!file.type || file.type.indexOf('image/') !== 0) {
+                alert('只能上传图片文件，已忽略：' + file.name);
+                return;
+            }
+            if (images.length >= max) {
+                alert('最多上传 ' + max + ' 张图片。');
+                return;
+            }
+            compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
+                if (images.length >= max) return;
+                images.push(dataUrl);
+                render();
+            }).catch(function() { /* 非图片/解码失败：跳过 */ });
+        });
     });
 }
 
@@ -541,8 +586,9 @@ function initTaskHall() {
         var actionBtn = isAdminUser() ? '' :
             '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
 
-        var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img) {
-            return '<img src="' + (img.thumb || img) + '" data-full="' + (img.full || img) + '" class="task-image-thumb" onerror="this.style.display=\'none\'">';
+        var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img, idx) {
+            var thumbSrc = (img && img.thumb) ? img.thumb : ((img && img.full) ? img.full : img);
+            return '<img src="' + thumbSrc + '" data-postid="' + task.id + '" data-idx="' + idx + '" class="task-image-thumb" loading="lazy" onerror="this.style.display=\'none\'">';
         }).join('') + '</div>' : '';
         return '<div class="task-item" data-postid="' + task.id + '" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
             '<div class="task-item-main">' +
@@ -592,6 +638,19 @@ function initTaskHall() {
     renderTasks();
     // 暴露给 initWebSocket 的 NEW_TASK 局部插入新卡片用
     window.renderTaskItem = renderTaskItem;
+    // 实时新任务是否匹配当前筛选(类型/分类/关键词)——不匹配则不插入，避免"看着生活服务却冒出跑腿代办"
+    window.hallMatchesCurrentFilter = function(task) {
+        if (!task) return false;
+        var f = buildFilters();
+        if (f.side && f.side !== 'all' && task.publisherSide !== f.side) return false;
+        if (f.categories && f.categories.length > 0 && f.categories.indexOf(task.category) < 0) return false;
+        if (f.keyword) {
+            var kw = f.keyword.toLowerCase();
+            var hay = ((task.title || '') + ' ' + (task.description || '') + ' ' + (task.publisherName || '')).toLowerCase();
+            if (hay.indexOf(kw) < 0) return false;
+        }
+        return true;
+    };
 
     var searchBtn = document.getElementById('searchBtn');
     var keywordInput = document.getElementById('taskKeyword');
@@ -706,23 +765,7 @@ function initPublishForm() {
     var imageInput = document.getElementById('postImages');
     var previewArea = document.getElementById('imagePreview');
     var uploadedImages = [];
-
-    if (imageInput) {
-        imageInput.addEventListener('change', function(e) {
-            var files = Array.from(e.target.files).slice(0, 3);
-            uploadedImages = [];
-            previewArea.innerHTML = '';
-            files.forEach(function(file) {
-                compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
-                    uploadedImages.push(dataUrl);
-                    var img = document.createElement('img');
-                    img.src = dataUrl;
-                    img.className = 'preview-thumb';
-                    previewArea.appendChild(img);
-                }).catch(function() { /* 单张读取失败则跳过 */ });
-            });
-        });
-    }
+    setupImageUploader(imageInput, previewArea, uploadedImages, 3);
 
     // 根据"出钱/收钱/纯互助"切换专属字段与文案
     var deadlineGroup = document.getElementById('deadlineGroup');
@@ -1828,23 +1871,7 @@ function initReview() {
     var imageInput = document.getElementById('reviewImages');
     var previewArea = document.getElementById('imagePreview');
     var uploadedImages = [];
-
-    if (imageInput) {
-        imageInput.addEventListener('change', function(e) {
-            var files = Array.from(e.target.files).slice(0, 3);
-            uploadedImages = [];
-            previewArea.innerHTML = '';
-            files.forEach(function(file) {
-                compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
-                    uploadedImages.push(dataUrl);
-                    var img = document.createElement('img');
-                    img.src = dataUrl;
-                    img.className = 'preview-thumb';
-                    previewArea.appendChild(img);
-                }).catch(function() { /* 单张读取失败则跳过 */ });
-            });
-        });
-    }
+    setupImageUploader(imageInput, previewArea, uploadedImages, 3);
 
     var submitBtn = form.querySelector('.form-actions button[type="button"]');
     if (submitBtn) {
@@ -2321,6 +2348,8 @@ function initWebSocket() {
                     fetchTaskById(data.postId).then(function(res) {
                         var task = res && res.task;
                         if (!task) return;
+                        // 只插入匹配当前筛选(类型/分类/关键词)的新任务；不匹配则忽略，刷新时由服务端筛选保证一致
+                        if (window.hallMatchesCurrentFilter && !window.hallMatchesCurrentFilter(task)) return;
                         var taskList = document.getElementById('taskList');
                         if (!taskList) return;
                         // 已存在同 id 卡片则不重复插入
