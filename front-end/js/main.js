@@ -1904,15 +1904,28 @@ function initBills() {
     var list = document.getElementById('billList');
     if (!list) return;
 
-    var catMap = { recharge: '充值', order: '订单', payment: '收付款' };
+    var catMap = { recharge: '充值', order: '订单结算', payment: '收付款',
+        escrow_freeze: '冻结报酬', escrow_refund: '退回', escrow_transfer: '转账托管' };
 
-    getMyBills().then(function(res) {
-        var totalIn = res.totalIn || 0, totalOut = res.totalOut || 0, net = totalIn - totalOut;
+    // 账单标题：从备注取「：」后的任务/订单名，取不到则用订单号
+    function billTitle(note, relId) {
+        var s = String(note || '');
+        var i = s.lastIndexOf('：');
+        var t = i >= 0 ? s.slice(i + 1).trim() : s;
+        return t || ('订单 #' + relId);
+    }
+
+    Promise.all([getBalance().catch(function() { return null; }), getMyBills()]).then(function(arr) {
+        var bal = arr[0] || {}, res = arr[1] || {};
+        var totalIn = res.totalIn || 0, totalOut = res.totalOut || 0;
         if (summary) {
+            var avail = bal.balance != null ? bal.balance : '—';
+            var frozen = bal.frozenBalance != null ? bal.frozenBalance : 0;
             summary.innerHTML =
+                '<div class="bill-sum-item"><span class="bill-sum-label">可用余额</span><span style="font-size:20px;font-weight:700;">¥' + avail + '</span></div>' +
+                '<div class="bill-sum-item"><span class="bill-sum-label">冻结中</span><span class="bill-out" style="font-size:20px;font-weight:700;">¥' + frozen + '</span></div>' +
                 '<div class="bill-sum-item"><span class="bill-sum-label">总收入</span><span class="bill-in">+¥' + totalIn + '</span></div>' +
-                '<div class="bill-sum-item"><span class="bill-sum-label">总支出</span><span class="bill-out">-¥' + totalOut + '</span></div>' +
-                '<div class="bill-sum-item"><span class="bill-sum-label">净额</span><span>' + (net >= 0 ? '+' : '-') + '¥' + Math.abs(net) + '</span></div>';
+                '<div class="bill-sum-item"><span class="bill-sum-label">总支出</span><span class="bill-out">-¥' + totalOut + '</span></div>';
         }
 
         var items = res.list || [];
@@ -1920,43 +1933,71 @@ function initBills() {
             list.innerHTML = '<div class="card empty-state"><p>暂无账单记录</p></div>';
             return;
         }
-        // 按月分组（YYYY-MM），月份倒序；每月一个卡片：月汇总 + 月内流水
-        var months = {}, monthOrder = [];
+
+        // 按 relatedId 分组：有 relatedId → 订单账单(可展开看构成)；无 → 单条流水(充值/即时转账)
+        var groups = {}, order = [];
         items.forEach(function(t) {
-            var ym = (t.time || '').substring(0, 7);
-            if (!months[ym]) { months[ym] = []; monthOrder.push(ym); }
-            months[ym].push(t);
+            var key = t.relatedId ? ('g' + t.relatedId) : ('s' + t.id);
+            if (!groups[key]) { groups[key] = { rel: t.relatedId, items: [], grouped: !!t.relatedId }; order.push(key); }
+            groups[key].items.push(t);
         });
-        monthOrder.sort().reverse();
-        list.innerHTML = monthOrder.map(function(ym) {
-            var ms = months[ym];
-            var min = 0, mout = 0;
-            ms.forEach(function(t) {
-                if (t.direction === 'in') min += Number(t.amount) || 0;
-                else mout += Number(t.amount) || 0;
-            });
-            var mnet = min - mout;
-            var parts = ym.split('-');
-            var ymLabel = parts[0] + '年' + parseInt(parts[1], 10) + '月';
-            var itemsHtml = ms.map(function(t) {
+        // 组按最新一笔时间倒序（items 沿用后端的时间倒序，[0] 即最新）
+        order.sort(function(a, b) {
+            return String(groups[b].items[0].time || '').localeCompare(String(groups[a].items[0].time || ''));
+        });
+
+        list.innerHTML = order.map(function(key) {
+            var g = groups[key];
+            var gin = 0, gout = 0;
+            g.items.forEach(function(t) { if (t.direction === 'in') gin += Number(t.amount) || 0; else gout += Number(t.amount) || 0; });
+            var gnet = gin - gout;
+            var netSign = gnet >= 0 ? '+' : '-';
+            var netCls = gnet >= 0 ? 'bill-in' : 'bill-out';
+            var latest = g.items[0];
+
+            if (!g.grouped) {
+                var t = g.items[0];
                 var sign = t.direction === 'in' ? '+' : '-';
-                var cls = t.direction === 'in' ? 'bill-in' : 'bill-out';
-                return '<div class="bill-item">' +
-                    '<div class="bill-item-main">' +
-                        '<div class="bill-note">' + (t.note || catMap[t.category] || '交易') + '</div>' +
-                        '<div class="bill-meta">' + (catMap[t.category] || t.category) + ' ｜ ' + formatDateTime(t.time) + '</div>' +
-                    '</div>' +
-                    '<div class="bill-amount ' + cls + '">' + sign + '¥' + t.amount + '</div>' +
+                return '<div class="card bill-single" style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<div><div class="bill-note">' + (t.note || catMap[t.category] || '交易') + '</div>' +
+                    '<div class="bill-meta">' + (catMap[t.category] || t.category) + ' ｜ ' + formatDateTime(t.time) + '</div></div>' +
+                    '<div class="bill-amount ' + (t.direction === 'in' ? 'bill-in' : 'bill-out') + '">' + sign + '¥' + t.amount + '</div>' +
+                '</div>';
+            }
+
+            var comps = g.items.map(function(t) {
+                var s = t.direction === 'in' ? '+' : '-';
+                return '<div class="bill-item" style="display:flex;justify-content:space-between;padding:6px 0;">' +
+                    '<div><div style="font-size:13px;">' + (t.note || catMap[t.category] || t.category) + '</div>' +
+                    '<div class="bill-meta">' + (catMap[t.category] || t.category) + ' ｜ ' + formatDateTime(t.time) + '</div></div>' +
+                    '<div class="' + (t.direction === 'in' ? 'bill-in' : 'bill-out') + '" style="white-space:nowrap;">' + s + '¥' + t.amount + '</div>' +
                 '</div>';
             }).join('');
-            return '<div class="card bill-month">' +
-                '<div class="bill-month-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #eee;">' +
-                    '<strong style="font-size:15px;">' + ymLabel + '</strong>' +
-                    '<span style="font-size:12px;color:#666;">收入 +¥' + min + ' ｜ 支出 -¥' + mout + ' ｜ 净额 ' + (mnet >= 0 ? '+' : '-') + '¥' + Math.abs(mnet) + '</span>' +
+
+            return '<div class="card bill-order-group">' +
+                '<div class="bill-order-head" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">' +
+                    '<div><div style="font-weight:600;">' + billTitle(latest.note, g.rel) + '</div>' +
+                    '<div class="bill-meta">订单账单 ｜ ' + g.items.length + ' 笔明细 ｜ ' + formatDateTime(latest.time) + '</div></div>' +
+                    '<div style="display:flex;align-items:center;gap:10px;">' +
+                        '<span class="' + netCls + '" style="font-weight:600;">' + netSign + '¥' + Math.abs(Math.round(gnet * 100) / 100) + '</span>' +
+                        '<span class="bill-chevron" style="display:inline-block;transition:transform .2s;color:#999;">▸</span>' +
+                    '</div>' +
                 '</div>' +
-                itemsHtml +
+                '<div class="bill-order-body" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #eee;">' + comps + '</div>' +
             '</div>';
         }).join('');
+
+        // 点击订单账单头部：展开/收起明细，箭头旋转
+        list.addEventListener('click', function(e) {
+            var head = e.target.closest ? e.target.closest('.bill-order-head') : null;
+            if (!head || !list.contains(head)) return;
+            var body = head.parentNode.querySelector('.bill-order-body');
+            var chev = head.querySelector('.bill-chevron');
+            if (!body) return;
+            var open = body.style.display !== 'none';
+            body.style.display = open ? 'none' : 'block';
+            if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+        });
     }).catch(function(err) {
         list.innerHTML = '<div class="card empty-state"><p>' + (err.message || '加载失败') + '</p></div>';
     });
