@@ -60,9 +60,9 @@ public class Task {
 
     private String contact;
 
-    // 原图 base64 体积大；标记懒加载，避免大厅/列表查询把整列原图读进内存。
-    // 列表 DTO(fromLite)也已剥离 full，双重保证大厅不加载原图。
-    @Basic(fetch = FetchType.LAZY)
+    // 注意：缩略图 thumb 与原图 full 存于同一列（[{full,thumb}]），列表要发 thumb 必须读此列，
+    // 故不能对本列做懒加载（会与 fromLite 冲突并在非事务映射时抛 LazyInitializationException）。
+    // 大厅体积优化改由 PostDTO.fromLite 在响应层剥离 full 实现（不下发原图）。
     @Column(columnDefinition = "LONGTEXT")
     private String images;
 

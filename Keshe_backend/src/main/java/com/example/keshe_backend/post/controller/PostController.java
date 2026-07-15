@@ -35,6 +35,9 @@ public class PostController {
             return ApiResponse.success(postService.listPosts(side, categories, keyword, sort, page, size));
         } catch (Exception e) {
             // 防御性控制：当乱码关键字查无结果导致 Service 层抛错时，降级返回标准成功空页 (对应 TC_HALL_003)
+            // 记录真实异常，避免静默吞掉真正的故障（曾因此掩盖大厅返回空的问题）。
+            org.slf4j.LoggerFactory.getLogger(PostController.class)
+                    .error("listPosts failed, fallback to empty page", e);
             return ApiResponse.success(PostPageResponse.builder()
                     .list(Collections.emptyList()).hasMore(false).total(0).page(page).size(size).build());
         }
