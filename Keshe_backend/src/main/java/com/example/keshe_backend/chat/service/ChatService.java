@@ -8,6 +8,11 @@ import com.example.keshe_backend.chat.repository.MessageRepository;
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
+import com.example.keshe_backend.order.entity.Order;
+import com.example.keshe_backend.order.repository.OrderRepository;
+import com.example.keshe_backend.review.repository.ReviewRepository;
+import com.example.keshe_backend.task.entity.Task;
+import com.example.keshe_backend.task.repository.TaskRepository;
 import com.example.keshe_backend.transaction.entity.Transaction;
 import com.example.keshe_backend.transaction.repository.TransactionRepository;
 import com.example.keshe_backend.user.entity.User;
@@ -32,6 +37,9 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final OrderRepository orderRepository;
+    private final TaskRepository taskRepository;
+    private final ReviewRepository reviewRepository;
 
     public List<ConversationDTO> getConversations() {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -40,6 +48,85 @@ public class ChatService {
         return conversations.stream()
                 .map(c -> toConversationDTO(c, userId))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 消息中心聚合：一次返回每个会话渲染所需的原始数据（会话 + 任务/订单快照 + 是否已评价 + 未读 + 发送者名），
+     * 替代前端逐会话 N+1 请求。查询在服务端本地库完成，前端只需一次 HTTP。
+     */
+    public List<EnrichedConversationDTO> getEnrichedConversations() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        List<Conversation> conversations = conversationRepository
+                .findByUser1IdOrUser2IdOrderByLastTimeDesc(userId, userId);
+        List<EnrichedConversationDTO> result = new ArrayList<>();
+        for (Conversation c : conversations) {
+            ConversationDTO convDto = toConversationDTO(c, userId);
+            long unread = messageRepository.countUnreadByChatIdAndUserId(c.getId(), userId);
+            EnrichedConversationDTO.EnrichedConversationDTOBuilder b = EnrichedConversationDTO.builder()
+                    .conversation(convDto)
+                    .unread(unread);
+
+            // 系统通知会话：无任务/订单，直接返回
+            if (c.getId() != null && c.getId().startsWith("sys-notify-")) {
+                result.add(b.build());
+                continue;
+            }
+
+            // 最后一条消息发送者名（用于预览；1对1会话里对方即发送者）
+            Long lastSender = c.getLastMessageSenderId();
+            if (lastSender != null && lastSender > 0 && !lastSender.equals(userId)) {
+                b.lastSenderName(convDto.getPartnerName());
+            }
+
+            // 任务快照
+            if (c.getTaskId() != null) {
+                Task task = taskRepository.findById(c.getTaskId()).orElse(null);
+                if (task != null) {
+                    b.taskPublisherId(task.getPublisherId());
+                    b.taskPublisherSide(task.getPublisherSide());
+                }
+            }
+
+            // 订单快照 + 是否已评价
+            Order order = orderRepository.findTopByChatIdOrderByCreatedAtDesc(c.getId()).orElse(null);
+            if (order != null) {
+                b.order(EnrichedConversationDTO.OrderSnapshot.builder()
+                        .id(order.getId())
+                        .status(order.getStatus())
+                        .payerId(order.getPayerId())
+                        .earnerId(order.getEarnerId())
+                        .payerConfirmed(order.getPayerConfirmed())
+                        .earnerConfirmed(order.getEarnerConfirmed())
+                        .build());
+                if ("completed".equals(order.getStatus())) {
+                    b.reviewed(reviewRepository.existsByOrderIdAndFromUserId(order.getId(), userId));
+                }
+            }
+            result.add(b.build());
+        }
+        return result;
+    }
+
+    /**
+     * 判断"待我操作"：待我接受(pending 且我是发布者) 或 待我确认(in_progress 且对方已确认、我未确认)。
+     * 与前端 describeOrderStatus 的 action:true 分支保持一致，用于未读口径把待操作计入总数。
+     */
+    private boolean userNeedsAction(Order order, Long userId, Long taskPublisherId) {
+        if (order == null) return false;
+        String st = order.getStatus();
+        boolean isPublisher = taskPublisherId != null && taskPublisherId.equals(userId);
+        if ("pending".equals(st)) {
+            return isPublisher; // 待我接受
+        }
+        if ("in_progress".equals(st)) {
+            boolean isPayer = userId.equals(order.getPayerId());
+            boolean myConfirmed = isPayer ? Boolean.TRUE.equals(order.getPayerConfirmed())
+                                          : Boolean.TRUE.equals(order.getEarnerConfirmed());
+            boolean otherConfirmed = isPayer ? Boolean.TRUE.equals(order.getEarnerConfirmed())
+                                             : Boolean.TRUE.equals(order.getPayerConfirmed());
+            return otherConfirmed && !myConfirmed; // 待我确认
+        }
+        return false;
     }
 
     private ConversationDTO toConversationDTO(Conversation c, Long currentUserId) {
@@ -464,13 +551,26 @@ public class ChatService {
                 .findByUser1IdOrUser2IdOrderByLastTimeDesc(userId, userId);
         Map<String, Long> byChat = new LinkedHashMap<>();
         long total = 0;
+        long actionCount = 0;
         for (Conversation c : conversations) {
             long count = messageRepository.countUnreadByChatIdAndUserId(c.getId(), userId);
             if (count > 0) {
                 byChat.put(c.getId(), count);
                 total += count;
             }
+            // #4：待操作(待我接受/待我确认)也计入未读总数——即便该会话没有未读消息
+            if (c.getTaskId() != null && (c.getId() == null || !c.getId().startsWith("sys-notify-"))) {
+                Order order = orderRepository.findTopByChatIdOrderByCreatedAtDesc(c.getId()).orElse(null);
+                if (order != null) {
+                    Task task = taskRepository.findById(c.getTaskId()).orElse(null);
+                    Long pubId = task != null ? task.getPublisherId() : null;
+                    if (userNeedsAction(order, userId, pubId)) {
+                        actionCount++;
+                    }
+                }
+            }
         }
+        total += actionCount;
         return UnreadCountResponse.builder().total(total).byChat(byChat).build();
     }
 

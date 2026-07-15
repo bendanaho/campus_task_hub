@@ -26,6 +26,15 @@ public class ChatController {
     }
 
     /**
+     * 会话列表（聚合版）：一次返回每个会话渲染所需的任务/订单/未读/已评价等数据，
+     * 供消息中心一次拉取，避免前端逐会话 N+1 请求。
+     */
+    @GetMapping("/conversations/enriched")
+    public ApiResponse<List<EnrichedConversationDTO>> getEnrichedConversations() {
+        return ApiResponse.success(chatService.getEnrichedConversations());
+    }
+
+    /**
      * 确保会话存在
      */
     @PostMapping("/conversations/ensure")
