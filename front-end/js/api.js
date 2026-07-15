@@ -233,6 +233,17 @@ async function getTaskDetail(id) {
     return _handleRes(res);
 }
 
+// 按需获取某帖原图列表 [{full, thumb}]，仅在用户点击缩略图放大时调用，
+// 避免详情/订单页默认下载数 MB 原图。
+async function getPostImages(id) {
+    if (USE_MOCK) {
+        var d = await mockGetTaskDetail(id);
+        return (d && d.task && d.task.images) ? d.task.images : [];
+    }
+    var res = await fetch(API_BASE + '/posts/' + id + '/images');
+    return _handleRes(res);
+}
+
 // 发布帖子（取代旧 publishTask + publishService）。data.publisherSide: 'payer'|'earner'
 async function publishPost(data) {
     if (USE_MOCK) {

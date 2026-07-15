@@ -177,6 +177,17 @@ function compressImageFile(file, maxDim, quality) {
     });
 }
 
+// 按帖 id 缓存原图，点击放大时按需拉取一次（详情/列表接口默认只给缩略图）
+var _postFullImagesCache = {};
+function loadPostFullImages(postId) {
+    if (_postFullImagesCache[postId]) return Promise.resolve(_postFullImagesCache[postId]);
+    if (typeof getPostImages !== 'function') return Promise.resolve([]);
+    return getPostImages(postId).then(function(imgs) {
+        _postFullImagesCache[postId] = imgs || [];
+        return _postFullImagesCache[postId];
+    }).catch(function() { return []; });
+}
+
 // ==================== 登录/注册 ====================
 
 function handleRegisterForm() {
@@ -826,8 +837,9 @@ function initTaskDetail() {
         var imagesHtml = '';
         if (task.images && task.images.length > 0) {
             imagesHtml = '<div class="detail-images">' +
-                task.images.map(function(img) {
-                    return '<img src="' + (img.full || img) + '" class="detail-image" onerror="this.style.display=\'none\'">';
+                task.images.map(function(img, idx) {
+                    var thumbSrc = (img && img.thumb) ? img.thumb : ((img && img.full) ? img.full : img);
+                    return '<img src="' + thumbSrc + '" data-idx="' + idx + '" class="detail-image" loading="lazy" onerror="this.style.display=\'none\'">';
                 }).join('') +
             '</div>';
         }
@@ -1960,14 +1972,12 @@ function initLightbox() {
                 if (directFull) { bigImg.src = directFull; return; }
                 var pid = e.target.getAttribute('data-postid');
                 var idx = parseInt(e.target.getAttribute('data-idx'), 10) || 0;
-                if (pid && typeof getTaskDetail === 'function') {
-                    getTaskDetail(pid).then(function(res) {
-                        var task = res && (res.task || res);
-                        var imgs = (task && task.images) ? task.images : [];
+                if (pid) {
+                    loadPostFullImages(pid).then(function(imgs) {
                         var it = imgs[idx];
                         var full = it && (it.full || it.thumb);
                         if (full) bigImg.src = full;
-                    }).catch(function() { /* 拉取失败保留缩略图 */ });
+                    });
                 }
             }
         });
@@ -1979,8 +1989,17 @@ function initLightbox() {
             if (e.target.classList.contains('detail-image')) {
                 e.stopPropagation();
                 var bigImg = overlay.querySelector('img');
-                bigImg.src = e.target.src;
                 overlay.classList.add('active');
+                bigImg.src = e.target.src; // 先用缩略图占位
+                var idx = parseInt(e.target.getAttribute('data-idx'), 10) || 0;
+                var pid = (typeof getUrlParam === 'function') ? getUrlParam('id') : null;
+                if (pid) {
+                    loadPostFullImages(pid).then(function(imgs) {
+                        var it = imgs[idx];
+                        var full = it && (it.full || it.thumb);
+                        if (full) bigImg.src = full;
+                    });
+                }
             }
         });
     }
