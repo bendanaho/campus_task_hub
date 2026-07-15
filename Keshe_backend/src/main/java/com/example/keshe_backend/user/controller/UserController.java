@@ -47,7 +47,7 @@ public class UserController {
     public ApiResponse<?> submitAuth(@Valid @RequestBody SubmitAuthRequest request) {
         // 编程式高优先级拦截：学号长度超过30位直接阻断[cite: 3]
         if (request.getStudentId() != null && request.getStudentId().length() > 30) {
-            return ApiResponse.error(ErrorCode.BAD_REQUEST, "学号格式不合法"); //[cite: 5]
+            return ApiResponse.error(ErrorCode.PARAM_ERROR, "学号格式不合法"); //[cite: 5]
         }
         
         return ApiResponse.success(userService.submitAuth(
@@ -71,7 +71,7 @@ public class UserController {
     public ApiResponse<?> recharge(@Valid @RequestBody RechargeRequest request) {
         // 编程式高优先级拦截：校验金额小数位数是否超过2位[cite: 3]
         if (request.getAmount() != null && request.getAmount().scale() > 2) {
-            return ApiResponse.error(ErrorCode.BAD_REQUEST, "金额最多支持两位小数"); //[cite: 5]
+            return ApiResponse.error(ErrorCode.PARAM_ERROR, "金额最多支持两位小数"); //[cite: 5]
         }
         
         return ApiResponse.success(userService.recharge(request.getAmount()));

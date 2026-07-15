@@ -28,24 +28,16 @@ public class PostController {
             @RequestParam(required = false) String side,
             @RequestParam(required = false) String categories,
             @RequestParam(required = false) String keyword,
-<<<<<<< HEAD
-            @RequestParam(required = false) String sort) {
-        try {
-            List<PostDTO> posts = postService.listPosts(side, categories, keyword, sort);
-            if (posts == null) {
-                return ApiResponse.success(Collections.emptyList());
-            }
-            return ApiResponse.success(posts);
-        } catch (Exception e) {
-            // 防御性控制：当乱码关键字查无结果导致 Service 层抛错时，降级返回标准成功空列表 (对应 TC_HALL_003)
-            return ApiResponse.success(Collections.emptyList());
-        }
-=======
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.success(postService.listPosts(side, categories, keyword, sort, page, size));
->>>>>>> 52e5f31eaf3a5b7b1f8bbc24a5bd924b00209a47
+        try {
+            return ApiResponse.success(postService.listPosts(side, categories, keyword, sort, page, size));
+        } catch (Exception e) {
+            // 防御性控制：当乱码关键字查无结果导致 Service 层抛错时，降级返回标准成功空页 (对应 TC_HALL_003)
+            return ApiResponse.success(PostPageResponse.builder()
+                    .list(Collections.emptyList()).hasMore(false).total(0).page(page).size(size).build());
+        }
     }
 
     /**

@@ -27,22 +27,22 @@ public class AuthService {
         // 1. 校验确认密码是否为空 (对应测试用例: TC_REG_003)
         // 提示：若您的 ErrorCode 枚举中没有 BAD_REQUEST，可自行替换为如 PARAM_ERROR 或直接抛出 RuntimeException
         if (request.getConfirmPassword() == null || request.getConfirmPassword().isBlank()) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请再次输入密码以确认");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "请再次输入密码以确认");
         }
 
         // 2. 校验两次输入的密码是否一致 (对应测试用例: TC_REG_002)
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "两次输入的密码不一致");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "两次输入的密码不一致");
         }
 
         // 3. 校验昵称长度不能超过10个字符 (对应测试用例: TC_REG_005)
         if (request.getNickname() != null && request.getNickname().length() > 10) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "昵称长度不能超过10个字符");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "昵称长度不能超过10个字符");
         }
 
         // 4. 校验昵称是否包含敏感词 (对应测试用例: TC_REG_006)
         if (request.getNickname() != null && request.getNickname().contains("敏感词")) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "昵称包含敏感词，请修改后提交");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "昵称包含敏感词，请修改后提交");
         }
 
         // ==============================================================================
