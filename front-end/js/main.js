@@ -181,7 +181,7 @@ function handleRegisterForm() {
             alert('两次输入的密码不一致。'); return;
         }
 
-        register({ username: username, phone: phone, email: email, password: password })
+        register({ username: username, phone: phone, email: email, password: password, confirmPassword: confirmPassword })
             .then(function() {
                 alert('注册成功，请登录。');
                 var redirect = getUrlParam('redirect') || '';
