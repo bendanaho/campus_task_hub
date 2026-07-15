@@ -1027,69 +1027,67 @@ function initMessageCenter() {
         }).join('');
     }
 
-    getConversations().then(async function(conversations) {
-        if (!conversations || conversations.length === 0) {
+    getEnrichedConversations().then(function(items) {
+        if (!items || items.length === 0) {
             list.innerHTML = '<div class="card empty-state"><p>暂无消息</p></div>';
             return;
         }
+        var currentUser = getCurrentUser();
+        var myId = currentUser ? currentUser.id : '';
+        unreadByChat = {};
 
-        var unread = await getUnreadCounts();
-        unreadByChat = (unread && unread.byChat) || {};
+        // 聚合接口已一次性返回每会话所需数据，这里纯本地计算，无任何逐会话请求
+        var enriched = items.map(function(it) {
+            var c = it.conversation;
+            if (it.unread > 0) unreadByChat[c.id] = it.unread;
 
-        var enriched = await Promise.all(conversations.map(async function(c) {
-            var currentUser = getCurrentUser();
-            var roleText = '';
-
-            // 系统通知会话：无订单/角色，只做未读 + 预览
+            // 系统通知会话：无订单/角色，只做预览
             if (c.id.indexOf('sys-notify-') === 0) {
                 var np = c.lastMessage ? ('[系统] ' + c.lastMessage) : '';
-                return { c: c, roleText: '', statusInfo: { text: '', className: '' }, msgPreview: np };
+                return { c: c, roleText: '', statusInfo: { text: '', className: '' }, msgPreview: np, orderId: null };
             }
 
-            // fetchTaskById 返回 { task, publisher } 包装对象，必须取 .task；
-            // 否则 task.publisherId 恒为 undefined → isPublisher 判断失败，
-            // 服务发起者收到订单时会误显“待对方接受”（且角色文案也错）
-            var _taskRes = c.taskId ? await fetchTaskById(c.taskId) : null;
-            var task = _taskRes ? _taskRes.task : null;
-            var statusInfo = await getConversationStatusText(task, c.id, currentUser ? currentUser.id : '');
-
-            // 完成但我还没评价 → 待我评价（低优先级，可暂不评价；不再用红框/待办高亮抢占顶部）
-            var order = await getOrder(c.id);
-            if (order && order.status === 'completed' && currentUser) {
-                var reviewed = await hasReviewed(order.id);
-                if (!reviewed && !isReviewSkipped(order.id)) {
-                    statusInfo = { text: '待我评价', className: 'status-completed', review: true };
-                }
+            // 状态文案：由订单快照本地计算（等价于原 getConversationStatusText）
+            var order = it.order;
+            var statusInfo;
+            if (!order || order.status === 'cancelled') {
+                statusInfo = { text: '待下单', className: 'status-pending' };
+            } else {
+                var isPublisher = (it.taskPublisherId != null) && (myId === it.taskPublisherId);
+                statusInfo = describeOrderStatus(order, myId, isPublisher);
+            }
+            // 完成但我还没评价 → 待我评价
+            if (order && order.status === 'completed' && !it.reviewed && !isReviewSkipped(order.id)) {
+                statusInfo = { text: '待我评价', className: 'status-completed', review: true };
             }
 
-            if (task && currentUser) {
-                if (task.publisherSide === 'none') {
-                    roleText = (currentUser.id === task.publisherId) ? '我是发起者' : '我是参与者';
+            // 角色文案
+            var roleText = '';
+            if (it.taskPublisherSide && myId) {
+                if (it.taskPublisherSide === 'none') {
+                    roleText = (myId === it.taskPublisherId) ? '我是发起者' : '我是参与者';
                 } else {
-                    var iAmPayer = (currentUser.id === task.publisherId)
-                        ? (task.publisherSide === 'payer')
-                        : (task.publisherSide === 'earner');
+                    var iAmPayer = (myId === it.taskPublisherId)
+                        ? (it.taskPublisherSide === 'payer')
+                        : (it.taskPublisherSide === 'earner');
                     roleText = iAmPayer ? '我是付款方' : '我是收款方';
                 }
             }
 
-            // 最后一条消息前缀
+            // 最后一条消息前缀（发送者名来自聚合结果，无需再请求）
             var msgPreview = '';
             if (c.lastMessage) {
-                if (c.lastMessageSenderId === 'system') {
-                    msgPreview = '[系统] ' + c.lastMessage;
-                } else if (c.lastMessageSenderId === (currentUser ? currentUser.id : '')) {
+                if (c.lastMessageSenderId === myId) {
                     msgPreview = '我：' + c.lastMessage;
                 } else if (c.lastMessageSenderId) {
-                    var sender = await fetchUserById(c.lastMessageSenderId);
-                    msgPreview = (sender ? sender.username : '对方') + '：' + c.lastMessage;
+                    msgPreview = (it.lastSenderName || '对方') + '：' + c.lastMessage;
                 } else {
                     msgPreview = c.lastMessage;
                 }
             }
 
             return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview, orderId: order ? order.id : null };
-        }));
+        });
 
         // 排序优先级：待我操作 > 进行中 > 有未读 > 待评价 > 普通。同级保持原有时间倒序（sort 稳定）
         function convScore(item) {

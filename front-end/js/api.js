@@ -513,6 +513,38 @@ async function getConversations() {
     return _handleRes(res);
 }
 
+// 消息中心聚合：一次返回每会话的任务/订单/未读/已评价等原始数据，替代逐会话 N+1 请求。
+// mock 模式退化为逐会话组装，保证本地开发可用。
+async function getEnrichedConversations() {
+    if (USE_MOCK) {
+        var convs = await mockGetConversations();
+        var out = [];
+        for (var i = 0; i < convs.length; i++) {
+            var c = convs[i];
+            var order = null, reviewed = false, task = null;
+            if (c.id.indexOf('sys-notify-') !== 0) {
+                try { order = await mockGetOrder(c.id); } catch (e) {}
+                if (c.taskId) { try { var tr = await mockGetTaskDetail(c.taskId); task = tr ? tr.task : null; } catch (e) {} }
+                if (order && order.status === 'completed') { try { reviewed = await mockHasReviewed(order.id); } catch (e) {} }
+            }
+            out.push({
+                conversation: c,
+                taskPublisherId: task ? task.publisherId : null,
+                taskPublisherSide: task ? task.publisherSide : null,
+                order: order ? { id: order.id, status: order.status, payerId: order.payerId, earnerId: order.earnerId, payerConfirmed: order.payerConfirmed, earnerConfirmed: order.earnerConfirmed } : null,
+                reviewed: reviewed,
+                unread: 0,
+                lastSenderName: ''
+            });
+        }
+        return out;
+    }
+    var res = await fetch(API_BASE + '/conversations/enriched', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
 async function getMessages(chatId) {
     if (USE_MOCK) {
         return mockGetMessages(chatId);
