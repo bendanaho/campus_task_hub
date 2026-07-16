@@ -115,6 +115,16 @@ public class OrderService {
             amount = BigDecimal.ZERO;
         }
 
+        // 付款方下单即校验可用余额充足：服务帖(earner)接单者是付款方，若余额不足则立即拦下，
+        // 避免"余额不足也能下单、拖到对方接单时才 hold 失败"的坏体验。
+        // 悬赏帖(payer)报酬已在发布时冻结、下单者是收款方，无需校验。
+        if (payerId.equals(userId) && amount.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal bal = currentUser.getBalance() == null ? BigDecimal.ZERO : currentUser.getBalance();
+            if (bal.compareTo(amount) < 0) {
+                throw new BusinessException(ErrorCode.BALANCE_NOT_ENOUGH, "余额不足，无法下单，请先充值");
+            }
+        }
+
         Order order = new Order();
         order.setChatId(request.getChatId());
         order.setPostId(request.getPostId());

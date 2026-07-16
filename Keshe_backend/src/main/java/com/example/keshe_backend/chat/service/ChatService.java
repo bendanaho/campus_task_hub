@@ -352,6 +352,10 @@ public class ChatService {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "不能给自己付款");
         }
         BigDecimal amount = request.getAmount();
+        // 金额最多两位小数（与充值一致，编程式高优先级拦截）
+        if (amount != null && amount.scale() > 2) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "金额最多支持两位小数");
+        }
         String kind = request.getKind();
         if (!"request".equals(kind) && !"transfer".equals(kind)) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "kind 必须为 request 或 transfer");

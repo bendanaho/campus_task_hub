@@ -202,6 +202,11 @@ public class PostService {
             throw new BusinessException(ErrorCode.POST_EXPIRED);
         }
 
+        // 报酬金额最多两位小数（与充值/转账一致）
+        if (request.getRewardValue() != null && request.getRewardValue().scale() > 2) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "报酬金额最多支持两位小数");
+        }
+
         Task task = new Task();
         task.setTitle(request.getTitle());
         task.setType(0); // 旧字段兼容，后续迁移可移除
