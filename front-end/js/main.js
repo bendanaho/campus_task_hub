@@ -1804,6 +1804,15 @@ function initChatDetail() {
             '</span>';
     }
 
+    // 下单入口按钮。抽出来是因为"首次下单"和"上一单完成后再下一单"要给完全一样的入口
+    // （文案/金额都一致），不能只在"尚无订单"时才有。
+    function orderCreateButton(task) {
+        var amount = task.rewardValue || parseRewardValue(task.reward);
+        var label = task.publisherSide === 'payer' ? '接单赚钱'
+            : (task.publisherSide === 'none' ? '报名参加' : ('下单（支付 ' + amount + ' 元）'));
+        return '<button type="button" class="btn btn-small" onclick="handleOrderCreate(\'' + task.id + '\', \'' + chatId + '\')">' + label + '</button>';
+    }
+
     // 按"在这笔订单里我是付款方还是收款方 + 订单状态"决定按钮（2 角色，取代原来的 4 角色分支）
     async function buildTaskBarActions(task, order, currentUser) {
         var isPublisher = currentUser && currentUser.id === task.publisherId;
@@ -1823,10 +1832,7 @@ function initChatDetail() {
                 return '<span class="task-bar-waiting">等待对方发起订单...</span>';
             }
             // 响应者发起：悬赏帖→我接单收钱；服务帖→我下单付钱；纯互助→报名参加
-            var amount = task.rewardValue || parseRewardValue(task.reward);
-            var label = task.publisherSide === 'payer' ? '接单赚钱'
-                : (task.publisherSide === 'none' ? '报名参加' : ('下单（支付 ' + amount + ' 元）'));
-            return '<button type="button" class="btn btn-small" onclick="handleOrderCreate(\'' + task.id + '\', \'' + chatId + '\')">' + label + '</button>';
+            return orderCreateButton(task);
         }
 
         var isPayer = currentUser && currentUser.id === order.payerId;
@@ -1872,10 +1878,17 @@ function initChatDetail() {
         if (order.status === 'completed') {
             var toUserId = isPayer ? order.earnerId : order.payerId;
             var reviewed = await hasReviewed(order.id);
-            if (!reviewed) {
-                return '<a href="review.html?order=' + order.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+            var doneHtml = reviewed
+                ? '<span class="task-bar-waiting">已完成</span>'
+                : '<a href="review.html?order=' + order.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+            // 上一单完成后，只要帖子还在架就该能再下一单——服务帖本就可反复下单，
+            // 此前这里评价完直接 return"已完成"，把路堵死了(后端其实一直允许：
+            // 重复守卫只看 pending/in_progress，completed 不拦)。
+            // 悬赏帖被接单时就已 closed，走不到这里；发布者自己不下单。
+            if (task.status === 'open' && !isPublisher) {
+                doneHtml += orderCreateButton(task);
             }
-            return '<span class="task-bar-waiting">已完成</span>';
+            return doneHtml;
         }
 
         // disputed / closed（阶段二）
