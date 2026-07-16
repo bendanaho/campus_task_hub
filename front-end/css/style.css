@@ -11,33 +11,32 @@
 
 /* ---------- 变量 ---------- */
 :root {
-    /* 素雅 / 专业风：沉稳板岩蓝主色 + 炭墨文字 + 干净浅灰底（变量名沿用，仅换值） */
-    --coral: #34557a;
-    --coral-deep: #26415f;
-    --coral-soft: rgba(52, 85, 122, 0.08);
-    --coral-tint: rgba(52, 85, 122, 0.14);
-    --cream: #f6f7f9;
-    --cream-warm: #eef1f5;
-    --ink: #1f2d3d;
-    --ink-soft: #47586b;
-    --ink-mute: rgba(31, 45, 61, 0.55);
-    --ink-line: rgba(31, 45, 61, 0.08);
-    --ink-line-strong: rgba(31, 45, 61, 0.14);
-    --sun: #d99a2b;
-    --sun-soft: rgba(217, 154, 43, 0.16);
+    --coral: #e8553a;
+    --coral-deep: #d4442c;
+    --coral-soft: rgba(232, 85, 58, 0.10);
+    --coral-tint: rgba(232, 85, 58, 0.15);
+    --cream: #fff9f2;
+    --cream-warm: #fdf3e6;
+    --ink: #1e3a5f;
+    --ink-soft: #3d5a80;
+    --ink-mute: rgba(30, 58, 95, 0.55);
+    --ink-line: rgba(30, 58, 95, 0.08);
+    --ink-line-strong: rgba(30, 58, 95, 0.15);
+    --sun: #f5b942;
+    --sun-soft: rgba(245, 185, 66, 0.20);
     --white: #ffffff;
-    --danger: #d64545;
-    --success: #2f9e6f;
-    --warn: #d99a2b;
-    --shadow-sm: 0 1px 3px rgba(31, 45, 61, 0.06);
-    --shadow-md: 0 6px 18px -8px rgba(31, 45, 61, 0.14);
-    --shadow-lg: 0 14px 34px -12px rgba(31, 45, 61, 0.18);
-    --shadow-coral: 0 6px 16px -6px rgba(52, 85, 122, 0.28);
+    --danger: #e8553a;
+    --success: #16a34a;
+    --warn: #d97706;
+    --shadow-sm: 0 2px 8px rgba(30, 58, 95, 0.05);
+    --shadow-md: 0 8px 24px -8px rgba(30, 58, 95, 0.12);
+    --shadow-lg: 0 18px 40px -12px rgba(30, 58, 95, 0.18);
+    --shadow-coral: 0 8px 20px -6px rgba(232, 85, 58, 0.35);
     --font-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --radius-sm: 8px;
-    --radius: 12px;
-    --radius-lg: 14px;
-    --radius-xl: 16px;
+    --radius-sm: 10px;
+    --radius: 16px;
+    --radius-lg: 20px;
+    --radius-xl: 24px;
     --radius-pill: 999px;
 }
 
@@ -49,7 +48,10 @@ body {
     background-color: var(--cream);
     color: var(--ink);
     line-height: 1.6;
-    /* 素雅风：去掉圆点纹理，纯净底色 */
+    /* 暖橙背景圆点纹理 */
+    background-image: radial-gradient(circle, rgba(232, 85, 58, 0.05) 1.2px, transparent 1.2px);
+    background-size: 26px 26px;
+    background-attachment: fixed;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -78,14 +80,23 @@ html { scrollbar-gutter: stable both-edges; }
     background: linear-gradient(120deg, var(--coral) 0%, var(--coral-deep) 100%);
     color: #fff;
     padding: 16px 0;
-    box-shadow: 0 4px 20px -4px rgba(52, 85, 122, 0.35);
+    box-shadow: 0 4px 20px -4px rgba(232, 85, 58, 0.35);
     position: sticky;
     top: 0;
     z-index: 30;
     min-width: max-content;
     width: 100%;
 }
-.navbar::before { content: none; }
+/* 圆点纹理叠加 */
+.navbar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.18) 1.4px, transparent 1.4px);
+    background-size: 22px 22px;
+    pointer-events: none;
+    opacity: 0.6;
+}
 .navbar .container {
     display: flex;
     justify-content: space-between;
@@ -105,12 +116,16 @@ html { scrollbar-gutter: stable both-edges; }
     gap: 10px;
 }
 .logo::before {
-    content: '';
-    display: inline-block;
-    width: 8px;
-    height: 24px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.85);
+    content: '🤲';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(6px);
+    font-size: 20px;
 }
 
 .nav-links {
@@ -174,14 +189,15 @@ html { scrollbar-gutter: stable both-edges; }
     gap: 12px;
     position: relative;
 }
-/* 标题末尾细短线（素雅） */
+/* 标题末尾手绘波浪线（用 SVG 背景模拟） */
 .section-title::after {
     content: '';
     display: inline-block;
-    width: 32px;
-    height: 3px;
-    border-radius: 2px;
-    background: var(--coral);
+    width: 60px;
+    height: 8px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 10' fill='none'%3E%3Cpath d='M3 6 Q 14 1, 28 5 T 56 6 T 77 5' stroke='%23f5b942' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: contain;
 }
 
 /* ---------- Hero 横幅 ---------- */
@@ -195,17 +211,25 @@ html { scrollbar-gutter: stable both-edges; }
     position: relative;
     overflow: hidden;
 }
-.hero::before { content: none; }
-.hero::after {
+.hero::before {
     content: '';
     position: absolute;
-    right: -60px;
-    bottom: -80px;
-    width: 220px;
-    height: 220px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 1.5px, transparent 1.5px);
+    background-size: 22px 22px;
+    opacity: 0.4;
     pointer-events: none;
+}
+.hero::after {
+    content: '🌈';
+    position: absolute;
+    right: -14px;
+    bottom: -30px;
+    font-size: 10rem;
+    opacity: 0.18;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
 }
 .hero > * { position: relative; z-index: 1; }
 
@@ -265,12 +289,12 @@ html { scrollbar-gutter: stable both-edges; }
     font-weight: 700;
     font-family: var(--font-display);
     line-height: 1.4;
-    box-shadow: 0 4px 12px -4px rgba(52, 85, 122, 0.4);
+    box-shadow: 0 4px 12px -4px rgba(232, 85, 58, 0.4);
 }
 .btn:hover {
     background-color: var(--coral-deep);
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px -4px rgba(52, 85, 122, 0.5);
+    box-shadow: 0 6px 16px -4px rgba(232, 85, 58, 0.5);
 }
 .btn:active { transform: translateY(0); }
 
@@ -305,11 +329,11 @@ html { scrollbar-gutter: stable both-edges; }
 .btn-publish:hover { background-color: var(--coral-deep); }
 .btn-take    { background-color: var(--success); box-shadow: 0 4px 12px -4px rgba(22, 163, 74, 0.4); }
 .btn-take:hover { background-color: #15803d; }
-.btn-demand  { background-color: var(--coral); box-shadow: 0 4px 12px -4px rgba(52, 85, 122, 0.4); }
+.btn-demand  { background-color: var(--coral); box-shadow: 0 4px 12px -4px rgba(232, 85, 58, 0.4); }
 .btn-demand:hover { background-color: var(--coral-deep); }
-.btn-service { background-color: var(--sun); color: var(--ink); box-shadow: 0 4px 12px -4px rgba(217, 154, 43, 0.5); }
+.btn-service { background-color: var(--sun); color: var(--ink); box-shadow: 0 4px 12px -4px rgba(245, 185, 66, 0.5); }
 .btn-service:hover { background-color: #e5a933; }
-.btn-mutual  { background-color: var(--ink); box-shadow: 0 4px 12px -4px rgba(31, 45, 61, 0.35); }
+.btn-mutual  { background-color: var(--ink); box-shadow: 0 4px 12px -4px rgba(30, 58, 95, 0.35); }
 .btn-mutual:hover { background-color: #16304f; }
 
 .btn-small { padding: 6px 14px; font-size: 13px; }
@@ -421,7 +445,7 @@ html { scrollbar-gutter: stable both-edges; }
     border-color: var(--coral);
     box-shadow: 0 0 0 4px var(--coral-soft);
 }
-.form-control::placeholder { color: rgba(31, 45, 61, 0.35); }
+.form-control::placeholder { color: rgba(30, 58, 95, 0.35); }
 
 textarea.form-control {
     resize: vertical;
@@ -430,7 +454,7 @@ textarea.form-control {
 }
 
 /* select 模拟 placeholder */
-.placeholder-select { color: rgba(31, 45, 61, 0.35); }
+.placeholder-select { color: rgba(30, 58, 95, 0.35); }
 .placeholder-select:valid { color: var(--ink); }
 .placeholder-select option { color: var(--ink); }
 
@@ -591,7 +615,7 @@ textarea.form-control {
     object-fit: cover;
     border-radius: 12px;
     border: 2px solid #fff;
-    box-shadow: 0 4px 10px -2px rgba(31, 45, 61, 0.15);
+    box-shadow: 0 4px 10px -2px rgba(30, 58, 95, 0.15);
     cursor: zoom-in;
     transition: transform 0.2s;
 }
@@ -621,7 +645,7 @@ textarea.form-control {
     border: 2px solid var(--ink-line-strong);
     border-radius: var(--radius);
     background-color: #fff;
-    color: rgba(31, 45, 61, 0.55);
+    color: rgba(30, 58, 95, 0.55);
     font-size: 14px;
     cursor: pointer;
     text-align: left;
@@ -745,7 +769,7 @@ textarea.form-control {
     background-color: var(--coral);
     color: #fff;
     border-color: var(--coral);
-    box-shadow: 0 4px 12px -4px rgba(52, 85, 122, 0.4);
+    box-shadow: 0 4px 12px -4px rgba(232, 85, 58, 0.4);
 }
 
 /* ---------- 聊天页 ---------- */
@@ -772,7 +796,7 @@ textarea.form-control {
     border: 1px solid var(--ink-line);
     margin-top: 16px;
     /* 内圆点纹理，营造聊天窗温暖底 */
-    background-image: radial-gradient(circle, rgba(52, 85, 122, 0.04) 1.2px, transparent 1.2px);
+    background-image: radial-gradient(circle, rgba(232, 85, 58, 0.04) 1.2px, transparent 1.2px);
     background-size: 24px 24px;
 }
 
@@ -805,7 +829,7 @@ textarea.form-control {
     position: relative;
     cursor: context-menu;
     line-height: 1.55;
-    box-shadow: 0 2px 6px rgba(31, 45, 61, 0.06);
+    box-shadow: 0 2px 6px rgba(30, 58, 95, 0.06);
 }
 
 .chat-left {
@@ -819,7 +843,7 @@ textarea.form-control {
     color: #fff;
     margin-left: auto;
     border-bottom-right-radius: 6px;
-    box-shadow: 0 4px 12px -3px rgba(52, 85, 122, 0.3);
+    box-shadow: 0 4px 12px -3px rgba(232, 85, 58, 0.3);
 }
 
 .chat-time {
@@ -832,7 +856,7 @@ textarea.form-control {
 .chat-message.withdrawn {
     background: none !important;
     border: none;
-    color: rgba(31, 45, 61, 0.5);
+    color: rgba(30, 58, 95, 0.5);
     font-size: 12px;
     text-align: center;
     margin: 10px auto;
@@ -841,7 +865,7 @@ textarea.form-control {
     box-shadow: none;
 }
 .chat-message.system {
-    background: rgba(217, 154, 43, 0.15) !important;
+    background: rgba(245, 185, 66, 0.15) !important;
     color: var(--warn);
     font-size: 12px;
     font-weight: 600;
@@ -1145,7 +1169,7 @@ textarea.form-control {
     color: rgba(255, 255, 255, 0.85);
 }
 .footer p::before {
-    content: '';
+    content: '🤲 ';
     margin-right: 4px;
 }
 
@@ -1194,7 +1218,7 @@ textarea.form-control {
     font-size: 14px;
 }
 .empty-state::before {
-    content: '';
+    content: '🌤️';
     display: block;
     font-size: 44px;
     margin-bottom: 10px;
@@ -1239,7 +1263,7 @@ textarea.form-control {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(31, 45, 61, 0.88);
+    background-color: rgba(30, 58, 95, 0.88);
     z-index: 1000;
     justify-content: center;
     align-items: center;
@@ -1268,7 +1292,7 @@ textarea.form-control {
     font-family: var(--font-display);
 }
 .status-pending {
-    background-color: rgba(217, 154, 43, 0.20);
+    background-color: rgba(245, 185, 66, 0.20);
     color: #b45309;
 }
 .status-in_progress {
@@ -1284,7 +1308,7 @@ textarea.form-control {
     color: var(--ink-soft);
 }
 .status-cancelled {
-    background-color: rgba(31, 45, 61, 0.10);
+    background-color: rgba(30, 58, 95, 0.10);
     color: var(--ink-soft);
 }
 .status-badge.status-action {
@@ -1313,12 +1337,12 @@ textarea.form-control {
     font-size: 11px;
     font-weight: 800;
     vertical-align: middle;
-    box-shadow: 0 2px 6px rgba(52, 85, 122, 0.35);
+    box-shadow: 0 2px 6px rgba(232, 85, 58, 0.35);
     font-family: var(--font-display);
 }
 .message-item.needs-action {
     border-left: 4px solid var(--coral);
-    background: linear-gradient(90deg, rgba(52, 85, 122, 0.04), #fff 30%);
+    background: linear-gradient(90deg, rgba(232, 85, 58, 0.04), #fff 30%);
 }
 .message-item.needs-progress {
     border-left: 4px solid var(--success);
@@ -1379,7 +1403,7 @@ textarea.form-control {
     gap: 8px;
 }
 .active-title::before {
-    content: '';
+    content: '🔥';
     font-size: 16px;
 }
 
@@ -1433,11 +1457,11 @@ textarea.form-control {
     background-color: var(--coral);
     color: #fff;
     border-color: var(--coral);
-    box-shadow: 0 4px 12px -4px rgba(52, 85, 122, 0.4);
+    box-shadow: 0 4px 12px -4px rgba(232, 85, 58, 0.4);
 }
 .dispute-card {
     border-left: 4px solid var(--coral);
-    background: linear-gradient(90deg, rgba(52, 85, 122, 0.04), #fff 30%);
+    background: linear-gradient(90deg, rgba(232, 85, 58, 0.04), #fff 30%);
 }
 .dispute-card textarea { resize: vertical; }
 .report-reasons {
