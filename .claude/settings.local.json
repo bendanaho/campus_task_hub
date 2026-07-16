@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -m 15 -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://182.92.133.163:8081/)",
+      "Bash(curl -s -m 15 -X POST http://182.92.133.163:8081/api/login -H \"Content-Type: application/json\" -d '{\"account\":\"penguin\",\"password\":\"pass123\"}')",
+      "Bash(npm -v)",
+      "Bash(npx --version)",
+      "PowerShell($ErrorActionPreference='SilentlyContinue'; \"node: \" + \\(node -v\\); \"npm: \" + \\(npm -v\\); \"npx: \" + \\(& npx --version\\))",
+      "Bash(curl -s -m 15 http://182.92.133.163:8081/profile.html)",
+      "Bash(curl -s -m 15 http://182.92.133.163:8081/publish-task.html)",
+      "Bash(python -c \"import docx\")",
+      "PowerShell($py = \"C:\\\\Users\\\\Owari\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; if \\(-not \\(Test-Path $py\\)\\) { $py = \"python\" }; & $py --version)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Owari\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\" -ErrorAction SilentlyContinue | Select FullName; Get-ChildItem \"D:\\\\Users\\\\Owari\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -ErrorAction SilentlyContinue | Select FullName; \\(Get-Command py -ErrorAction SilentlyContinue\\).Source)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import docx; print\\('docx ok'\\)\")",
+      "Bash(pip show *)",
+      "PowerShell(python --version)",
+      "PowerShell(python -c \"import docx; print\\('docx ok'\\)\")",
+      "PowerShell(Get-Command python -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command py -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command python3 -ErrorAction SilentlyContinue)",
+      "Read(//c/Users/Owari/AppData/Local/Temp/claude/C--Users-Owari-Desktop-soft/eda9b27b-6956-418e-98ba-169608a093b9/scratchpad/docx_x/**)",
+      "Bash(sed -e 's/<w:p [^>]*>/\\\\n<P>/g' -e 's/<w:p>/\\\\n<P>/g' -e 's/<[^>]*>//g' word/document.xml)",
+      "Bash(grep -v '^\\\\s*$')",
+      "Bash(cd /c/Users/Owari/Desktop/soft)",
+      "Bash(ls -la e2e/results)",
+      "Bash(ls e2e *)",
+      "Bash(awk '/TC_WAL_004/{f=1} f{print} /<\\\\/testcase>/{if\\(f>0\\){c++; if\\(c>=1 && /<\\\\/testcase>/ && seen\\){exit}}}' e2e/results/junit.xml)",
+      "Bash(pandoc -t markdown \"05_测试计划与分析报告.docx\")",
+      "Bash(pandoc --version)",
+      "Bash(python -c \"import docx; print\\('python-docx', docx.__version__\\)\")",
+      "Bash(cp \"05_测试计划与分析报告.docx\" \"05_测试计划与分析报告_模板备份.docx\")"
+    ]
+  }
+}
