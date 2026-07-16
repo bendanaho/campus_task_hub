@@ -63,12 +63,15 @@ public class PostService {
                 preds.add(root.get("category").in(Arrays.asList(categories.split(","))));
             }
             if (keyword != null && !keyword.isEmpty()) {
-                String like = "%" + keyword.toLowerCase() + "%";
-                preds.add(cb.or(
-                        cb.like(cb.lower(root.get("title")), like),
-                        cb.like(cb.lower(root.get("description")), like),
-                        cb.like(cb.lower(root.get("publisherName")), like)
-                ));
+                // 近义词搜索：把关键词扩展为一组近义词，对每个词在标题/描述/发布者名上做 LIKE 后 OR
+                List<Predicate> ors = new ArrayList<>();
+                for (String term : com.example.keshe_backend.common.util.SynonymDict.expand(keyword)) {
+                    String like = "%" + term + "%";
+                    ors.add(cb.like(cb.lower(root.get("title")), like));
+                    ors.add(cb.like(cb.lower(root.get("description")), like));
+                    ors.add(cb.like(cb.lower(root.get("publisherName")), like));
+                }
+                preds.add(cb.or(ors.toArray(new Predicate[0])));
             }
             return cb.and(preds.toArray(new Predicate[0]));
         };
