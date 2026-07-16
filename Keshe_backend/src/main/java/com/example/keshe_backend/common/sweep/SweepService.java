@@ -31,6 +31,8 @@ import java.util.List;
 public class SweepService {
 
     private static final int AUTO_DAYS = 2;
+    /** 待接受订单超过这么多天未被接受 → 自动取消并退款，避免付款方的钱被无限期冻住 */
+    private static final int PENDING_EXPIRE_DAYS = 3;
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
@@ -45,8 +47,44 @@ public class SweepService {
      * 业务方法在读取敏感数据前显式调用此方法进行清理。
      */
     public void sweep() {
+        expirePendingSweep();
         autoConfirmSweep();
         ensureDefaultReviews();
+    }
+
+    /**
+     * 待接受订单超时自动取消并退款。
+     *
+     * 下单时就冻结付款方的钱（见 OrderService.createOrder），若对方一直不接受，
+     * 这笔钱会无限期冻着——余额里看不见、花不出去，而买家未必意识到该去哪解开。
+     * 此前系统只对 in_progress 做超时自动确认，pending 完全没有兜底。
+     *
+     * 只取消、退款，不做任何结算，对双方都无损。
+     */
+    @Transactional
+    public void expirePendingSweep() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(PENDING_EXPIRE_DAYS);
+        List<Order> expired = orderRepository.findByStatusAndCreatedAtBefore("pending", cutoff);
+        for (Order order : expired) {
+            log.info("待接受订单超时自动取消: id={}, createdAt={}", order.getId(), order.getCreatedAt());
+            order.setStatus("cancelled");
+            orderRepository.save(order);
+
+            Task post = taskRepository.findById(order.getPostId()).orElse(null);
+            String title = post != null ? post.getTitle() : "";
+            // 退回下单时冻结的钱。悬赏帖(payer)的报酬冻在【帖子】上（发布时冻结）、
+            // 不随订单取消退回，帖子还挂着等下一个人接——与 OrderService 同一条规则。
+            BigDecimal amount = order.getAmount();
+            if (post != null && !"payer".equals(post.getPublisherSide())
+                    && amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
+                walletService.refund(order.getPayerId(), amount, "escrow_refund", relOrder(order.getId()),
+                        "待接受超时自动取消，退回冻结报酬：" + title);
+            }
+            chatService.addSystemMessage(order.getChatId(),
+                    "该订单超过 " + PENDING_EXPIRE_DAYS + " 天未被接受，已自动取消"
+                            + (amount != null && amount.compareTo(BigDecimal.ZERO) > 0 ? "，冻结的报酬已退回付款方" : ""),
+                    String.valueOf(order.getPostId()), title);
+        }
     }
 
     /**
@@ -148,6 +186,7 @@ public class SweepService {
     @Transactional
     public void scheduledSweep() {
         log.debug("定时清理开始...");
+        expirePendingSweep();
         autoConfirmSweep();
         ensureDefaultReviews();
     }

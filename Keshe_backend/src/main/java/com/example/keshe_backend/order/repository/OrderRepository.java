@@ -34,6 +34,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByStatusAndAutoConfirmAtBefore(String status, LocalDateTime time);
 
+    /** 指定状态且创建时间早于 time 的订单：用于"待接受订单超时自动取消"。 */
+    List<Order> findByStatusAndCreatedAtBefore(String status, LocalDateTime time);
+
     List<Order> findByStatusAndReviewDeadlineBefore(String status, LocalDateTime time);
 
     // 管理员：争议列表（按申诉时间倒序）与全部订单总览
