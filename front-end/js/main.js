@@ -1348,7 +1348,11 @@ function initMessageCenter() {
         return 0;
     }
 
+    // 只重拉数据 + 重绘，不碰 activeTab / msgPage，也不重新绑定事件。
+    // 新消息到达时必须走这里：以前 WebSocket 直接重跑 initMessageCenter()，
+    // 会把当前标签重置回"待处理"、页码回到第 1 页，还每次多绑一组事件监听。
     function loadData() {
+    var keepScroll = window.scrollY || window.pageYOffset || 0;
     return getEnrichedConversations().then(function(items) {
         if (!items || items.length === 0) {
             list.innerHTML = '<div class="card empty-state"><p>暂无消息</p></div>';
@@ -1426,6 +1430,8 @@ function initMessageCenter() {
         renderOverview();
         renderTabs();
         renderPanel();
+        // 列表是整块重绘的，绘完把滚动位置放回原处，避免"来条新消息就被弹回顶部"
+        if (keepScroll > 0) window.scrollTo(0, keepScroll);
     });
     }
 
@@ -1433,6 +1439,8 @@ function initMessageCenter() {
     // 从聊天页"返回"时页面常由 bfcache 恢复，DOMContentLoaded 不再触发，
     // 未读角标会停在离开前的状态。注册刷新钩子，由 pageshow/visibilitychange 重新拉数据。
     window.__pageRefresh = loadData;
+    // WebSocket 收到新消息时也走它做局部刷新（保持当前标签/页码/滚动位置）
+    window.refreshMessageCenter = loadData;
 
     if (overviewEl) overviewEl.addEventListener('click', function(e) { var c = e.target.closest && e.target.closest('.ov-card'); if (c) switchTab(c.getAttribute('data-tab')); });
     if (tabsEl) tabsEl.addEventListener('click', function(e) { var b = e.target.closest && e.target.closest('.order-tab'); if (b) switchTab(b.getAttribute('data-tab')); });
@@ -1461,8 +1469,9 @@ window.skipReview = function(orderId) {
             localStorage.setItem('skipped_reviews', JSON.stringify(skipped));
         }
     } catch (e) {}
-    // 重新渲染消息中心列表（去掉该会话的待评价提示）
-    initMessageCenter();
+    // 重新渲染消息中心列表（去掉该会话的待评价提示）。
+    // 走局部刷新而不是重跑 init：否则点一下"暂不评价"就被弹回"待处理"第 1 页。
+    if (typeof window.refreshMessageCenter === 'function') window.refreshMessageCenter();
 };
 
 // ==================== 聊天详情 ====================
@@ -3073,8 +3082,10 @@ function initWebSocket() {
                         if (window.renderTaskBar) window.renderTaskBar();
                     }
                 } else if (window.location.pathname.includes('message-center.html')) {
-                    // 消息中心：刷新会话列表（状态文案/预览/未读/排序）
-                    if (typeof initMessageCenter === 'function') initMessageCenter();
+                    // 消息中心：只重拉数据重绘（保持当前标签/页码/滚动位置）。
+                    // 不能再调 initMessageCenter()——那会重置回"待处理"第 1 页并重复绑定事件，
+                    // 用户一收到消息就被打断。
+                    if (typeof window.refreshMessageCenter === 'function') window.refreshMessageCenter();
                 }
             }
         } catch (e) {
