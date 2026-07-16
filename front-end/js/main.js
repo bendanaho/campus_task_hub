@@ -184,11 +184,11 @@ function setupImageUploader(inputEl, previewEl, images, max) {
     if (!inputEl || !previewEl) return;
     function render() {
         previewEl.innerHTML = '';
-        images.forEach(function(dataUrl, i) {
+        images.forEach(function(url, i) {
             var wrap = document.createElement('span');
             wrap.style.cssText = 'position:relative;display:inline-block;margin:4px;';
             var img = document.createElement('img');
-            img.src = dataUrl;
+            img.src = url;   // 现在是 /uploads/xxx.jpg
             img.className = 'preview-thumb';
             var del = document.createElement('button');
             del.type = 'button';
@@ -221,12 +221,16 @@ function setupImageUploader(inputEl, previewEl, images, max) {
         if (dropped > 0) msg.push('最多 ' + max + ' 张，仅添加前 ' + toAdd.length + ' 张（多选的 ' + dropped + ' 张未添加）');
         if (msg.length) alert(msg.join('；') + '。');
 
+        // 上传成文件、只保留 URL(uploadImage 内部已做压缩)。
+        // 此前这里 push 的是 base64 dataURL，会被原样存进 tasks.images，
+        // 导致大厅每次都要下发几百 KB 的 base64 缩略图(实测响应 99% 都是它)。
         toAdd.forEach(function(file) {
-            compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
+            uploadImage(file).then(function(r) {
                 if (images.length >= max) return;
-                images.push(dataUrl);
+                if (!r || !r.url) return;
+                images.push(r.url);
                 render();
-            }).catch(function() { /* 解码失败：跳过 */ });
+            }).catch(function(err) { alert((err && err.message) || '图片上传失败'); });
         });
     });
 }
@@ -2261,12 +2265,9 @@ function initOrderCenter() {
         }
         var allTp = Math.ceil(records.length / orderPageSize);
         if (orderPage > allTp - 1) orderPage = allTp - 1;
-        // 只对当前页的记录查"是否已评价"，避免为整份列表逐单发请求
-        var pageRecords = pageSlice(records, orderPage, orderPageSize);
-        var enriched = await Promise.all(pageRecords.map(async function(r) {
-            var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
-            return { r: r, reviewed: reviewed };
-        }));
+        var enriched = pageSlice(records, orderPage, orderPageSize).map(function(r) {
+            return { r: r, reviewed: !!r.reviewed };   // reviewed 随列表由后端返回
+        });
         renderPager(orderPagerEl, {
             page: orderPage, totalPages: allTp, total: records.length,
             onGo: function(p) { orderPage = p; renderAllTab(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
@@ -2348,10 +2349,11 @@ function initOrderCenter() {
 
     async function loadAll() {
         var records = await getMyOrders();
-        allOrders = await Promise.all((records || []).map(async function(r) {
-            var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
-            return Object.assign({}, r, { reviewed: reviewed });
-        }));
+        // reviewed 由后端批量算好随列表返回；此前这里对每个已完成订单都要单独发一次
+        // /reviews/has-reviewed 请求(HTTP 级 N+1)，12 个已完成订单就要多发 12 个请求。
+        allOrders = (records || []).map(function(r) {
+            return Object.assign({}, r, { reviewed: !!r.reviewed });
+        });
         // 我发布的帖子拆两组：open=待响应(可撤回)；其余=已下架/已结束。
         // 后者以前无处可看——发布者收到"已被管理员下架"的通知，却在自己页面找不到那个帖子。
         try {
