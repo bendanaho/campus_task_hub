@@ -1059,23 +1059,59 @@ function initMessageCenter() {
     if (!protectPage(['message-center.html'])) return;
 
     var list = document.querySelector('.message-list');
-    if (!list) return;
-
+    var overviewEl = document.getElementById('msgOverview');
+    var tabsEl = document.getElementById('msgTabs');
+    var filterBar = document.getElementById('msgFilterBar');
     var statusFilter = document.getElementById('msgStatusFilter');
     var roleFilter = document.getElementById('msgRoleFilter');
     var keywordInput = document.getElementById('msgKeyword');
     var searchBtn = document.getElementById('msgSearchBtn');
+    if (!list) return;
 
-    var enrichedCache = null;
-    var unreadByChat = {};
+    var enriched = [];
+    var counts = { action: 0, unread: 0 };
+    var activeTab = 'action';
 
-    // 按筛选条件过滤并渲染（enriched 已缓存，筛选变化不重新拉数据）
+    function renderRow(item) {
+        var c = item.c;
+        var si = item.statusInfo || {};
+        var needAction = !!si.action;
+        var inProgress = !needAction && si.className === 'status-in_progress';
+        var statusBadge = si.text
+            ? '<span class="status-badge ' + (needAction ? 'status-action' : si.className) + '">' + (needAction ? '● ' : '') + si.text + '</span>'
+            : '';
+        var uc = item.unread || 0;
+        var unreadBadge = uc > 0 ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>' : '';
+        var reviewBtn = (si.review && item.orderId)
+            ? '<button type="button" class="btn btn-small btn-link-skip" onclick="skipReview(\'' + item.orderId + '\')">暂不评价</button>'
+            : '';
+        var itemClass = 'message-item';
+        if (needAction) itemClass += ' needs-action';
+        else if (inProgress) itemClass += ' needs-progress';
+        return '<div class="' + itemClass + '">' +
+            '<div class="msg-header">' +
+                '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
+                '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
+            '</div>' +
+            '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
+            '<p class="msg-preview">' + item.msgPreview + '</p>' +
+            '<div class="actions">' +
+                '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
+                reviewBtn +
+            '</div>' +
+        '</div>';
+    }
+
+    function renderList(arr, emptyText) {
+        list.innerHTML = arr.length ? arr.map(renderRow).join('') : '<div class="card empty-state"><p>' + (emptyText || '暂无消息') + '</p></div>';
+    }
+
+    // 「全部」标签的筛选（状态/角色/关键词）
     function applyFilters() {
-        if (!enrichedCache) return;
         var st = statusFilter ? statusFilter.value : 'all';
         var rl = roleFilter ? roleFilter.value : 'all';
         var kw = keywordInput ? keywordInput.value.trim().toLowerCase() : '';
-        var filtered = enrichedCache.filter(function(item) {
+        var filtered = enriched.filter(function(item) {
             var c = item.c;
             var si = item.statusInfo || {};
             if (st === 'action' && !si.action) return false;
@@ -1090,65 +1126,75 @@ function initMessageCenter() {
             }
             return true;
         });
-        if (filtered.length === 0) {
-            list.innerHTML = '<div class="card empty-state"><p>没有符合条件的会话</p></div>';
+        renderList(filtered, '没有符合条件的会话');
+    }
+
+    function renderPanel() {
+        if (filterBar) filterBar.style.display = (activeTab === 'all') ? '' : 'none';
+        if (activeTab === 'all') { applyFilters(); return; }
+        if (activeTab === 'action') {
+            renderList(enriched.filter(function(it) { return it.needsAction && !it.isSystem; }), '没有需要处理的消息');
             return;
         }
-        list.innerHTML = filtered.map(function(item) {
-            var c = item.c;
-            var si = item.statusInfo || {};
-            var needAction = !!si.action;
-            var inProgress = !needAction && si.className === 'status-in_progress';
-            var statusBadge = si.text
-                ? '<span class="status-badge ' + (needAction ? 'status-action' : si.className) + '">' +
-                    (needAction ? '● ' : '') + si.text + '</span>'
-                : '';
-            var uc = unreadByChat[c.id] || 0;
-            var unreadBadge = uc > 0
-                ? '<span class="msg-unread">' + (uc > 99 ? '99+' : uc) + ' 条未读</span>'
-                : '';
-            var reviewBtn = (si.review && item.orderId)
-                ? '<button type="button" class="btn btn-small btn-link-skip" onclick="skipReview(\'' + item.orderId + '\')">暂不评价</button>'
-                : '';
-            var itemClass = 'message-item';
-            if (needAction) itemClass += ' needs-action';
-            else if (inProgress) itemClass += ' needs-progress';
-            return '<div class="' + itemClass + '">' +
-                '<div class="msg-header">' +
-                    '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
-                    '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
-                '</div>' +
-                '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
-                '<p class="msg-preview">' + item.msgPreview + '</p>' +
-                '<div class="actions">' +
-                    '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
-                    reviewBtn +
-                '</div>' +
-            '</div>';
+        // 未读：按最后消息时间倒序（含未读的系统通知）
+        var arr = enriched.filter(function(it) { return it.unread > 0; })
+            .slice().sort(function(a, b) { return String(b.c.lastTime || '').localeCompare(String(a.c.lastTime || '')); });
+        renderList(arr, '没有未读消息');
+    }
+
+    function renderOverview() {
+        if (!overviewEl) return;
+        overviewEl.innerHTML =
+            '<div class="ov-card ov-danger" data-tab="action"><p class="ov-label">待我处理</p><p class="ov-num">' + counts.action + '</p></div>' +
+            '<div class="ov-card ov-accent" data-tab="unread"><p class="ov-label">未读</p><p class="ov-num">' + counts.unread + '</p></div>';
+    }
+    function renderTabs() {
+        if (!tabsEl) return;
+        var tabs = [
+            { key: 'action', label: '待处理', count: counts.action, danger: true },
+            { key: 'unread', label: '未读', count: counts.unread },
+            { key: 'all', label: '全部' }
+        ];
+        tabsEl.innerHTML = tabs.map(function(t) {
+            var badge = t.count > 0 ? ' <span class="tab-badge' + (t.danger ? ' tab-badge-danger' : '') + '">' + t.count + '</span>' : '';
+            return '<button type="button" class="order-tab' + (activeTab === t.key ? ' active' : '') + '" data-tab="' + t.key + '">' + t.label + badge + '</button>';
         }).join('');
+    }
+    function switchTab(key) { activeTab = key; renderTabs(); renderPanel(); }
+
+    function convScore(item) {
+        var si = item.statusInfo || {};
+        if (si.action) return 4;
+        if (si.className === 'status-in_progress') return 3;
+        if (item.unread > 0) return 2;
+        if (si.review) return 1;
+        return 0;
     }
 
     getEnrichedConversations().then(function(items) {
         if (!items || items.length === 0) {
             list.innerHTML = '<div class="card empty-state"><p>暂无消息</p></div>';
+            if (overviewEl) overviewEl.innerHTML = '';
+            if (tabsEl) tabsEl.innerHTML = '';
             return;
         }
         var currentUser = getCurrentUser();
         var myId = currentUser ? currentUser.id : '';
-        unreadByChat = {};
 
-        // 聚合接口已一次性返回每会话所需数据，这里纯本地计算，无任何逐会话请求
-        var enriched = items.map(function(it) {
+        // 聚合接口一次返回，纯本地计算；每项附 isSystem / unread / needsAction 三个分类标记
+        enriched = items.map(function(it) {
             var c = it.conversation;
-            if (it.unread > 0) unreadByChat[c.id] = it.unread;
+            var isSystem = c.id.indexOf('sys-notify-') === 0;
+            var unread = it.unread || 0;
 
-            // 系统通知会话：无订单/角色，只做预览
-            if (c.id.indexOf('sys-notify-') === 0) {
-                var np = c.lastMessage ? ('[系统] ' + c.lastMessage) : '';
-                return { c: c, roleText: '', statusInfo: { text: '', className: '' }, msgPreview: np, orderId: null };
+            if (isSystem) {
+                return {
+                    c: c, roleText: '', statusInfo: { text: '', className: '' },
+                    msgPreview: c.lastMessage ? ('[系统] ' + c.lastMessage) : '',
+                    orderId: null, isSystem: true, unread: unread, needsAction: false
+                };
             }
 
-            // 状态文案：由订单快照本地计算（等价于原 getConversationStatusText）
             var order = it.order;
             var statusInfo;
             if (!order || order.status === 'cancelled') {
@@ -1157,64 +1203,51 @@ function initMessageCenter() {
                 var isPublisher = (it.taskPublisherId != null) && (myId === it.taskPublisherId);
                 statusInfo = describeOrderStatus(order, myId, isPublisher);
             }
-            // 完成但我还没评价 → 待我评价
             if (order && order.status === 'completed' && !it.reviewed && !isReviewSkipped(order.id)) {
                 statusInfo = { text: '待我评价', className: 'status-completed', review: true };
             }
 
-            // 角色文案
             var roleText = '';
             if (it.taskPublisherSide && myId) {
                 if (it.taskPublisherSide === 'none') {
                     roleText = (myId === it.taskPublisherId) ? '我是发起者' : '我是参与者';
                 } else {
-                    var iAmPayer = (myId === it.taskPublisherId)
-                        ? (it.taskPublisherSide === 'payer')
-                        : (it.taskPublisherSide === 'earner');
+                    var iAmPayer = (myId === it.taskPublisherId) ? (it.taskPublisherSide === 'payer') : (it.taskPublisherSide === 'earner');
                     roleText = iAmPayer ? '我是付款方' : '我是收款方';
                 }
             }
 
-            // 最后一条消息前缀（发送者名来自聚合结果，无需再请求）
             var msgPreview = '';
             if (c.lastMessage) {
-                if (c.lastMessageSenderId === myId) {
-                    msgPreview = '我：' + c.lastMessage;
-                } else if (c.lastMessageSenderId) {
-                    msgPreview = (it.lastSenderName || '对方') + '：' + c.lastMessage;
-                } else {
-                    msgPreview = c.lastMessage;
-                }
+                if (c.lastMessageSenderId === myId) msgPreview = '我：' + c.lastMessage;
+                else if (c.lastMessageSenderId) msgPreview = (it.lastSenderName || '对方') + '：' + c.lastMessage;
+                else msgPreview = c.lastMessage;
             }
 
-            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview, orderId: order ? order.id : null };
+            // 待我处理 = 待我接受/待我确认(action) 或 待我评价(review)
+            var needsAction = (statusInfo.action === true) || (statusInfo.review === true);
+            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview, orderId: order ? order.id : null, isSystem: false, unread: unread, needsAction: needsAction };
         });
 
-        // 排序优先级：待我操作 > 进行中 > 有未读 > 待评价 > 普通。同级保持原有时间倒序（sort 稳定）
-        function convScore(item) {
-            var si = item.statusInfo || {};
-            if (si.action) return 4;                              // 待我接受 / 待我确认
-            if (si.className === 'status-in_progress') return 3;  // 进行中（无需我操作）
-            var uc = unreadByChat[item.c.id] || 0;
-            if (uc > 0) return 2;                                 // 有未读新消息
-            if (si.review) return 1;                              // 待我评价
-            return 0;
-        }
+        // 「全部」标签默认排序（待办>进行中>未读>待评价>普通）
         enriched.sort(function(a, b) { return convScore(b) - convScore(a); });
 
-        list.innerHTML = '';
-        enrichedCache = enriched;
-        applyFilters();
+        counts = {
+            action: enriched.filter(function(it) { return it.needsAction && !it.isSystem; }).length,
+            unread: enriched.filter(function(it) { return it.unread > 0; }).length
+        };
+
+        renderOverview();
+        renderTabs();
+        renderPanel();
     });
 
+    if (overviewEl) overviewEl.addEventListener('click', function(e) { var c = e.target.closest && e.target.closest('.ov-card'); if (c) switchTab(c.getAttribute('data-tab')); });
+    if (tabsEl) tabsEl.addEventListener('click', function(e) { var b = e.target.closest && e.target.closest('.order-tab'); if (b) switchTab(b.getAttribute('data-tab')); });
     if (statusFilter) statusFilter.addEventListener('change', applyFilters);
     if (roleFilter) roleFilter.addEventListener('change', applyFilters);
     if (searchBtn) searchBtn.addEventListener('click', applyFilters);
-    if (keywordInput) {
-        keywordInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); applyFilters(); }
-        });
-    }
+    if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); applyFilters(); } });
 }
 
 // 消息中心「暂不评价」：本地记住用户主动跳过的订单，不再在消息中心提示待评价

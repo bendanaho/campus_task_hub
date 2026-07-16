@@ -24,7 +24,10 @@
         <div class="container">
             <h1 class="section-title">消息中心</h1>
 
-            <div class="filter-bar">
+            <div id="msgOverview" class="order-overview"></div>
+            <div id="msgTabs" class="order-tabs"></div>
+
+            <div class="filter-bar" id="msgFilterBar" style="display:none;">
                 <select id="msgStatusFilter" class="form-control">
                     <option value="all">全部状态</option>
                     <option value="action">待我操作</option>
