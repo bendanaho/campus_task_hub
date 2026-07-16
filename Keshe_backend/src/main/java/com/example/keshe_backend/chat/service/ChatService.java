@@ -203,19 +203,54 @@ public class ChatService {
                 .build();
     }
 
+    /**
+     * 取得或创建 (任务, 双方) 对应的唯一会话，返回其 chatId（调用方必须使用返回值）。
+     *
+     * 此前这里只按客户端传来的 chatId 字符串查重，等于把"会话的身份"交给客户端定义：
+     * 换个拼法就能对同一个 (任务, 双方) 造出第二条会话，聊天记录被劈成两半。
+     * 现在身份由后端按业务键 (taskId, 双方) 唯一确定，客户端传什么 id 只作为新建时的建议名。
+     *
+     * 会话对应任务而非订单：聊天发生在下单之前，且一个 (任务,双方) 会先后产生多笔订单
+     * （取消后可重下、服务帖可反复下单），它们都归属同一条会话。
+     */
     @Transactional
-    public void ensureConversation(EnsureConversationRequest request) {
+    public String ensureConversation(EnsureConversationRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        if (conversationRepository.existsById(request.getChatId())) {
-            return;
+        Long partnerId = request.getPartnerId();
+        Long taskId = request.getTaskId();
+
+        // 业务键命中 → 复用既有会话，无论客户端提议的 id 是什么
+        if (taskId != null && partnerId != null) {
+            Conversation existing = conversationRepository
+                    .findByTaskIdAndPair(taskId, userId, partnerId).orElse(null);
+            if (existing != null) return existing.getId();
         }
+        if (conversationRepository.existsById(request.getChatId())) {
+            return request.getChatId();
+        }
+
         Conversation c = new Conversation();
         c.setId(request.getChatId());
-        c.setUser1Id(userId);
-        c.setUser2Id(request.getPartnerId());
-        c.setTaskId(request.getTaskId());
-        c.setTaskTitle(request.getTaskTitle() != null ? request.getTaskTitle() : "");
+        // 归一化：小 id 恒为 user1。全代码对 user1/user2 都是对称使用
+        // (partnerId = user1==me ? user2 : user1)，谁在前无语义差别；
+        // 归一化后才能给 (task_id, user1_id, user2_id) 建唯一索引做数据库层兜底。
+        if (partnerId != null && userId > partnerId) {
+            c.setUser1Id(partnerId);
+            c.setUser2Id(userId);
+        } else {
+            c.setUser1Id(userId);
+            c.setUser2Id(partnerId);
+        }
+        c.setTaskId(taskId);
+        // 标题以服务端为准：客户端不一定拿得到（如大厅直接点"下单"时它只有 postId），
+        // 传空就按 taskId 自己查，避免会话标题存成空串。
+        String title = request.getTaskTitle();
+        if ((title == null || title.isBlank()) && taskId != null) {
+            title = taskRepository.findById(taskId).map(Task::getTitle).orElse("");
+        }
+        c.setTaskTitle(title != null ? title : "");
         conversationRepository.save(c);
+        return c.getId();
     }
 
     public List<MessageDTO> getMessages(String chatId) {

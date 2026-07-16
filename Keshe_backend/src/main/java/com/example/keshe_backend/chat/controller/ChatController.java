@@ -37,11 +37,16 @@ public class ChatController {
     /**
      * 确保会话存在
      */
+    /**
+     * 取得或创建 (任务, 双方) 的唯一会话。
+     * 返回 chatId —— 可能与客户端提议的不同（已存在同一业务键的会话时复用既有的），
+     * 客户端必须以返回值为准。
+     */
     @PostMapping("/conversations/ensure")
-    public ApiResponse<Map<String, Boolean>> ensureConversation(
+    public ApiResponse<Map<String, String>> ensureConversation(
             @Valid @RequestBody EnsureConversationRequest request) {
-        chatService.ensureConversation(request);
-        return ApiResponse.success(Map.of("success", true));
+        String chatId = chatService.ensureConversation(request);
+        return ApiResponse.success(Map.of("chatId", chatId));
     }
 
     /**

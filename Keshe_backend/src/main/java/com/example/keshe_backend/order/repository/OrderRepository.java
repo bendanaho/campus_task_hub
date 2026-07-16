@@ -29,6 +29,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByPostIdAndStatusIn(Long postId, List<String> statuses);
 
+    /** 某会话下处于指定状态的订单：用于"同一会话同时只能有一笔活跃订单"的校验。 */
+    List<Order> findByChatIdAndStatusIn(String chatId, List<String> statuses);
+
     List<Order> findByStatusAndAutoConfirmAtBefore(String status, LocalDateTime time);
 
     List<Order> findByStatusAndReviewDeadlineBefore(String status, LocalDateTime time);

@@ -179,7 +179,11 @@ CREATE TABLE IF NOT EXISTS conversations (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT NULL,
     KEY idx_conv_user1 (user1_id),
-    KEY idx_conv_user2 (user2_id)
+    KEY idx_conv_user2 (user2_id),
+    -- (任务, 双方) 唯一确定一条会话：chatId 只是它的名字，身份由这个业务键定。
+    -- 写入时归一化为「小 id 在前」(见 ChatService.ensureConversation)，否则 (65,66) 与 (66,65)
+    -- 会被当成两条。系统通知会话 task_id 为 NULL，MySQL 唯一索引不约束 NULL，故不受影响。
+    UNIQUE KEY uk_conv_task_pair (task_id, user1_id, user2_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话表';
 
 -- -------------------------------------------

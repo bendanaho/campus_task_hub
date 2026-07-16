@@ -92,12 +92,24 @@ public class OrderService {
             throw new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED);
         }
 
-        // 悬赏帖(payer)：同时只能有一个活跃订单
+        // 悬赏帖(payer)：一个悬赏只会被一个人接，故按【帖子】限制同时只能有一笔活跃订单
         if ("payer".equals(post.getPublisherSide())) {
             List<Order> active = orderRepository.findByPostIdAndStatusIn(
                     request.getPostId(), Arrays.asList("pending", "in_progress"));
             if (!active.isEmpty()) {
                 throw new BusinessException(ErrorCode.DUPLICATE_ORDER);
+            }
+        } else {
+            // 服务帖(earner)/组队帖(none)：一个帖子可同时服务多个买家，不能按帖子限制，
+            // 但【同一会话】(同一对用户在同一任务下)同时只能有一笔活跃订单。
+            // 此前这里完全没有守卫：同一个买家能对同一服务连下多单，每笔都会各自冻结一次钱，
+            // 而聊天页/消息中心只认最新一笔(findTopByChatIdOrderByCreatedAtDesc)，
+            // 早先那些订单在聊天里根本看不见 → 无法确认/申诉 → 付款方的钱永久冻结。
+            List<Order> activeInChat = orderRepository.findByChatIdAndStatusIn(
+                    request.getChatId(), Arrays.asList("pending", "in_progress"));
+            if (!activeInChat.isEmpty()) {
+                throw new BusinessException(ErrorCode.DUPLICATE_ORDER,
+                        "你与对方在该任务下已有进行中的订单，请先完成或取消它再下新单");
             }
         }
 
