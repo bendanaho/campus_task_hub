@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.criteria.Predicate;
+import java.io.File;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -42,6 +43,10 @@ public class PostService {
     private final ChatService chatService;
     private final OrderRepository orderRepository;
     private final WalletService walletService;
+
+    /** 与上传接口同一个目录：用于判断某张图的缩略图文件是否已生成 */
+    @org.springframework.beans.factory.annotation.Value("${app.upload-dir:./uploads}")
+    private String uploadDir;
 
     /**
      * 帖子列表（大厅，支持筛选、排序、分页）
@@ -419,12 +424,28 @@ public class PostService {
         for (String full : fullUrls) {
             if (!first) sb.append(",");
             first = false;
-            String[] ft = ImageUtil.toFullAndThumb(full);
+            String[] ft = fullAndThumbFor(full);
             sb.append("{\"full\":\"").append(esc(ft[0])).append("\",");
             sb.append("\"thumb\":\"").append(esc(ft[1])).append("\"}");
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    /**
+     * 得到 {full, thumb} 两个值。
+     * - 前端上传后传来的是 /uploads/xxx URL：缩略图文件已在上传时生成，按命名规则推导其 URL
+     *   （文件不存在则回退用原图，例如 gif/webp 生成失败的情况）。
+     * - 老客户端仍可能传 base64 data URL：走原来的 ImageUtil 转换，保证向后兼容。
+     */
+    private String[] fullAndThumbFor(String item) {
+        if (item != null && item.startsWith("/uploads/")) {
+            String name = item.substring("/uploads/".length());
+            String thumbName = ImageUtil.thumbNameFor(name);
+            File thumbFile = new File(uploadDir, thumbName);
+            return new String[]{ item, thumbFile.exists() ? "/uploads/" + thumbName : item };
+        }
+        return ImageUtil.toFullAndThumb(item);
     }
 
     private String esc(String s) {

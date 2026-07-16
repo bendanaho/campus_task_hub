@@ -3,6 +3,7 @@ package com.example.keshe_backend.common.upload;
 import com.example.keshe_backend.common.api.ApiResponse;
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
+import com.example.keshe_backend.common.util.ImageUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,15 +44,25 @@ public class UploadController {
             default -> "jpg";
         };
         String name = UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        String thumbUrl;
         try {
             File dir = new File(uploadDir);
             if (!dir.exists() && !dir.mkdirs()) {
                 throw new BusinessException(ErrorCode.PARAM_ERROR, "无法创建上传目录");
             }
-            file.transferTo(new File(dir, name).getAbsoluteFile());
+            File saved = new File(dir, name).getAbsoluteFile();
+            file.transferTo(saved);
+
+            // 同时生成缩略图文件：列表页（大厅/订单）只发缩略图 URL，避免把原图塞进 JSON。
+            // 生成失败（如 gif/webp 解不出）则回退用原图，保证图片始终可用。
+            String thumbName = ImageUtil.thumbNameFor(name);
+            File thumbFile = new File(dir, thumbName).getAbsoluteFile();
+            thumbUrl = ImageUtil.writeThumbFile(saved, thumbFile)
+                    ? "/uploads/" + thumbName
+                    : "/uploads/" + name;
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "图片保存失败");
         }
-        return ApiResponse.success(Map.of("url", "/uploads/" + name));
+        return ApiResponse.success(Map.of("url", "/uploads/" + name, "thumbUrl", thumbUrl));
     }
 }

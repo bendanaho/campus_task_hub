@@ -21,4 +21,10 @@ public class MyOrderResponse {
     private String myRole;      // "payer" / "earner"
     private Long partnerId;
     private String partnerName;
+
+    /**
+     * 我是否已评价过该订单。后端一次批量算好，前端不必再逐单请求 /reviews/has-reviewed
+     * （那是 HTTP 级 N+1：12 个已完成订单就要多发 12 个请求）。
+     */
+    private boolean reviewed;
 }

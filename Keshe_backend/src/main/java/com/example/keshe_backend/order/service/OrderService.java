@@ -11,6 +11,7 @@ import com.example.keshe_backend.order.dto.OrderDTO;
 import com.example.keshe_backend.order.entity.Order;
 import com.example.keshe_backend.order.repository.OrderRepository;
 import com.example.keshe_backend.post.dto.PostDTO;
+import com.example.keshe_backend.review.repository.ReviewRepository;
 import com.example.keshe_backend.task.entity.Task;
 import com.example.keshe_backend.task.repository.TaskRepository;
 import com.example.keshe_backend.transaction.entity.Transaction;
@@ -28,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +48,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
     private final WalletService walletService;
+    private final ReviewRepository reviewRepository;
     private final com.example.keshe_backend.chat.service.ChatService chatService;
 
     // 金额格式化：25.00 → "25"，避免系统消息里出现多余小数
@@ -556,6 +559,14 @@ public class OrderService {
         Map<Long, User> userById = new HashMap<>();
         if (!partnerIds.isEmpty()) for (User u : userRepository.findAllById(partnerIds)) userById.put(u.getId(), u);
 
+        // 批量算"我已评价过哪些订单"，省掉前端逐单请求 /reviews/has-reviewed
+        List<Long> completedIds = candidates.stream()
+                .filter(o -> "completed".equals(o.getStatus()))
+                .map(Order::getId).collect(Collectors.toList());
+        Set<Long> reviewedIds = completedIds.isEmpty()
+                ? new HashSet<>()
+                : new HashSet<>(reviewRepository.findReviewedOrderIds(userId, completedIds));
+
         List<MyOrderResponse> result = new ArrayList<>();
         for (Order order : candidates) {
             Task post = postById.get(order.getPostId());
@@ -591,6 +602,7 @@ public class OrderService {
                     .myRole(myRole)
                     .partnerId(partnerId)
                     .partnerName(partnerName)
+                    .reviewed(reviewedIds.contains(order.getId()))
                     .build());
         }
         return result;
