@@ -69,8 +69,20 @@ public abstract class BaseIntegrationTest {
         return (Map<String, Object>) ok(resp).get("data");
     }
 
+    /**
+     * 取列表数据，兼容两种 data 形状：
+     *  - 裸数组：/conversations、/orders/mine 等
+     *  - 分页对象 {list,hasMore,total,page,size}：/posts（大厅分页后）
+     * 大厅改分页后 data 由数组变对象，这里统一收口，调用方不必关心。
+     */
     protected List<Map<String, Object>> dataList(ResponseEntity<Map> resp) {
-        return (List<Map<String, Object>>) ok(resp).get("data");
+        Object data = ok(resp).get("data");
+        if (data instanceof List) return (List<Map<String, Object>>) data;
+        if (data instanceof Map) {
+            Object list = ((Map<String, Object>) data).get("list");
+            if (list instanceof List) return (List<Map<String, Object>>) list;
+        }
+        throw new AssertionError("data 既不是数组也不是分页对象: " + data);
     }
 
     protected void assertFail(ResponseEntity<Map> resp, String keyword) {
@@ -86,6 +98,11 @@ public abstract class BaseIntegrationTest {
 
     protected BigDecimal myBalance() {
         return toBigDecimal(data(apiGet("/user/balance")).get("balance"));
+    }
+
+    /** 冻结余额（托管中的钱）。可用余额 myBalance() 不含这部分。 */
+    protected BigDecimal myFrozen() {
+        return toBigDecimal(data(apiGet("/user/balance")).get("frozenBalance"));
     }
 
     // ==================== 辅助 ====================

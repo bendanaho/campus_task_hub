@@ -10,7 +10,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 订单系统集成测试 — 逐条对照前端 tests/order.test.js 的 26 个用例。
- * 使用 RestTemplate 发送真实 HTTP 请求，每个测试 @Transactional 自动回滚。
+ * 使用 RestTemplate 发送真实 HTTP 请求。
+ *
+ * 注意：测试之间【不隔离】。请求走真实 HTTP，事务在服务端提交，测试侧无从回滚；
+ * 全类共用一份 H2 种子数据，按方法名顺序执行，前一个用例的资金变动会带到后一个。
+ * 因此除 test02 开头那处种子余额外，一律用"先取基准再比增量"的写法，不要断言绝对金额。
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public class OrderIntegrationTest extends BaseIntegrationTest {
@@ -34,23 +38,28 @@ public class OrderIntegrationTest extends BaseIntegrationTest {
     // ====================== 服务帖全流程（对照 JS test 2） ======================
 
     @Test
-    @DisplayName("02-服务帖全流程：下单不扣款 → 接受冻结 → 双方确认结算")
+    @DisplayName("02-服务帖全流程：下单即冻结 → 接受 → 双方确认结算")
     void test02_servicePostFullFlow() {
         loginAs("王同学");
         assertEquals(0, myBalance().compareTo(new BigDecimal("80")));
+        var frozenBefore = myFrozen();
 
+        // 服务帖(earner)：发布者收钱，下单的人才是付款方
         var post = findPost("电脑故障排查");
         var created = data(apiPost("/orders", Map.of("postId", longId(post, "id"), "chatId", "tc-svc")));
         Long oid = longId(created, "id");
         assertEquals("pending", str(created, "status"));
-        assertEquals(0, myBalance().compareTo(new BigDecimal("80")), "pending 不扣款");
+        // 钱在【下单】这一刻就从可用余额挪进冻结余额，不等对方接受
+        assertEquals(0, myBalance().compareTo(new BigDecimal("65")), "下单即冻结：80-15=65");
+        assertEquals(0, myFrozen().compareTo(frozenBefore.add(new BigDecimal("15"))), "报酬进入冻结余额");
 
         loginAs("李四");
+        var earnerBefore = myBalance();
         var accepted = data(apiPost("/orders/" + oid + "/accept", null));
         assertEquals("in_progress", str(accepted, "status"));
 
         loginAs("王同学");
-        assertTrue(myBalance().compareTo(new BigDecimal("65")) <= 0, "冻结后 80-15=65");
+        assertEquals(0, myBalance().compareTo(new BigDecimal("65")), "接受不再二次扣款");
 
         loginAs("李四");
         var c1 = data(apiPost("/orders/" + oid + "/confirm", null));
@@ -63,29 +72,51 @@ public class OrderIntegrationTest extends BaseIntegrationTest {
         var c2 = data(apiPost("/orders/" + oid + "/confirm", null));
         assertEquals("completed", str(c2, "status"));
         assertNotNull(c2.get("reviewDeadline"));
+        assertEquals(0, myFrozen().compareTo(frozenBefore), "完成后冻结全部释放");
+
+        loginAs("李四");
+        assertEquals(0, myBalance().compareTo(earnerBefore.add(new BigDecimal("15"))), "报酬结算给收款方");
     }
 
     // ====================== 悬赏帖全流程（对照 JS test 3） ======================
 
     @Test
-    @DisplayName("03-悬赏帖全流程：接单 → 接受冻结+下架 → 完成结算")
+    @DisplayName("03-悬赏帖全流程：发布即冻结 → 接单 → 接受后下架 → 完成结算")
     void test03_bountyPostFullFlow() {
+        // 必须通过 API 真发一个悬赏帖：种子帖是直接写库造的、没有对应的冻结记录，
+        // 拿它跑完整流程既测不到"发布冻结"，结算时还会把发布者的冻结余额扣成负数。
         loginAs("张三");
-        var post = findPost("宿舍搬运行李"); // t3, payer, 发布者 u4
-        var created = data(apiPost("/orders", Map.of("postId", longId(post, "id"), "chatId", "tc-bounty")));
+        var payerBalBefore = myBalance();
+        var payerFrozenBefore = myFrozen();
+        var pub = data(apiPost("/posts", Map.of(
+                "title", "测试悬赏搬行李", "publisherSide", "payer", "category", "life-service",
+                "description", "把行李从 1 号楼搬到 8 号楼", "reward", "15元", "rewardValue", 15)));
+        Long postId = longId((Map) pub.get("task"), "id");
+        // 悬赏帖(payer)：发布者出钱，报酬在【发布】这一刻就冻结做担保
+        assertEquals(0, myBalance().compareTo(payerBalBefore.subtract(new BigDecimal("15"))), "发布悬赏即冻结报酬");
+        assertEquals(0, myFrozen().compareTo(payerFrozenBefore.add(new BigDecimal("15"))), "报酬进入冻结余额");
+
+        // 接单方是收款方，下单不冻他的钱（报酬已冻在帖子上）
+        loginAs("王同学");
+        var earnerBalBefore = myBalance();
+        var created = data(apiPost("/orders", Map.of("postId", postId, "chatId", "tc-bounty")));
         Long oid = longId(created, "id");
         assertEquals("pending", str(created, "status"));
+        assertEquals(0, myBalance().compareTo(earnerBalBefore), "接单方是收款方，下单不扣款");
 
-        loginAs("陈同学");
+        loginAs("张三");
         data(apiPost("/orders/" + oid + "/accept", null));
-
-        var detail = data(apiGet("/posts/" + longId(post, "id")));
+        var detail = data(apiGet("/posts/" + postId));
         assertEquals("closed", str((Map) detail.get("task"), "status"), "悬赏帖接受后下架");
 
         data(apiPost("/orders/" + oid + "/confirm", null));
-        loginAs("张三");
+        loginAs("王同学");
         var done = data(apiPost("/orders/" + oid + "/confirm", null));
         assertEquals("completed", str(done, "status"));
+        assertEquals(0, myBalance().compareTo(earnerBalBefore.add(new BigDecimal("15"))), "报酬结算给收款方");
+
+        loginAs("张三");
+        assertEquals(0, myFrozen().compareTo(payerFrozenBefore), "发布者冻结已释放");
     }
 
     @Test
@@ -143,6 +174,10 @@ public class OrderIntegrationTest extends BaseIntegrationTest {
 
         data(apiPost("/auth", Map.of(
                 "realName", "新同学", "studentId", "2021999999", "college", "计算机学院")));
+
+        // 新注册用户余额为 0，而下单即冻结会先卡在余额不足。本用例考察的是实名门禁，
+        // 先充值把无关的余额因素排除掉，确保放行与否只取决于实名状态。
+        data(apiPost("/user/recharge", Map.of("amount", 100)));
 
         var created = data(apiPost("/orders", Map.of("postId", longId(post, "id"), "chatId", "tc-verify-ok")));
         assertEquals("pending", str(created, "status"));
@@ -287,22 +322,23 @@ public class OrderIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("16-接受时付款方余额不足被拦截且不扣款")
+    @DisplayName("16-下单时付款方余额不足被当场拦截且不扣款")
     void test16_insufficientBalance() {
         loginAs("张三");
         var pub = data(apiPost("/posts", Map.of(
                 "title", "高价服务", "publisherSide", "earner", "category", "other",
-                "description", "x", "reward", "999元", "rewardValue", 999)));
+                "description", "x", "reward", "99999元", "rewardValue", 99999)));
         Long postId = longId((Map) pub.get("task"), "id");
 
+        // 余额不足必须拦在【下单】这一刻、报在下单方自己这侧。
+        // 旧实现放行下单、等对方点"接受"时才 hold 失败：那段等待期里这笔钱仍可被花掉，
+        // 且错误最终暴露在无辜的卖家那侧。
         loginAs("王同学");
         var balBefore = myBalance();
-        var created = data(apiPost("/orders", Map.of("postId", postId, "chatId", "tc-nobal")));
-        loginAs("张三");
-        assertFail(apiPost("/orders/" + longId(created, "id") + "/accept", null), "余额不足");
-
-        loginAs("王同学");
+        var frozenBefore = myFrozen();
+        assertFail(apiPost("/orders", Map.of("postId", postId, "chatId", "tc-nobal")), "余额不足");
         assertEquals(0, myBalance().compareTo(balBefore), "拦截后不扣款");
+        assertEquals(0, myFrozen().compareTo(frozenBefore), "拦截后不冻结");
     }
 
     // ====================== 取消（对照 JS test 19） ======================
@@ -424,10 +460,11 @@ public class OrderIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("24-getPosts 按 publisherSide 筛选且只返回 open")
     void test24_postsFilter() {
-        var payerSide = dataList(apiGet("/posts?side=payer"));
-        var earnerSide = dataList(apiGet("/posts?side=earner"));
-        var noneSide = dataList(apiGet("/posts?side=none"));
-        var all = dataList(apiGet("/posts"));
+        // size=100：末尾要比对"三类之和 == 全部"，四个查询都必须取到全量而非首页 10 条
+        var payerSide = dataList(apiGet("/posts?side=payer&size=100"));
+        var earnerSide = dataList(apiGet("/posts?side=earner&size=100"));
+        var noneSide = dataList(apiGet("/posts?side=none&size=100"));
+        var all = dataList(apiGet("/posts?size=100"));
 
         for (var p : payerSide) { assertEquals("payer", str(p, "publisherSide")); assertEquals("open", str(p, "status")); }
         for (var p : earnerSide) { assertEquals("earner", str(p, "publisherSide")); assertEquals("open", str(p, "status")); }
@@ -461,8 +498,9 @@ public class OrderIntegrationTest extends BaseIntegrationTest {
         // 公开端点，不需要 token，但不清空 currentToken
         String saved = currentToken;
         currentToken = null;
-        var posts = dataList(apiGet("/posts?keyword=" + keyword));
-        if (posts.isEmpty()) posts = dataList(apiGet("/posts"));
+        // size=100：大厅默认每页 10 条，兜底的全量查询必须显式放大页长，否则种子帖子会被分页截断
+        var posts = dataList(apiGet("/posts?size=100&keyword=" + keyword));
+        if (posts.isEmpty()) posts = dataList(apiGet("/posts?size=100"));
         currentToken = saved; // 恢复
         return posts.stream().filter(p -> str(p, "title").contains(keyword))
                 .findFirst().orElseThrow(() -> new RuntimeException("找不到帖子: " + keyword));
