@@ -1782,16 +1782,27 @@ function initChatDetail() {
     // 当「当前用户是本单付款方」时，在任务栏展示：当前余额 ｜ 本单需支付金额（不足则标红）
     async function buildBalanceHint(task, order, currentUser) {
         if (!currentUser || task.publisherSide === 'none') return '';
-        // 仅在「尚未下单 / pending 待接受」阶段提示付款方备款；
-        // in_progress 起资金已冻结（acceptOrder 时已扣款），不再用当前余额比对订单金额，否则会误报"余额不足"
-        if (order && order.status !== 'pending') return '';
+        // 分两种情况，别混：
+        //  - 还没下单：显示「当前余额 ｜ 本单需 X」作备款提示，不足标红。
+        //  - 已下单(pending 及之后)：钱在【下单那一刻】就冻结了，就是为这一单预留的
+        //    → 只说"已冻结"，绝不能再拿【可用余额】去比对订单金额：可用余额已经被这笔
+        //    冻结扣走了，一比必然得出"余额不足"，等于用这笔钱证明你付不起这笔钱。
+        //    (冻结时机从"接单时"提前到"下单时"后，pending 也归入"已冻结"这一类。)
+        if (order && order.status !== 'cancelled') {
+            if (currentUser.id !== order.payerId) return '';
+            var held = order.amount;
+            if (!(held > 0)) return '';
+            if (order.status === 'pending') {
+                return '<span class="task-bar-balance">本单 ¥' + held + ' 已冻结，等待对方接受</span>';
+            }
+            return '';   // in_progress 及之后由 buildTaskBarActions 显示"已支付 X 元·冻结中"
+        }
+        // 到这里只剩「尚未下单 / 上一单已取消」——都按"即将下一单"看待，口径与首次进入一致：
+        // 服务帖(earner)由响应者付、悬赏帖(payer)由发布者付；金额取帖子的报酬。
         var isPublisher = currentUser.id === task.publisherId;
-        // 是否为本单付款方：有订单看 payerId；无订单时——服务帖(earner)由响应者付、悬赏帖(payer)由发布者付
-        var iAmPayer = order
-            ? (currentUser.id === order.payerId)
-            : (task.publisherSide === 'earner' ? !isPublisher : isPublisher);
+        var iAmPayer = task.publisherSide === 'earner' ? !isPublisher : isPublisher;
         if (!iAmPayer) return '';
-        var amount = order ? order.amount : (task.rewardValue || parseRewardValue(task.reward));
+        var amount = task.rewardValue || parseRewardValue(task.reward);
         var bal = 0;
         try { bal = (await getMyBalance()).balance || 0; } catch (e) { bal = 0; }
         // 变价订单(面议/按页计费，金额为 0)：只显示余额，费用走聊天收款/转账
