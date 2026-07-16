@@ -26,6 +26,7 @@ public class PostDTO {
     private String description;
     private Long publisherId;
     private String publisherName;
+    private String publisherAvatar;   // 发布者头像 URL；Task 未冗余存，由 Service 层批量回填
     private BigDecimal publisherCredit;
     private String reward;
     private BigDecimal rewardValue;

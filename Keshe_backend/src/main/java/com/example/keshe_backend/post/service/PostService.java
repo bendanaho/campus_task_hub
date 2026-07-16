@@ -81,6 +81,7 @@ public class PostService {
         List<PostDTO> list = taskPage.getContent().stream()
                 .map(PostDTO::fromLite)   // 大厅只返回缩略图，原图点开详情再取
                 .collect(Collectors.toList());
+        fillPublisherAvatars(list);       // 批量回填发布者头像（一次查库，避免逐条 N+1）
         return PostPageResponse.builder()
                 .list(list)
                 .hasMore(taskPage.hasNext())
@@ -88,6 +89,29 @@ public class PostService {
                 .page(page)
                 .size(size)
                 .build();
+    }
+
+    /**
+     * 批量给一批 PostDTO 回填发布者头像。
+     * Task 实体只冗余存了发布者名/信用分，没存头像；这里按 publisherId 去重后一次 findAllById，
+     * 建 id→avatar 映射再回填，保证大厅一页（多条帖子）只多一次库查询，不产生 N+1。
+     */
+    private void fillPublisherAvatars(List<PostDTO> list) {
+        if (list == null || list.isEmpty()) return;
+        Set<Long> ids = list.stream()
+                .map(PostDTO::getPublisherId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) return;
+        Map<Long, String> avatarById = new HashMap<>();
+        for (User u : userRepository.findAllById(ids)) {
+            avatarById.put(u.getId(), u.getAvatar());
+        }
+        for (PostDTO dto : list) {
+            if (dto.getPublisherId() != null) {
+                dto.setPublisherAvatar(avatarById.get(dto.getPublisherId()));
+            }
+        }
     }
 
     private Sort buildSort(String sort) {
