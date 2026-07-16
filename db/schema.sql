@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
     college VARCHAR(255) DEFAULT NULL COMMENT '学院',
     class_name VARCHAR(255) DEFAULT NULL COMMENT '班级',
     bio VARCHAR(255) DEFAULT NULL COMMENT '个人简介',
+    profile_photos TEXT DEFAULT NULL COMMENT '个人展示照片URL(JSON数组,最多5张)',
     balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '账户余额',
     frozen_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '冻结余额(订单托管中)',
     role INT NOT NULL DEFAULT 0 COMMENT '角色 0=普通用户 1=管理员',

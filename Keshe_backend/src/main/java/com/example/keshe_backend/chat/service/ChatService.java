@@ -191,12 +191,17 @@ public class ChatService {
 
     @Transactional
     public MessageDTO sendMessage(String chatId, String content) {
+        return sendMessage(chatId, content, "text");
+    }
+
+    public MessageDTO sendMessage(String chatId, String content, String type) {
         Long userId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
         Conversation conv = requireParticipant(chatId, userId);
         Long receiverId = conv.getUser1Id().equals(userId) ? conv.getUser2Id() : conv.getUser1Id();
         LocalDateTime now = LocalDateTime.now();
+        boolean isImage = "image".equals(type);
 
         Message msg = new Message();
         msg.setChatId(chatId);
@@ -204,13 +209,13 @@ public class ChatService {
         msg.setSenderName(user.getUsername());
         msg.setReceiverId(receiverId);
         msg.setContent(content);
-        msg.setType("text");
+        msg.setType(isImage ? "image" : "text");
         msg.setTime(now);
         msg.setTaskId(conv.getTaskId() != null ? conv.getTaskId().toString() : "");
         msg.setTaskTitle(conv.getTaskTitle());
         msg = messageRepository.save(msg);
 
-        conv.setLastMessage(content);
+        conv.setLastMessage(isImage ? "[图片]" : content);
         conv.setLastTime(now);
         conv.setLastMessageSenderId(userId);
         conversationRepository.save(conv);

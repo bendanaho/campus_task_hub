@@ -75,6 +75,10 @@ public class User {
 
     private String bio;
 
+    /** 个人展示照片：JSON 数组字符串，最多 5 个图片 URL（技能证书等） */
+    @Column(name = "profile_photos", columnDefinition = "TEXT")
+    private String profilePhotos;
+
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 

@@ -18,6 +18,7 @@ public class SafeUserDTO {
     private String college;
     private String className;
     private String bio;
+    private String profilePhotos;
     private Integer role;
 
     public static SafeUserDTO from(User user) {
@@ -32,6 +33,7 @@ public class SafeUserDTO {
         dto.setCollege(user.getCollege());
         dto.setClassName(user.getClassName());
         dto.setBio(user.getBio());
+        dto.setProfilePhotos(user.getProfilePhotos());
         dto.setRole(user.getRole());
         return dto;
     }

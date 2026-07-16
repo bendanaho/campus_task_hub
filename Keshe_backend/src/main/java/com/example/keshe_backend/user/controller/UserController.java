@@ -43,6 +43,12 @@ public class UserController {
      * 提交实名认证
      * 修复测试点：TC_AUTH_003 (学号超长畸形拦截)[cite: 3]
      */
+    @PutMapping("/user/profile")
+    public ApiResponse<com.example.keshe_backend.user.dto.UserProfileResponse> updateProfile(
+            @RequestBody com.example.keshe_backend.user.dto.UpdateProfileRequest request) {
+        return ApiResponse.success(userService.updateProfile(request));
+    }
+
     @PostMapping("/auth")
     public ApiResponse<?> submitAuth(@Valid @RequestBody SubmitAuthRequest request) {
         // 编程式高优先级拦截：学号长度超过30位直接阻断[cite: 3]

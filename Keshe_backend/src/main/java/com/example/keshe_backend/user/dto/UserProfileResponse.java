@@ -19,6 +19,7 @@ public class UserProfileResponse {
     private String college;
     private String className;
     private String bio;
+    private String profilePhotos; // JSON 数组字符串，展示照片 URL
     private Integer role;
 
     public static UserProfileResponse from(User user) {
@@ -35,6 +36,7 @@ public class UserProfileResponse {
         dto.setCollege(user.getCollege());
         dto.setClassName(user.getClassName());
         dto.setBio(user.getBio());
+        dto.setProfilePhotos(user.getProfilePhotos());
         dto.setRole(user.getRole());
         return dto;
     }

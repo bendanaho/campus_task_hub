@@ -107,6 +107,37 @@ public class UserService {
     }
 
     /**
+     * 更新个人资料：头像 / 个人简介 / 展示照片(最多5张)。字段为 null 表示不改。
+     */
+    @Transactional
+    public com.example.keshe_backend.user.dto.UserProfileResponse updateProfile(
+            com.example.keshe_backend.user.dto.UpdateProfileRequest req) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+        if (req.getAvatar() != null) {
+            user.setAvatar(req.getAvatar());
+        }
+        if (req.getBio() != null) {
+            String bio = req.getBio();
+            user.setBio(bio.length() > 500 ? bio.substring(0, 500) : bio);
+        }
+        if (req.getProfilePhotos() != null) {
+            java.util.List<String> ps = req.getProfilePhotos();
+            if (ps.size() > 5) ps = ps.subList(0, 5);
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < ps.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append("\"").append(ps.get(i).replace("\\", "\\\\").replace("\"", "\\\"")).append("\"");
+            }
+            sb.append("]");
+            user.setProfilePhotos(sb.toString());
+        }
+        userRepository.save(user);
+        return com.example.keshe_backend.user.dto.UserProfileResponse.from(user);
+    }
+
+    /**
      * 充值
      */
     @Transactional

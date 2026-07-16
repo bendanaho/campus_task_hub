@@ -58,7 +58,7 @@ public class ChatController {
     @PostMapping("/conversations/{id}/messages")
     public ApiResponse<MessageDTO> sendMessage(@PathVariable String id,
                                                 @Valid @RequestBody SendMessageRequest request) {
-        return ApiResponse.success(chatService.sendMessage(id, request.getContent()));
+        return ApiResponse.success(chatService.sendMessage(id, request.getContent(), request.getType()));
     }
 
     /**
