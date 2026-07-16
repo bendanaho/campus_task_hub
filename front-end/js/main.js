@@ -789,6 +789,10 @@ function initPublishForm() {
         if (side === 'none') {
             var cat = document.getElementById('postCategory');
             if (cat) cat.value = 'teamwork';
+        } else {
+            // 从"组队"切回我出钱/我收钱：清掉组队时自动设的分类，恢复未选状态
+            var cat2 = document.getElementById('postCategory');
+            if (cat2 && cat2.value === 'teamwork') cat2.value = '';
         }
     }
     form.querySelectorAll('input[name="publisherSide"]').forEach(function(r) {
