@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS reports (
     reporter_id BIGINT NOT NULL COMMENT '举报者ID',
     reporter_name VARCHAR(50) DEFAULT NULL COMMENT '举报者用户名（快照）',
     reason TEXT NOT NULL COMMENT '举报理由',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending 待处理 / handled 已处理',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending 待处理 / handled 已处理(帖子被下架或删除) / dismissed 已驳回(举报不成立,帖子保留)',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_reports_post_status (post_id, status) COMMENT '管理员按帖子查 pending 举报'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='举报表';

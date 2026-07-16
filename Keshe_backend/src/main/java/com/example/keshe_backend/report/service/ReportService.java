@@ -28,6 +28,7 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final com.example.keshe_backend.chat.service.ChatService chatService;
 
     /**
      * 普通用户举报帖子：登录、非管理员、非本人帖、(postId,reporterId) 去重。
@@ -53,6 +54,10 @@ public class ReportService {
         }
         if (reportRepository.existsByPostIdAndReporterIdAndStatus(postId, userId, "pending")) {
             throw new BusinessException(ErrorCode.CONFLICT, "你已举报过该帖子，管理员会尽快处理");
+        }
+        // 管理员已驳回过同一人对同一帖的举报 → 不允许再提，防止反复刷举报骚扰
+        if (reportRepository.existsByPostIdAndReporterIdAndStatus(postId, userId, "dismissed")) {
+            throw new BusinessException(ErrorCode.CONFLICT, "你对该帖的举报经管理员核实未通过，无法重复举报");
         }
 
         Report report = new Report();
@@ -92,6 +97,36 @@ public class ReportService {
         List<AdminReportItemResponse> list = new ArrayList<>(byPost.values());
         list.sort(Comparator.comparingInt(AdminReportItemResponse::getReportCount).reversed());
         return list;
+    }
+
+    /**
+     * 管理员驳回举报（忽略）：该帖 pending 举报 → dismissed，帖子保持原样（不下架、不删除）。
+     * 用于误报/恶意举报——此前管理员只能下架或删除，无论举报是否成立都在惩罚发布者。
+     * 只通知举报人：发布者本就不知道自己被举报，通知反而平白制造焦虑。
+     *
+     * @return 被驳回的举报条数
+     */
+    @Transactional
+    public int dismissReports(Long postId, String reason) {
+        Task post = taskRepository.findById(postId)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED, "帖子不存在"));
+        List<Report> pending = reportRepository.findByPostIdAndStatus(postId, "pending");
+        if (pending.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该帖没有待处理的举报");
+        }
+        for (Report rep : pending) {
+            rep.setStatus("dismissed");
+        }
+        reportRepository.saveAll(pending);
+
+        String r = reason == null ? "" : reason.trim();
+        for (Report rep : pending) {
+            chatService.addSystemNotify(rep.getReporterId(),
+                    "你举报的「" + post.getTitle() + "」经管理员核实未发现违规，该帖将继续展示。"
+                            + (!r.isEmpty() ? "说明：" + r : ""));
+        }
+        return pending.size();
     }
 
     /**

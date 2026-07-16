@@ -88,4 +88,14 @@ public class AdminController {
     public ApiResponse<List<AdminReportItemResponse>> listReports() {
         return ApiResponse.success(reportService.adminListReports());
     }
+
+    /**
+     * 驳回（忽略）某帖的全部待处理举报：举报不成立时用，帖子保持原样。
+     */
+    @PostMapping("/reports/{postId}/dismiss")
+    public ApiResponse<Integer> dismissReports(@PathVariable Long postId,
+                                               @RequestBody(required = false) AdminReasonRequest request) {
+        String reason = request == null ? null : request.getReason();
+        return ApiResponse.success(reportService.dismissReports(postId, reason));
+    }
 }

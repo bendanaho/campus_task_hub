@@ -284,6 +284,18 @@ public class PostService {
         Task task = taskRepository.findById(postId)
                 .filter(t -> t.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND_OR_CANCELLED));
+
+        // 高危防护：软删后 getPostDetail 直接 404，该帖上仍活跃的订单会失去任务详情
+        // （聊天页任务栏拿不到任务 → 双方无法确认完成/申诉），付款方冻结的钱将卡死。
+        // 因此有 pending/in_progress 订单时禁止删除，先让管理员把订单处理掉（下架不受此限）。
+        List<Order> activeOrders = orderRepository.findByPostIdAndStatusIn(
+                postId, Arrays.asList("pending", "in_progress"));
+        if (!activeOrders.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "该帖有 " + activeOrders.size() + " 个进行中/待接受的订单，删除会导致订单卡死、资金无法解冻。"
+                            + "请先下架该帖并处理完这些订单，或改用「下架」。");
+        }
+
         task.setDeletedAt(LocalDateTime.now());
         taskRepository.save(task);
         reportService.markReportsHandled(postId);
