@@ -22,9 +22,14 @@
         <div class="container">
             <h1 class="section-title">我的订单</h1>
 
-            <div id="activeOrders" class="active-orders"></div>
+            <!-- 顶部概览：点击数字切到对应标签 -->
+            <div id="orderOverview" class="order-overview"></div>
 
-            <div class="filter-bar">
+            <!-- 标签页 -->
+            <div id="orderTabs" class="order-tabs"></div>
+
+            <!-- 仅「全部订单」标签内显示的筛选栏 -->
+            <div class="filter-bar" id="orderFilterBar" style="display:none;">
                 <select id="orderFilter" class="form-control">
                     <option value="all">全部</option>
                     <option value="payer">我付款的</option>
@@ -48,7 +53,7 @@
                 <button type="button" class="btn" id="orderSearchBtn">搜索</button>
             </div>
 
-            <div class="record-list"></div>
+            <div class="record-list" id="orderPanel"></div>
         </div>
     </main>
 

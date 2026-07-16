@@ -1825,155 +1825,180 @@ function initOrderCenter() {
     if (!window.location.pathname.includes('order-center.html')) return;
     if (!protectPage(['order-center.html'])) return;
 
-    var list = document.querySelector('.record-list');
+    var panel = document.getElementById('orderPanel');
+    var tabsEl = document.getElementById('orderTabs');
+    var overviewEl = document.getElementById('orderOverview');
+    var filterBar = document.getElementById('orderFilterBar');
     var filterSelect = document.getElementById('orderFilter');
     var statusSelect = document.getElementById('orderStatus');
     var keywordInput = document.getElementById('orderKeyword');
     var searchBtn = document.getElementById('orderSearchBtn');
-    if (!list) return;
+    if (!panel) return;
 
-    // 进行中任务概览：顶部醒目展示未完成订单（pending/in_progress/disputed），独立于下方筛选列表
-    async function loadActiveOrders() {
-        var activeBox = document.getElementById('activeOrders');
-        if (!activeBox) return;
-        var currentUser = getCurrentUser();
-        if (!currentUser) { activeBox.innerHTML = ''; return; }
-        try {
-            var records = await getMyOrders();
-            var active = (records || []).filter(function(r) {
-                return ['pending', 'in_progress', 'disputed'].indexOf(r.order.status) >= 0;
-            });
-            if (active.length === 0) {
-                activeBox.innerHTML = '<div class="card empty-state"><p>暂无进行中任务</p></div>';
-                return;
-            }
-            activeBox.innerHTML = '<div class="active-title">进行中任务（' + active.length + '）</div>' +
-                active.map(function(r) {
-                    var o = r.order;
-                    var isPublisher = r.post ? r.post.publisherId === currentUser.id : false;
-                    var st = describeOrderStatus(o, currentUser.id, isPublisher);
-                    var isMutual = r.post && r.post.publisherSide === 'none';
-                    var roleLabel = isMutual
-                        ? (r.post.publisherId === currentUser.id ? '发起者' : '参与者')
-                        : (r.myRole === 'payer' ? '我付款' : '我收款');
-                    var amountText = isMutual ? '不涉及金钱' : ((r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元');
-                    return '<div class="record-item">' +
-                        '<h3>' + r.title + '</h3>' +
-                        '<p class="meta"><span class="status-badge ' + st.className + '">' + st.text + '</span>身份：' + roleLabel + ' ｜ 金额：' + amountText + ' ｜ 对方：' + r.partnerName + '</p>' +
-                        '<div class="actions"><a href="chat-detail.html?chatId=' + o.chatId + '&partner=' + r.partnerId + '&task=' + o.postId + '" class="btn">进入聊天</a>' +
-                        '<a href="task-detail.html?id=' + o.postId + '" class="btn btn-secondary">查看详情</a></div>' +
-                    '</div>';
-                }).join('');
-        } catch (e) {
-            activeBox.innerHTML = '';
-        }
+    var currentUser = getCurrentUser();
+    if (!currentUser) { panel.innerHTML = '<div class="card empty-state"><p>请先登录</p></div>'; return; }
+    var myId = currentUser.id;
+
+    var allOrders = [];          // getMyOrders 全量（已附 reviewed）
+    var myOpenPosts = [];        // 我发布的 open 帖子
+    var activeTab = 'action';
+    var counts = { action: 0, progress: 0, mine: 0 };
+
+    function statusOf(r) {
+        var isPublisher = r.post ? r.post.publisherId === myId : false;
+        return describeOrderStatus(r.order, myId, isPublisher);
+    }
+    function isReviewPending(r) {
+        return r.order.status === 'completed' && !r.reviewed && !isReviewSkipped(r.order.id);
+    }
+    function isNeedsAction(r) { return statusOf(r).action === true || isReviewPending(r); }
+    function isInProgress(r) {
+        if (isNeedsAction(r)) return false;
+        return r.order.status === 'in_progress' || r.order.status === 'disputed';
+    }
+    function roleAmount(r) {
+        var isMutual = r.post && r.post.publisherSide === 'none';
+        var roleLabel = isMutual
+            ? (r.post.publisherId === myId ? '发起者' : '参与者')
+            : (r.myRole === 'payer' ? '我付款' : '我收款');
+        var amountText = isMutual ? '不涉及金钱' : ((r.myRole === 'payer' ? '付 ' : '收 ') + r.order.amount + ' 元');
+        return roleLabel + ' · ' + amountText;
     }
 
-    // 我发布的、还没被接受的帖子（open）：在订单中心直接管理，支持撤回
-    async function loadMyOpenPosts() {
-        var activeBox = document.getElementById('activeOrders');
-        if (!activeBox) return;
-        var box = document.getElementById('myOpenPosts');
-        if (!box) {
-            box = document.createElement('div');
-            box.id = 'myOpenPosts';
-            activeBox.parentNode.insertBefore(box, activeBox.nextSibling);
+    // 紧凑单行卡（需要处理 / 进行中）
+    function compactCard(r) {
+        var o = r.order;
+        var si = statusOf(r);
+        var badgeText = si.text, badgeCls = si.className;
+        var primaryHref = 'chat-detail.html?chatId=' + o.chatId + '&partner=' + r.partnerId + '&task=' + o.postId;
+        var primaryText = '去处理';
+        if (isReviewPending(r)) {
+            badgeText = '待我评价'; badgeCls = 'status-completed';
+            var toUserId = r.myRole === 'payer' ? o.earnerId : o.payerId;
+            primaryHref = 'review.html?order=' + o.id + '&to=' + toUserId;
+            primaryText = '去评价';
+        } else if (!si.action) {
+            primaryText = '进入聊天';
         }
-        try {
-            var posts = await getMyPosts();
-            var open = (posts || []).filter(function(p) { return p.status === 'open'; });
-            if (open.length === 0) { box.innerHTML = ''; return; }
-            box.innerHTML = '<div class="active-title" style="margin-top:14px;">我发布的 · 待响应（' + open.length + '）</div>' +
-                open.map(function(p) {
-                    var typeLabel = p.publisherSide === 'payer' ? '悬赏求助' : (p.publisherSide === 'none' ? '组队互助' : '提供服务');
-                    var rewardText = p.publisherSide === 'none' ? '不涉及金钱' : ('报酬：' + formatReward(p.reward));
-                    return '<div class="record-item">' +
-                        '<h3>' + p.title + '</h3>' +
-                        '<p class="meta"><span class="status-badge status-pending">待响应</span>' + typeLabel + ' ｜ ' + rewardText + ' ｜ 发布于 ' + formatDateTime(p.publishTime) + '</p>' +
-                        '<div class="actions">' +
-                            '<a href="task-detail.html?id=' + p.id + '" class="btn btn-secondary">查看详情</a>' +
-                            '<button type="button" class="btn btn-small btn-link-report" onclick="handleOrderCenterWithdraw(\'' + p.id + '\')">撤回</button>' +
-                        '</div>' +
-                    '</div>';
-                }).join('');
-        } catch (e) {
-            box.innerHTML = '';
-        }
+        return '<div class="record-item order-row">' +
+            '<div class="order-row-main">' +
+                '<h3 class="order-row-title">' + r.title + '</h3>' +
+                '<p class="meta"><span class="status-badge ' + badgeCls + '">' + badgeText + '</span>' + roleAmount(r) + ' · 对方 ' + r.partnerName + '</p>' +
+            '</div>' +
+            '<a href="' + primaryHref + '" class="btn btn-secondary order-row-btn">' + primaryText + '</a>' +
+        '</div>';
     }
 
-    // 订单中心撤回发布：确认后软下架并局部刷新本板块（悬赏帖冻结的报酬会退回）
-    window.handleOrderCenterWithdraw = function(postId) {
-        if (!confirm('确定撤回该互助吗？\n撤回后大厅不再显示，待接受申请将取消；悬赏冻结的报酬将退回余额。')) return;
-        ownerClosePost(postId).then(function() {
-            alert('已撤回');
-            loadMyOpenPosts();
-        }).catch(function(err) {
-            alert(err.message || '撤回失败');
-        });
-    };
+    // 我发布的·待响应 卡
+    function openPostCard(p) {
+        var typeLabel = p.publisherSide === 'payer' ? '悬赏求助' : (p.publisherSide === 'none' ? '组队互助' : '提供服务');
+        var rewardText = p.publisherSide === 'none' ? '不涉及金钱' : ('报酬 ' + formatReward(p.reward));
+        return '<div class="record-item order-row">' +
+            '<div class="order-row-main">' +
+                '<h3 class="order-row-title">' + p.title + '</h3>' +
+                '<p class="meta"><span class="status-badge status-pending">待响应</span>' + typeLabel + ' · ' + rewardText + ' · ' + timeAgo(p.publishTime) + '</p>' +
+            '</div>' +
+            '<div class="order-row-actions">' +
+                '<a href="task-detail.html?id=' + p.id + '" class="btn btn-secondary btn-small">详情</a>' +
+                '<button type="button" class="btn btn-small btn-link-report" onclick="handleOrderCenterWithdraw(\'' + p.id + '\')">撤回</button>' +
+            '</div>' +
+        '</div>';
+    }
 
-    async function renderAll() {
-        var currentUser = getCurrentUser();
-        if (!currentUser) {
-            list.innerHTML = '<div class="card empty-state"><p>请先登录</p></div>';
-            return;
-        }
-
-        var filterValue = filterSelect ? filterSelect.value : 'all';
-        var moneyRole = (filterValue === 'payer' || filterValue === 'earner') ? filterValue : undefined;
+    // 全部订单：详细卡 + 筛选
+    async function renderAllTab() {
+        var moneyRole = (filterSelect && (filterSelect.value === 'payer' || filterSelect.value === 'earner')) ? filterSelect.value : undefined;
         var statusValue = statusSelect ? statusSelect.value : 'all';
         var keyword = keywordInput ? keywordInput.value.trim() : '';
         var records = await getMyOrders(moneyRole, keyword, statusValue);
-        if (!records || records.length === 0) {
-            list.innerHTML = '<div class="card empty-state"><p>暂无符合条件的订单</p></div>';
-            return;
-        }
-
+        if (!records || records.length === 0) { panel.innerHTML = '<div class="card empty-state"><p>暂无符合条件的订单</p></div>'; return; }
         var enriched = await Promise.all(records.map(async function(r) {
             var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
             return { r: r, reviewed: reviewed };
         }));
-
-        list.innerHTML = enriched.map(function(item) {
-            var r = item.r;
-            var o = r.order;
-            var isMutual = r.post && r.post.publisherSide === 'none';
-            var roleLabel = isMutual
-                ? (r.post.publisherId === currentUser.id ? '发起者' : '参与者')
-                : (r.myRole === 'payer' ? '我付款' : '我收款');
-            var amountText = isMutual ? '不涉及金钱' : ((r.myRole === 'payer' ? '支付 ' : '收入 ') + o.amount + ' 元');
-            var isPublisher = r.post ? r.post.publisherId === currentUser.id : false;
-            var st = describeOrderStatus(o, currentUser.id, isPublisher);
-            var statusBadge = '<span class="status-badge ' + st.className + '">' + st.text + '</span>';
-
+        panel.innerHTML = enriched.map(function(item) {
+            var r = item.r, o = r.order;
+            var isPublisher = r.post ? r.post.publisherId === myId : false;
+            var st = describeOrderStatus(o, myId, isPublisher);
             var actionsHtml = '<a href="task-detail.html?id=' + o.postId + '" class="btn btn-secondary">查看详情</a>' +
                 '<a href="chat-detail.html?chatId=' + o.chatId + '&partner=' + r.partnerId + '&task=' + o.postId + '" class="btn btn-secondary">进入聊天</a>';
-
             if (o.status === 'completed' && !item.reviewed) {
                 var toUserId = r.myRole === 'payer' ? o.earnerId : o.payerId;
                 actionsHtml += '<a href="review.html?order=' + o.id + '&to=' + toUserId + '" class="btn btn-secondary">去评价</a>';
             }
-
             return '<div class="record-item">' +
                 '<h3>' + r.title + '</h3>' +
-                '<p class="meta">' + statusBadge + '身份：' + roleLabel + ' ｜ 金额：' + amountText + ' ｜ 时间：' + formatDateTime(o.createdAt) + '</p>' +
-                '<p>对方：' + r.partnerName + '</p>' +
+                '<p class="meta"><span class="status-badge ' + st.className + '">' + st.text + '</span>' + roleAmount(r) + ' ｜ 时间：' + formatDateTime(o.createdAt) + ' ｜ 对方：' + r.partnerName + '</p>' +
                 '<div class="actions">' + actionsHtml + '</div>' +
             '</div>';
         }).join('');
     }
 
-    renderAll();
-    loadActiveOrders();
-    loadMyOpenPosts();
-    if (filterSelect) filterSelect.addEventListener('change', renderAll);
-    if (statusSelect) statusSelect.addEventListener('change', renderAll);
-    if (searchBtn) searchBtn.addEventListener('click', renderAll);
-    if (keywordInput) {
-        keywordInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); renderAll(); }
-        });
+    function renderOverview() {
+        overviewEl.innerHTML =
+            '<div class="ov-card ov-danger" data-tab="action"><p class="ov-label">需要我处理</p><p class="ov-num">' + counts.action + '</p></div>' +
+            '<div class="ov-card ov-accent" data-tab="progress"><p class="ov-label">进行中</p><p class="ov-num">' + counts.progress + '</p></div>' +
+            '<div class="ov-card" data-tab="mine"><p class="ov-label">我发布的·待响应</p><p class="ov-num">' + counts.mine + '</p></div>';
     }
+    function renderTabs() {
+        var tabs = [
+            { key: 'action', label: '需要我处理', count: counts.action, danger: true },
+            { key: 'progress', label: '进行中', count: counts.progress },
+            { key: 'mine', label: '我发布的', count: counts.mine },
+            { key: 'all', label: '全部订单' }
+        ];
+        tabsEl.innerHTML = tabs.map(function(t) {
+            var badge = (t.count > 0) ? ' <span class="tab-badge' + (t.danger ? ' tab-badge-danger' : '') + '">' + t.count + '</span>' : '';
+            return '<button type="button" class="order-tab' + (activeTab === t.key ? ' active' : '') + '" data-tab="' + t.key + '">' + t.label + badge + '</button>';
+        }).join('');
+    }
+    function renderPanel() {
+        filterBar.style.display = (activeTab === 'all') ? '' : 'none';
+        if (activeTab === 'all') { renderAllTab(); return; }
+        if (activeTab === 'mine') {
+            panel.innerHTML = myOpenPosts.length
+                ? myOpenPosts.map(openPostCard).join('')
+                : '<div class="card empty-state"><p>没有待响应的发布</p></div>';
+            return;
+        }
+        var arr = allOrders.filter(activeTab === 'action' ? isNeedsAction : isInProgress);
+        panel.innerHTML = arr.length
+            ? arr.map(compactCard).join('')
+            : '<div class="card empty-state"><p>' + (activeTab === 'action' ? '没有需要处理的订单' : '没有进行中的订单') + '</p></div>';
+    }
+    function switchTab(key) { activeTab = key; renderTabs(); renderPanel(); }
+
+    async function loadAll() {
+        var records = await getMyOrders();
+        allOrders = await Promise.all((records || []).map(async function(r) {
+            var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
+            return Object.assign({}, r, { reviewed: reviewed });
+        }));
+        try { myOpenPosts = ((await getMyPosts()) || []).filter(function(p) { return p.status === 'open'; }); } catch (e) { myOpenPosts = []; }
+        counts = {
+            action: allOrders.filter(isNeedsAction).length,
+            progress: allOrders.filter(isInProgress).length,
+            mine: myOpenPosts.length
+        };
+        renderOverview();
+        renderTabs();
+        renderPanel();
+    }
+
+    // 撤回发布：确认后软下架（悬赏冻结报酬退回），重新加载
+    window.handleOrderCenterWithdraw = function(postId) {
+        if (!confirm('确定撤回该互助吗？\n撤回后大厅不再显示，待接受申请将取消；悬赏冻结的报酬将退回余额。')) return;
+        ownerClosePost(postId).then(function() { alert('已撤回'); loadAll(); }).catch(function(err) { alert(err.message || '撤回失败'); });
+    };
+
+    tabsEl.addEventListener('click', function(e) { var b = e.target.closest && e.target.closest('.order-tab'); if (b) switchTab(b.getAttribute('data-tab')); });
+    overviewEl.addEventListener('click', function(e) { var c = e.target.closest && e.target.closest('.ov-card'); if (c) switchTab(c.getAttribute('data-tab')); });
+    if (filterSelect) filterSelect.addEventListener('change', renderAllTab);
+    if (statusSelect) statusSelect.addEventListener('change', renderAllTab);
+    if (searchBtn) searchBtn.addEventListener('click', renderAllTab);
+    if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); renderAllTab(); } });
+
+    loadAll();
 }
 
 // ==================== 评价 ====================
