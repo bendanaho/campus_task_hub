@@ -679,6 +679,21 @@ function initHomePage() {
     });
 }
 
+// 用户「头像+名字」名片入口：点进 TA 的主页。头像缺省用名字首字兜底，加载失败也回退首字。
+// 顶层函数，供大厅、任务详情等多个页面共用。
+function userChip(userId, name, avatar, extraClass) {
+    var safe = (name == null || name === '') ? '用户' : String(name);
+    var letter = safe.charAt(0) || '?';
+    var cls = 'user-chip' + (extraClass ? ' ' + extraClass : '');
+    var img = avatar
+        ? '<img src="' + avatar + '" class="user-chip-ava" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+        : '';
+    var fb = '<span class="user-chip-ava user-chip-ava--fb"' + (avatar ? ' style="display:none"' : '') + '>' + letter + '</span>';
+    var inner = img + fb + '<span class="user-chip-name">' + safe + '</span>';
+    if (!userId) return '<span class="' + cls + ' user-chip--plain">' + inner + '</span>';
+    return '<a href="profile.html?userId=' + userId + '" class="' + cls + '" title="查看 TA 的主页">' + inner + '</a>';
+}
+
 // ==================== 互助大厅 ====================
 
 function initTaskHall() {
@@ -711,20 +726,6 @@ function initTaskHall() {
             keyword: keyword,
             sort: sortValue
         };
-    }
-
-    // 用户「头像+名字」名片入口：点进 TA 的主页。头像缺省用名字首字兜底，加载失败也回退首字。
-    function userChip(userId, name, avatar, extraClass) {
-        var safe = (name == null || name === '') ? '用户' : String(name);
-        var letter = safe.charAt(0) || '?';
-        var cls = 'user-chip' + (extraClass ? ' ' + extraClass : '');
-        var img = avatar
-            ? '<img src="' + avatar + '" class="user-chip-ava" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
-            : '';
-        var fb = '<span class="user-chip-ava user-chip-ava--fb"' + (avatar ? ' style="display:none"' : '') + '>' + letter + '</span>';
-        var inner = img + fb + '<span class="user-chip-name">' + safe + '</span>';
-        if (!userId) return '<span class="' + cls + ' user-chip--plain">' + inner + '</span>';
-        return '<a href="profile.html?userId=' + userId + '" class="' + cls + '" title="查看 TA 的主页">' + inner + '</a>';
     }
 
     function renderTaskItem(task) {
