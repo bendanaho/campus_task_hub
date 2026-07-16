@@ -2372,6 +2372,18 @@ function mockEnsureConversation(data) {
     return new Promise(function(resolve) {
         setTimeout(function() {
             var db = _mockGetDB();
+            // 与后端一致：先按 (任务, 双方) 业务键找既有会话，命中就复用它的 id
+            var me = getCurrentUser();
+            if (data.taskId && data.partnerId && me) {
+                for (var k = 0; k < db.conversations.length; k++) {
+                    var cv = db.conversations[k];
+                    if (String(cv.taskId) === String(data.taskId) &&
+                        String(cv.partnerId) === String(data.partnerId)) {
+                        resolve({ chatId: cv.id });
+                        return;
+                    }
+                }
+            }
             var exists = false;
             for (var i = 0; i < db.conversations.length; i++) {
                 if (db.conversations[i].id === data.chatId) {
@@ -2391,7 +2403,7 @@ function mockEnsureConversation(data) {
                 });
                 _mockSaveDB(db);
             }
-            resolve({ success: true });
+            resolve({ chatId: data.chatId });
         }, 100);
     });
 }

@@ -945,9 +945,22 @@ function goToOrderChat(postId, publisherId) {
         alert('这是你自己发布的帖子。');
         return;
     }
-    var chatId = 'c-' + postId + '-' + me.id;
-    window.location.href = 'chat-detail.html?chatId=' + encodeURIComponent(chatId) +
-        '&partner=' + encodeURIComponent(publisherId) + '&task=' + encodeURIComponent(postId);
+    // chatId 由后端定夺：(任务, 双方) 已有会话就复用既有的那条，避免同一任务同一对用户
+    // 出现两条会话、聊天记录被劈两半。这里传的只是"建议名"，一律以返回值为准。
+    var proposed = 'c-' + postId + '-' + me.id;
+    ensureConversation({
+        chatId: proposed,
+        partnerId: publisherId,
+        partnerName: '',
+        taskId: postId,
+        taskTitle: ''
+    }).then(function(r) {
+        var chatId = (r && r.chatId) ? r.chatId : proposed;
+        window.location.href = 'chat-detail.html?chatId=' + encodeURIComponent(chatId) +
+            '&partner=' + encodeURIComponent(publisherId) + '&task=' + encodeURIComponent(postId);
+    }).catch(function(err) {
+        alert((err && err.message) || '进入聊天失败');
+    });
 }
 
 // ==================== 发布任务/服务 ====================
@@ -1383,9 +1396,15 @@ function initMessageCenter() {
             var taskGone = !!it.taskDeleted || (!!it.taskStatus && it.taskStatus !== 'open');
             var statusInfo;
             if (!order || order.status === 'cancelled') {
-                statusInfo = taskGone
-                    ? { text: '已下架/已结束', className: 'status-cancelled', closed: true }
-                    : { text: '待下单', className: 'status-pending' };
+                if (taskGone) {
+                    statusInfo = { text: '已下架/已结束', className: 'status-cancelled', closed: true };
+                } else if (order && order.status === 'cancelled') {
+                    // 上一单取消了、但任务还挂着 → 说清"发生了什么"和"现在能干什么"。
+                    // 只写"待下单"会让刚取消完的人以为状态没更新。
+                    statusInfo = { text: '订单已取消 · 可重新下单', className: 'status-cancelled' };
+                } else {
+                    statusInfo = { text: '待下单', className: 'status-pending' };
+                }
             } else {
                 var isPublisher = (it.taskPublisherId != null) && (myId === it.taskPublisherId);
                 statusInfo = describeOrderStatus(order, myId, isPublisher);
@@ -1885,7 +1904,15 @@ function initChatDetail() {
                 partnerName: partner ? partner.username : '',
                 taskId: taskId,
                 taskTitle: result && result.task ? result.task.title : ''
-            });
+            }).then(function(r) {
+                // 后端按 (任务,双方) 定夺会话身份。若返回的 id 与 URL 里的不同，
+                // 说明本页拿的是个过时/非规范的 chatId（如旧书签、被合并掉的会话）——
+                // 继续用它会读写到一条不存在的会话，这里纠正到正确的会话。
+                if (r && r.chatId && r.chatId !== chatId) {
+                    window.location.replace('chat-detail.html?chatId=' + encodeURIComponent(r.chatId) +
+                        '&partner=' + encodeURIComponent(partnerId) + '&task=' + encodeURIComponent(taskId));
+                }
+            }).catch(function() { /* ensure 失败不阻塞聊天页 */ });
         });
     }
 
