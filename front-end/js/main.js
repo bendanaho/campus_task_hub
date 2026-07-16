@@ -379,10 +379,8 @@ function initProfilePage() {
                 // 他人主页:标题前加返回按钮
                 var backBtn = document.createElement('a');
                 backBtn.href = 'javascript:void(0)';
-                backBtn.className = 'btn btn-secondary btn-small';
-                backBtn.textContent = '← 返回';
-                backBtn.style.display = 'inline-block';
-                backBtn.style.marginBottom = '10px';
+                backBtn.className = 'btn profile-back';
+                backBtn.innerHTML = '<span class="profile-back-arrow">←</span> 返回上一页';
                 backBtn.onclick = function() { goBack(); };
                 titleEl.parentNode.insertBefore(backBtn, titleEl);
             }
@@ -534,8 +532,9 @@ function initProfilePage() {
                         rechargeBtn.addEventListener('click', function() {
                             var input = prompt('请输入充值金额（元）。说明：本平台为校园虚拟余额，非真实支付。', '50');
                             if (input === null) return;
-                            var amt = Number(input);
-                            if (!isFinite(amt) || amt <= 0) { alert('请输入正确的充值金额。'); return; }
+                            var parsed = parseMoneyInput(input);
+                            if (!parsed.ok) { alert(parsed.error); return; }
+                            var amt = parsed.value;
                             recharge(amt).then(function(res) {
                                 alert('充值成功！当前余额 ' + res.balance + ' 元');
                                 renderBalance();
@@ -979,6 +978,8 @@ function initPublishForm() {
             reward = '无';
         }
         if (side !== 'none' && !reward) { alert('请填写报酬金额。'); return; }
+        // 报酬金额最多两位小数（reward 为自由文本，拦"5.999"这类多于两位小数的数字）
+        if (side !== 'none' && /\d+\.\d{3,}/.test(reward)) { alert('报酬金额最多保留两位小数。'); return; }
 
         var data = {
             title: title,
@@ -1144,7 +1145,7 @@ function initMessageCenter() {
     if (!list) return;
 
     var enriched = [];
-    var counts = { action: 0, unread: 0 };
+    var counts = { action: 0, progress: 0, unread: 0 };
     var activeTab = 'action';
 
     function renderRow(item) {
@@ -1211,6 +1212,13 @@ function initMessageCenter() {
             renderList(enriched.filter(function(it) { return it.needsAction && !it.isSystem; }), '没有需要处理的消息');
             return;
         }
+        if (activeTab === 'progress') {
+            // 进行中：按最后消息时间倒序，方便和对方继续沟通
+            var prog = enriched.filter(function(it) { return it.inProgress; })
+                .slice().sort(function(a, b) { return String(b.c.lastTime || '').localeCompare(String(a.c.lastTime || '')); });
+            renderList(prog, '暂无进行中的订单');
+            return;
+        }
         // 未读：按最后消息时间倒序（含未读的系统通知）
         var arr = enriched.filter(function(it) { return it.unread > 0; })
             .slice().sort(function(a, b) { return String(b.c.lastTime || '').localeCompare(String(a.c.lastTime || '')); });
@@ -1221,12 +1229,14 @@ function initMessageCenter() {
         if (!overviewEl) return;
         overviewEl.innerHTML =
             '<div class="ov-card ov-danger" data-tab="action"><p class="ov-label">待我处理</p><p class="ov-num">' + counts.action + '</p></div>' +
+            '<div class="ov-card ov-progress" data-tab="progress"><p class="ov-label">进行中</p><p class="ov-num">' + counts.progress + '</p></div>' +
             '<div class="ov-card ov-accent" data-tab="unread"><p class="ov-label">未读</p><p class="ov-num">' + counts.unread + '</p></div>';
     }
     function renderTabs() {
         if (!tabsEl) return;
         var tabs = [
             { key: 'action', label: '待处理', count: counts.action, danger: true },
+            { key: 'progress', label: '进行中', count: counts.progress },
             { key: 'unread', label: '未读', count: counts.unread },
             { key: 'all', label: '全部' }
         ];
@@ -1266,7 +1276,7 @@ function initMessageCenter() {
                 return {
                     c: c, roleText: '', statusInfo: { text: '', className: '' },
                     msgPreview: c.lastMessage ? ('[系统] ' + c.lastMessage) : '',
-                    orderId: null, isSystem: true, unread: unread, needsAction: false
+                    orderId: null, isSystem: true, unread: unread, needsAction: false, inProgress: false
                 };
             }
 
@@ -1301,7 +1311,9 @@ function initMessageCenter() {
 
             // 待我处理 = 待我接受/待我确认(action) 或 待我评价(review)
             var needsAction = (statusInfo.action === true) || (statusInfo.review === true);
-            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview, orderId: order ? order.id : null, isSystem: false, unread: unread, needsAction: needsAction };
+            // 进行中 = 订单实际状态为 in_progress（含"待我确认"这类子状态，方便沟通时统一查看）
+            var inProgress = !!(order && order.status === 'in_progress');
+            return { c: c, roleText: roleText, statusInfo: statusInfo, msgPreview: msgPreview, orderId: order ? order.id : null, isSystem: false, unread: unread, needsAction: needsAction, inProgress: inProgress };
         });
 
         // 「全部」标签默认排序（待办>进行中>未读>待评价>普通）
@@ -1309,6 +1321,7 @@ function initMessageCenter() {
 
         counts = {
             action: enriched.filter(function(it) { return it.needsAction && !it.isSystem; }).length,
+            progress: enriched.filter(function(it) { return it.inProgress; }).length,
             unread: enriched.filter(function(it) { return it.unread > 0; }).length
         };
 
@@ -1797,8 +1810,9 @@ function initChatDetail() {
             if (!requireVerified()) return;
             var input = prompt('请输入' + verb + '金额（元）：');
             if (input === null) return;
-            var amt = Number(input);
-            if (!isFinite(amt) || amt <= 0) { alert('请输入正确的金额。'); return; }
+            var parsed = parseMoneyInput(input);
+            if (!parsed.ok) { alert(parsed.error); return; }
+            var amt = parsed.value;
             if (confirmTransfer && !confirm('确认立即向对方转账 ¥' + amt + ' 元？余额将立即扣除。')) return;
             sendPaymentCard(chatId, partnerId, kind, amt).then(function() {
                 renderMessages();

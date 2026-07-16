@@ -654,6 +654,29 @@ textarea.form-control {
     margin: 6px 0;
 }
 
+/* 他人主页「返回」按钮：醒目的橘色实心按钮，单独一行 */
+.profile-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 10px 20px;
+    background: linear-gradient(120deg, var(--coral) 0%, var(--coral-deep) 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(232, 85, 58, 0.32);
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+.profile-back:hover {
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 16px rgba(232, 85, 58, 0.42);
+}
+.profile-back:active { transform: translateY(0); }
+.profile-back-arrow { font-size: 18px; line-height: 1; }
+
 /* 任务详情顶部类型横幅(三类颜色差异化) */
 .detail-banner {
     padding: 12px 16px;
@@ -1659,6 +1682,7 @@ textarea.form-control {
 .ov-card.ov-danger { background: var(--coral-soft); border-color: var(--coral-tint); }
 .ov-card.ov-danger .ov-label, .ov-card.ov-danger .ov-num { color: var(--coral-deep); }
 .ov-card.ov-accent .ov-num { color: var(--coral); }
+.ov-card.ov-progress .ov-num { color: var(--ink-soft); }
 
 .order-tabs {
     display: flex;

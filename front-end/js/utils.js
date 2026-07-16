@@ -76,8 +76,26 @@ function getCreditColorValue(score) {
 
 function parseRewardValue(reward) {
     if (!reward) return 0;
-    const match = reward.match(/(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
+    // 支持小数（如"5.5"→5.5），最多两位、四舍五入（"5.999"→6）
+    const match = String(reward).match(/(\d+(?:\.\d+)?)/);
+    if (!match) return 0;
+    return Math.round(parseFloat(match[1]) * 100) / 100;
+}
+
+// 解析金额输入：要求正数、最多两位小数。返回 {ok, value} 或 {ok:false, error}。
+// 充值/转账/收款等金额输入统一走它，前端先行拦截（后端仍会兜底校验）。
+function parseMoneyInput(input) {
+    if (input === null || input === undefined || String(input).trim() === '') {
+        return { ok: false, error: '请输入金额。' };
+    }
+    const s = String(input).trim();
+    const n = Number(s);
+    if (!isFinite(n) || n <= 0) return { ok: false, error: '请输入正确的金额。' };
+    const dot = s.indexOf('.');
+    if (dot >= 0 && s.length - dot - 1 > 2) {
+        return { ok: false, error: '金额最多保留两位小数。' };
+    }
+    return { ok: true, value: n };
 }
 
 // 信用分：收到评价 rating 的贝叶斯平滑均值。预置 C=2 条 5★ 先验，
