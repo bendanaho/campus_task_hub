@@ -38,8 +38,8 @@ function renderNav() {
 
     var html = '';
     NAV_ITEMS.forEach(function(item) {
-        // 纯管理角色：只保留「互助大厅」供只读巡查，隐藏发布/消息中心/我的订单等消费者入口
-        if (admin && ['publish-task.html', 'message-center.html', 'order-center.html'].indexOf(item.href) >= 0) {
+        // 纯管理角色：只保留「互助大厅」供只读巡查，隐藏首页/发布/消息中心/我的订单等消费者入口
+        if (admin && ['index.html', 'publish-task.html', 'message-center.html', 'order-center.html'].indexOf(item.href) >= 0) {
             return;
         }
         var isActive = currentPage === item.href ? 'active' : '';
@@ -644,6 +644,12 @@ function initAuthForm() {
 function initHomePage() {
     if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/' && !window.location.pathname.endsWith('/')) return;
 
+    // 纯管理角色不需要首页这类消费者内容（导航里也已隐藏），直接落地管理后台
+    if (isAdminUser()) {
+        window.location.replace('admin.html');
+        return;
+    }
+
     var taskList = document.querySelector('.task-list');
     if (!taskList) return;
 
@@ -1086,8 +1092,10 @@ function initTaskDetail() {
                         : (isMine ? (task.status === 'open'
                                 ? '<span class="note">这是你发布的帖子</span> <button type="button" class="btn btn-small btn-secondary" onclick="handleOwnerClose(\'' + task.id + '\')">撤回</button>'
                                 : '<span class="note">这是你发布的帖子（已结束）</span>')
-                            : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
-                                : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>'))) +
+                            // 已下架/结束的帖子仍可通过直链打开，但不能再下单（后端会拒），不给接单按钮
+                            : (task.status === 'closed' ? '<span class="note">该任务已下架或结束，无法接单</span>'
+                                : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
+                                    : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>')))) +
                     '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
                 '</div>';
             // 管理员视角:若该任务有待处理举报,在详情底部展示举报内容(原因/举报人/时间)
@@ -1268,7 +1276,8 @@ function initMessageCenter() {
         return 0;
     }
 
-    getEnrichedConversations().then(function(items) {
+    function loadData() {
+    return getEnrichedConversations().then(function(items) {
         if (!items || items.length === 0) {
             list.innerHTML = '<div class="card empty-state"><p>暂无消息</p></div>';
             if (overviewEl) overviewEl.innerHTML = '';
@@ -1341,6 +1350,12 @@ function initMessageCenter() {
         renderTabs();
         renderPanel();
     });
+    }
+
+    loadData();
+    // 从聊天页"返回"时页面常由 bfcache 恢复，DOMContentLoaded 不再触发，
+    // 未读角标会停在离开前的状态。注册刷新钩子，由 pageshow/visibilitychange 重新拉数据。
+    window.__pageRefresh = loadData;
 
     if (overviewEl) overviewEl.addEventListener('click', function(e) { var c = e.target.closest && e.target.closest('.ov-card'); if (c) switchTab(c.getAttribute('data-tab')); });
     if (tabsEl) tabsEl.addEventListener('click', function(e) { var b = e.target.closest && e.target.closest('.order-tab'); if (b) switchTab(b.getAttribute('data-tab')); });
@@ -1688,6 +1703,11 @@ function initChatDetail() {
 
         // 尚无有效订单
         if (!order || order.status === 'cancelled') {
+            // 帖子已下架/结束：后端 createOrder 会以"任务不存在或已取消"拒掉，
+            // 这里提前说清楚，别给一个点了必然失败的下单按钮（大厅卡片可能还没被实时移除）
+            if (task.status === 'closed') {
+                return '<span class="task-bar-status">该任务已下架或结束，无法下单</span>';
+            }
             // 悬赏帖过了截止时间：不再允许接单
             if (task.publisherSide === 'payer' && task.deadline && new Date(task.deadline).getTime() < Date.now()) {
                 return '<span class="task-bar-status">该悬赏已截止</span>';
@@ -2261,6 +2281,8 @@ function initOrderCenter() {
     if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); renderAllTab(); } });
 
     loadAll();
+    // 同消息中心：bfcache 恢复后重新拉取，避免订单状态/数字停留在离开前
+    window.__pageRefresh = loadAll;
 }
 
 // ==================== 评价 ====================
@@ -2757,6 +2779,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // 启动 WebSocket 通信保护机制
     initWebSocket();
 
+    // 页面重新可见时刷新数据。
+    // 浏览器"返回"通常从 bfcache 恢复页面，DOMContentLoaded 不会再触发，
+    // 于是"进聊天已读 → 返回消息中心"后未读角标仍在，必须手动刷新才消失。
+    // pageshow(persisted) 覆盖 bfcache 恢复；visibilitychange 覆盖切回标签页。
+    function refreshOnReturn() {
+        if (!isLoggedIn()) return;
+        updateNavUnread();
+        if (typeof window.__pageRefresh === 'function') window.__pageRefresh();
+    }
+    window.addEventListener('pageshow', function(e) { if (e.persisted) refreshOnReturn(); });
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') refreshOnReturn();
+    });
+
     var scrollKey = 'scroll_' + location.pathname;
     var savedScroll = sessionStorage.getItem(scrollKey);
     if (savedScroll !== null) {
@@ -2870,6 +2906,31 @@ function initWebSocket() {
                 }
             }
             
+            // 场景二之二：任务被下架/撤回/删除（大厅实时移除该卡片 + 详情页拦住即将失败的下单）
+            // 不广播的话，别人的大厅会一直留着这张卡，点"接单"进聊天再下单才被后端拒("任务不存在或已取消")
+            if (data.type === 'TASK_CLOSED' && data.postId) {
+                if (window.location.pathname.includes('task-hall.html')) {
+                    var closedCard = document.querySelector('.task-item[data-postid="' + data.postId + '"]');
+                    if (closedCard) {
+                        closedCard.style.transition = 'opacity 0.4s ease';
+                        closedCard.style.opacity = '0';
+                        setTimeout(function() { closedCard.remove(); }, 400);
+                    }
+                }
+                var closedTaskId = getUrlParam('id');
+                if (window.location.pathname.includes('task-detail.html') && String(closedTaskId) === String(data.postId)) {
+                    var closedActions = document.querySelector('.detail-box .actions');
+                    if (closedActions) {
+                        closedActions.innerHTML = '<span class="note" style="color:#cf222e; font-weight:bold;">⚠️ 该任务已被下架或结束，无法下单。</span>' +
+                            '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>';
+                    }
+                }
+                // 正在该任务的聊天页：刷新任务栏，按钮会变成"该任务已下架/已结束，无法下单"
+                if (window.location.pathname.includes('chat-detail.html') && window.renderTaskBar) {
+                    window.renderTaskBar();
+                }
+            }
+
             // 场景三：点对点精准精准核心业务流单推（收到订单申请、被接单通知、确认提醒、争议等）
             if (data.type === 'PERSONAL_NOTICE') {
                 // 非阻塞横幅提示（不再用 alert 阻塞页面）；点击横幅才跳转/刷新，不再自动 reload 打断操作
