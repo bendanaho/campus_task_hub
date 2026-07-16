@@ -15,6 +15,7 @@ import com.example.keshe_backend.transaction.service.WalletService;
 import com.example.keshe_backend.user.entity.User;
 import com.example.keshe_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PostService {
 
@@ -275,6 +277,7 @@ public class PostService {
         chatService.addSystemNotify(task.getPublisherId(),
                 "你发布的「" + task.getTitle() + "」已被管理员下架，大厅将不再展示。"
                         + (!r.isEmpty() ? "原因：" + r : "如有疑问请联系平台。"));
+        broadcastTaskClosed(postId);
         return PostDTO.from(task);
     }
 
@@ -303,6 +306,7 @@ public class PostService {
         chatService.addSystemNotify(task.getPublisherId(),
                 "你发布的「" + task.getTitle() + "」已被管理员删除。"
                         + (!r.isEmpty() ? "原因：" + r : "如有疑问请联系平台。"));
+        broadcastTaskClosed(postId);
         return PostDTO.from(task);
     }
 
@@ -361,9 +365,25 @@ public class PostService {
                         "撤回悬赏退回报酬：" + task.getTitle());
             }
         }
+        broadcastTaskClosed(postId);
         return PostDTO.from(task);
     }
 
+
+    /**
+     * 广播「帖子已下架/移除」：让所有正在浏览大厅的人实时移除该卡片。
+     * 此前只有发布(NEW_TASK)和被接单(TASK_TAKEN)会广播，下架/撤回/删除都不广播，
+     * 于是别人的大厅一直留着这张卡 → 点"接单"进聊天再下单，才被后端以
+     * TASK_NOT_FOUND_OR_CANCELLED（"任务不存在或已取消"）拒掉，白跑一趟。
+     */
+    private void broadcastTaskClosed(Long postId) {
+        try {
+            String msg = String.format("{\"type\":\"TASK_CLOSED\",\"postId\":%d}", postId);
+            com.example.keshe_backend.common.websocket.NotificationWSServer.broadcast(msg);
+        } catch (Exception e) {
+            log.error("WebSocket 广播 TASK_CLOSED 失败", e);
+        }
+    }
 
     // 序列化为图片对象数组 [{"full":"...","thumb":"..."}]，写入端 esc() 转义引号/反斜杠/控制字符。
     // 一张图保存两份：full=原图 data URL，thumb=缩略图 data URL（由 ImageUtil 生成）。
