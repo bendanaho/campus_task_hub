@@ -1083,16 +1083,18 @@ textarea.form-control {
 /* ---------- 个人中心 ---------- */
 .profile-box {
     display: grid;
-    grid-template-columns: 260px 1fr;
-    gap: 24px;
-    align-items: stretch;
+    grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: 28px;
+    align-items: start;
     padding: 28px;
 }
 .profile-avatar {
     background: linear-gradient(135deg, var(--coral), var(--coral-deep));
     color: #fff;
-    border-radius: var(--radius-xl);
-    min-height: 240px;
+    border-radius: var(--radius-lg);
+    aspect-ratio: 1 / 1;
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1581,3 +1583,88 @@ textarea.form-control {
 .order-row-title { margin: 0 0 5px; font-size: 15px; font-family: var(--font-display); font-weight: 700; }
 .order-row-btn, .order-row-actions { white-space: nowrap; flex-shrink: 0; }
 .order-row-actions { display: flex; gap: 8px; }
+
+/* ---------- 聊天长消息换行 ---------- */
+.chat-message { word-break: break-word; overflow-wrap: anywhere; }
+.chat-text { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+
+/* ---------- 个人中心：头像正方形 + 编辑提示 + 右侧简介/照片 ---------- */
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
+.avatar-fallback { position: relative; z-index: 1; font-size: 44px; font-weight: 800; }
+.avatar-edit-hint {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 2;
+    padding: 8px 6px;
+    background: rgba(30, 58, 95, 0.55);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+.avatar-edit-hint i { font-style: normal; }
+.profile-avatar:hover .avatar-edit-hint { background: rgba(30, 58, 95, 0.72); }
+
+.profile-extra {
+    padding-left: 28px;
+    border-left: 1px dashed var(--ink-line-strong);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+.extra-block { }
+.extra-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink);
+}
+.extra-head em { font-style: normal; font-size: 12px; font-weight: 400; color: var(--ink-mute); margin-left: 4px; }
+.extra-bio {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--cream-warm);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    min-height: 48px;
+}
+.photo-gallery { display: flex; flex-wrap: wrap; gap: 12px; }
+.photo-item { position: relative; display: inline-block; }
+.photo-item img {
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--ink-line);
+    display: block;
+}
+.photo-item .photo-del {
+    position: absolute;
+    top: -8px; right: -8px;
+    width: 22px; height: 22px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: var(--coral);
+    color: #fff;
+    cursor: pointer;
+    line-height: 18px;
+    padding: 0;
+    font-size: 13px;
+    box-shadow: var(--shadow-sm);
+}
+.extra-empty { color: var(--ink-mute); font-size: 13px; }
+
+@media (max-width: 900px) {
+    .profile-box { grid-template-columns: 1fr; }
+    .profile-avatar { max-width: 220px; }
+    .profile-extra { padding-left: 0; border-left: none; border-top: 1px dashed var(--ink-line-strong); padding-top: 22px; }
+}
