@@ -1869,6 +1869,49 @@ function initOrderCenter() {
         }
     }
 
+    // 我发布的、还没被接受的帖子（open）：在订单中心直接管理，支持撤回
+    async function loadMyOpenPosts() {
+        var activeBox = document.getElementById('activeOrders');
+        if (!activeBox) return;
+        var box = document.getElementById('myOpenPosts');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'myOpenPosts';
+            activeBox.parentNode.insertBefore(box, activeBox.nextSibling);
+        }
+        try {
+            var posts = await getMyPosts();
+            var open = (posts || []).filter(function(p) { return p.status === 'open'; });
+            if (open.length === 0) { box.innerHTML = ''; return; }
+            box.innerHTML = '<div class="active-title" style="margin-top:14px;">我发布的 · 待响应（' + open.length + '）</div>' +
+                open.map(function(p) {
+                    var typeLabel = p.publisherSide === 'payer' ? '悬赏求助' : (p.publisherSide === 'none' ? '组队互助' : '提供服务');
+                    var rewardText = p.publisherSide === 'none' ? '不涉及金钱' : ('报酬：' + formatReward(p.reward));
+                    return '<div class="record-item">' +
+                        '<h3>' + p.title + '</h3>' +
+                        '<p class="meta"><span class="status-badge status-pending">待响应</span>' + typeLabel + ' ｜ ' + rewardText + ' ｜ 发布于 ' + formatDateTime(p.publishTime) + '</p>' +
+                        '<div class="actions">' +
+                            '<a href="task-detail.html?id=' + p.id + '" class="btn btn-secondary">查看详情</a>' +
+                            '<button type="button" class="btn btn-small btn-link-report" onclick="handleOrderCenterWithdraw(\'' + p.id + '\')">撤回</button>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+        } catch (e) {
+            box.innerHTML = '';
+        }
+    }
+
+    // 订单中心撤回发布：确认后软下架并局部刷新本板块（悬赏帖冻结的报酬会退回）
+    window.handleOrderCenterWithdraw = function(postId) {
+        if (!confirm('确定撤回该互助吗？\n撤回后大厅不再显示，待接受申请将取消；悬赏冻结的报酬将退回余额。')) return;
+        ownerClosePost(postId).then(function() {
+            alert('已撤回');
+            loadMyOpenPosts();
+        }).catch(function(err) {
+            alert(err.message || '撤回失败');
+        });
+    };
+
     async function renderAll() {
         var currentUser = getCurrentUser();
         if (!currentUser) {
@@ -1922,6 +1965,7 @@ function initOrderCenter() {
 
     renderAll();
     loadActiveOrders();
+    loadMyOpenPosts();
     if (filterSelect) filterSelect.addEventListener('change', renderAll);
     if (statusSelect) statusSelect.addEventListener('change', renderAll);
     if (searchBtn) searchBtn.addEventListener('click', renderAll);
