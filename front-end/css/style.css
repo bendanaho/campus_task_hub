@@ -567,15 +567,12 @@ textarea.form-control {
 /* 三类任务卡片底色:花钱/悬赏(浅红) · 收钱/服务(浅黄) · 互助(浅紫) */
 .task-item.task-side-payer {
     background-color: #fff5f3;
-    border-left: 4px solid var(--coral);
 }
 .task-item.task-side-earner {
     background-color: #fffdf2;
-    border-left: 4px solid var(--sun);
 }
 .task-item.task-side-none {
     background-color: #f6f1ff;
-    border-left: 4px solid #8b5cf6;
 }
 
 /* 可点击的用户名链接(跳他人主页) */

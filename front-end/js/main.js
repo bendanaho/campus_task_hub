@@ -373,7 +373,20 @@ function initProfilePage() {
 
         // 顶部标题区分自己/他人
         var titleEl = document.querySelector('.section-title');
-        if (titleEl) titleEl.textContent = isSelf ? '个人中心' : (user.username || 'TA') + ' 的主页';
+        if (titleEl) {
+            titleEl.textContent = isSelf ? '个人中心' : (user.username || 'TA') + ' 的主页';
+            if (!isSelf) {
+                // 他人主页:标题前加返回按钮
+                var backBtn = document.createElement('a');
+                backBtn.href = 'javascript:void(0)';
+                backBtn.className = 'btn btn-secondary btn-small';
+                backBtn.textContent = '← 返回';
+                backBtn.style.display = 'inline-block';
+                backBtn.style.marginBottom = '10px';
+                backBtn.onclick = function() { goBack(); };
+                titleEl.parentNode.insertBefore(backBtn, titleEl);
+            }
+        }
 
         var avatarEl = document.querySelector('.profile-avatar');
         if (avatarEl) {
