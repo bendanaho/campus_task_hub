@@ -1214,6 +1214,7 @@ function initMessageCenter() {
             if (st === 'progress' && si.className !== 'status-in_progress') return false;
             if (st === 'review' && !si.review) return false;
             if (st === 'done' && si.text !== '已完成') return false;
+            if (st === 'closed' && !si.closed) return false;
             if (rl === 'payer' && item.roleText !== '我是付款方') return false;
             if (rl === 'earner' && item.roleText !== '我是收款方') return false;
             if (kw) {
@@ -1302,9 +1303,14 @@ function initMessageCenter() {
             }
 
             var order = it.order;
+            // 帖子已下架/删除：没有活跃订单时不能再下单，此前一律显示"待下单"，
+            // 点进去才发现下不了单（任务栏写着"该任务已下架或结束"），状态是骗人的。
+            var taskGone = !!it.taskDeleted || (!!it.taskStatus && it.taskStatus !== 'open');
             var statusInfo;
             if (!order || order.status === 'cancelled') {
-                statusInfo = { text: '待下单', className: 'status-pending' };
+                statusInfo = taskGone
+                    ? { text: '已下架/已结束', className: 'status-cancelled', closed: true }
+                    : { text: '待下单', className: 'status-pending' };
             } else {
                 var isPublisher = (it.taskPublisherId != null) && (myId === it.taskPublisherId);
                 statusInfo = describeOrderStatus(order, myId, isPublisher);
