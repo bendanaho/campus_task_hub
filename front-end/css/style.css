@@ -1668,3 +1668,24 @@ textarea.form-control {
     .profile-avatar { max-width: 220px; }
     .profile-extra { padding-left: 0; border-left: none; border-top: 1px dashed var(--ink-line-strong); padding-top: 22px; }
 }
+
+/* ---------- 头像方形：img 铺满、容器 overflow 裁切，消除橘色边角 ---------- */
+.profile-avatar .avatar-img { border-radius: 0; }
+
+/* ---------- 评价评分：橘色星号 ---------- */
+.rating-box { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rating-box .rating-star {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--ink-line-strong);
+    cursor: pointer;
+    transition: color 0.12s ease, transform 0.12s ease;
+    box-shadow: none;
+    border-radius: 0;
+}
+.rating-box .rating-star:hover { transform: scale(1.18); color: var(--coral); }
+.rating-box .rating-star.active { color: var(--coral); }
+.rating-num { margin-left: 10px; font-size: 14px; color: var(--ink-soft); font-weight: 600; }

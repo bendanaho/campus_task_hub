@@ -204,20 +204,29 @@ function setupImageUploader(inputEl, previewEl, images, max) {
     inputEl.addEventListener('change', function(e) {
         var files = Array.from(e.target.files);
         e.target.value = ''; // 清空 input，允许再次选择/追加（含同一文件）
-        files.forEach(function(file) {
-            if (!file.type || file.type.indexOf('image/') !== 0) {
-                alert('只能上传图片文件，已忽略：' + file.name);
-                return;
-            }
-            if (images.length >= max) {
-                alert('最多上传 ' + max + ' 张图片。');
-                return;
-            }
+        if (files.length === 0) return;
+
+        var slots = max - images.length;
+        if (slots <= 0) {
+            alert('最多上传 ' + max + ' 张图片，已达上限。');
+            return;
+        }
+        // 汇总提示：非图片忽略、超限截取——各只提示一次
+        var imgFiles = files.filter(function(f) { return f.type && f.type.indexOf('image/') === 0; });
+        var nonImg = files.length - imgFiles.length;
+        var toAdd = imgFiles.slice(0, slots);
+        var dropped = imgFiles.length - toAdd.length;
+        var msg = [];
+        if (nonImg > 0) msg.push('已忽略 ' + nonImg + ' 个非图片文件');
+        if (dropped > 0) msg.push('最多 ' + max + ' 张，仅添加前 ' + toAdd.length + ' 张（多选的 ' + dropped + ' 张未添加）');
+        if (msg.length) alert(msg.join('；') + '。');
+
+        toAdd.forEach(function(file) {
             compressImageFile(file, 1600, 0.82).then(function(dataUrl) {
                 if (images.length >= max) return;
                 images.push(dataUrl);
                 render();
-            }).catch(function() { /* 非图片/解码失败：跳过 */ });
+            }).catch(function() { /* 解码失败：跳过 */ });
         });
     });
 }
@@ -2056,20 +2065,15 @@ function initReview() {
 
     var selectedRating = 5;
     var starBtns = document.querySelectorAll('.rating-star');
+    var ratingNum = document.getElementById('ratingNum');
+    function paintStars() {
+        starBtns.forEach(function(b, i) { b.classList.toggle('active', i < selectedRating); });
+        if (ratingNum) ratingNum.textContent = selectedRating + ' 星';
+    }
     starBtns.forEach(function(btn, index) {
-        btn.addEventListener('click', function() {
-            selectedRating = index + 1;
-            starBtns.forEach(function(b, i) {
-                if (i < selectedRating) {
-                    b.style.backgroundColor = '#1f6feb';
-                    b.style.color = '#fff';
-                } else {
-                    b.style.backgroundColor = '#eef4ff';
-                    b.style.color = '#1f6feb';
-                }
-            });
-        });
+        btn.addEventListener('click', function() { selectedRating = index + 1; paintStars(); });
     });
+    paintStars();
 
     var imageInput = document.getElementById('reviewImages');
     var previewArea = document.getElementById('imagePreview');
