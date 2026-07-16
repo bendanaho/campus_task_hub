@@ -1684,6 +1684,23 @@ textarea.form-control {
 .ov-card.ov-accent .ov-num { color: var(--coral); }
 .ov-card.ov-progress .ov-num { color: var(--ink-soft); }
 
+/* 「待接受订单占用了你多少钱」提示条 */
+.frozen-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -4px 0 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--coral-tint);
+    border-radius: 10px;
+    background: var(--coral-soft);
+    color: var(--coral-deep);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.frozen-notice b { font-weight: 700; }
+.frozen-notice-icon { flex: 0 0 auto; }
+
 /* 页码分页条：上一页 | 1 2 … N | 下一页 + 第 X / Y 页 */
 .pager {
     display: flex;

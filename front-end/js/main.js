@@ -2357,6 +2357,24 @@ function initOrderCenter() {
             '<div class="ov-card ov-danger" data-tab="action"><p class="ov-label">需要我处理</p><p class="ov-num">' + counts.action + '</p></div>' +
             '<div class="ov-card ov-accent" data-tab="progress"><p class="ov-label">进行中</p><p class="ov-num">' + counts.progress + '</p></div>' +
             '<div class="ov-card" data-tab="mine"><p class="ov-label">我发布的·待响应</p><p class="ov-num">' + counts.mine + '</p></div>';
+        renderFrozenNotice();
+    }
+
+    // 「待接受」订单会占着付款方的钱(下单即冻结)。这笔钱在余额里是看不见的，
+    // 用户未必知道它去哪了、该去哪解开 —— 这里明说，并给出可撤回的提示。
+    function renderFrozenNotice() {
+        var el = document.getElementById('frozenNotice');
+        if (!el) return;
+        var mine = allOrders.filter(function(r) {
+            return r.order && r.order.status === 'pending' && r.myRole === 'payer' && r.order.amount > 0;
+        });
+        if (!mine.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        var total = mine.reduce(function(sum, r) { return sum + Number(r.order.amount || 0); }, 0);
+        total = Math.round(total * 100) / 100;
+        el.style.display = '';
+        el.innerHTML = '<span class="frozen-notice-icon">🔒</span>' +
+            '<span>你有 <b>¥' + total + '</b> 冻结在 <b>' + mine.length + '</b> 笔待接受的订单里' +
+            '（对方接受前可随时撤回取回；超过 3 天未被接受会自动取消并退回）</span>';
     }
     function renderTabs() {
         var tabs = [
