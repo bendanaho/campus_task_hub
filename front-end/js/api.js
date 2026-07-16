@@ -556,7 +556,7 @@ async function getMessages(chatId) {
     return (list || []).map(_normalizeMessage);
 }
 
-async function sendMessage(chatId, content) {
+async function sendMessage(chatId, content, type) {
     if (USE_MOCK) {
         return mockSendMessage(chatId, content);
     }
@@ -566,9 +566,33 @@ async function sendMessage(chatId, content) {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + getToken()
         },
-        body: JSON.stringify({ content: content })
+        body: JSON.stringify({ content: content, type: type || 'text' })
     });
     return _normalizeMessage(await _handleRes(res));
+}
+
+// 压缩并上传图片(文件存储)，返回 { url }
+async function uploadImage(file) {
+    var dataUrl = await compressImageFile(file, 1600, 0.82);   // 复用前端压缩(main.js)
+    var blob = await (await fetch(dataUrl)).blob();
+    var fd = new FormData();
+    fd.append('file', blob, 'image.jpg');
+    var res = await fetch(API_BASE + '/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() },   // 不设 Content-Type，让浏览器带 boundary
+        body: fd
+    });
+    return _handleRes(res);
+}
+
+// 更新个人资料：{ avatar?, bio?, profilePhotos? }
+async function updateProfile(data) {
+    var res = await fetch(API_BASE + '/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify(data)
+    });
+    return _handleRes(res);
 }
 
 async function withdrawMessage(messageId) {

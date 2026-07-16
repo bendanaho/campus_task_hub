@@ -233,6 +233,22 @@ function loadPostFullImages(postId) {
     }).catch(function() { return []; });
 }
 
+// 打开大图遮罩（聊天图片点击放大用；遮罩不存在则临时创建）
+window.openImageOverlay = function(src) {
+    var overlay = document.getElementById('lightboxOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'lightboxOverlay';
+        overlay.className = 'lightbox-overlay';
+        overlay.innerHTML = '<img src="" alt="大图">';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', function() { overlay.classList.remove('active'); });
+    }
+    var big = overlay.querySelector('img');
+    if (big) big.src = src;
+    overlay.classList.add('active');
+};
+
 // ==================== 登录/注册 ====================
 
 function handleRegisterForm() {
@@ -344,11 +360,26 @@ function initProfilePage() {
         var avatarEl = document.querySelector('.profile-avatar');
         if (avatarEl) {
             if (user.avatar) {
-                avatarEl.innerHTML = '<img src="' + user.avatar + '" alt="头像" onerror="this.parentElement.innerHTML=this.alt">';
-                avatarEl.querySelector('img').alt = user.username;
+                avatarEl.innerHTML = '<img src="' + user.avatar + '" alt="头像" onerror="this.parentElement.innerHTML=this.alt" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
             } else {
                 avatarEl.textContent = user.username;
             }
+            // 点击头像上传更换
+            avatarEl.style.cursor = 'pointer';
+            avatarEl.title = '点击更换头像';
+            var avaInput = document.createElement('input');
+            avaInput.type = 'file'; avaInput.accept = 'image/*'; avaInput.style.display = 'none';
+            document.body.appendChild(avaInput);
+            avatarEl.addEventListener('click', function() { avaInput.click(); });
+            avaInput.addEventListener('change', function(e) {
+                var f = e.target.files[0]; avaInput.value = '';
+                if (!f || f.type.indexOf('image/') !== 0) { alert('只能上传图片'); return; }
+                uploadImage(f).then(function(r) { return updateProfile({ avatar: r.url }); }).then(function(u) {
+                    avatarEl.innerHTML = '<img src="' + u.avatar + '" alt="头像" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+                    var cu = getCurrentUser(); if (cu) { cu.avatar = u.avatar; setCurrentUser(cu); if (typeof renderNav === 'function') renderNav(); }
+                    alert('头像已更新');
+                }).catch(function(err) { alert(err.message || '头像上传失败'); });
+            });
         }
 
         var usernameEl = document.getElementById('profileUsername');
@@ -384,9 +415,61 @@ function initProfilePage() {
                 // 账户余额（平台虚拟钱包）+ 充值入口
                 infoContainer.insertBefore(createRow('账户余额',
                     '<span id="balanceValue">…</span> 元 <a href="javascript:void(0)" class="edit-link" id="rechargeBtn">充值</a> <a href="bill.html" class="edit-link">查看账单</a>'), insertBefore);
-                if (user.bio) {
-                    infoContainer.insertBefore(createRow('个人简介', user.bio), insertBefore);
-                }
+                // 个人简介（可编辑）
+                infoContainer.insertBefore(createRow('个人简介',
+                    '<span id="bioValue">' + (user.bio ? user.bio.replace(/</g, '&lt;') : '（未填写）') + '</span> <a href="javascript:void(0)" class="edit-link" id="editBio">编辑</a>'), insertBefore);
+
+                // 个人展示照片（技能证书等，最多5张）
+                var photos = [];
+                try { photos = JSON.parse(user.profilePhotos || '[]') || []; } catch (e) { photos = []; }
+                infoContainer.insertBefore(createRow('展示照片',
+                    '<span id="profilePhotos"></span> <a href="javascript:void(0)" class="edit-link" id="addPhoto">添加</a>'), insertBefore);
+
+                var renderPhotos = function() {
+                    var box = document.getElementById('profilePhotos');
+                    if (!box) return;
+                    box.innerHTML = photos.length ? photos.map(function(url, i) {
+                        return '<span style="position:relative;display:inline-block;margin:2px;">' +
+                            '<img src="' + url + '" onclick="openImageOverlay(this.src)" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:pointer;vertical-align:middle;">' +
+                            '<button type="button" data-i="' + i + '" class="photo-del" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;line-height:18px;padding:0;font-size:12px;">×</button></span>';
+                    }).join('') : '<span style="color:#999;">（未上传）</span>';
+                };
+                renderPhotos();
+
+                // 编辑简介
+                document.getElementById('editBio').addEventListener('click', function() {
+                    var nb = prompt('编辑个人简介（最多500字）：', user.bio || '');
+                    if (nb === null) return;
+                    updateProfile({ bio: nb }).then(function(u) {
+                        user.bio = u.bio || '';
+                        document.getElementById('bioValue').textContent = user.bio || '（未填写）';
+                    }).catch(function(err) { alert(err.message || '保存失败'); });
+                });
+
+                // 添加/删除展示照片
+                var photoInput = document.createElement('input');
+                photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.style.display = 'none';
+                document.body.appendChild(photoInput);
+                document.getElementById('addPhoto').addEventListener('click', function() {
+                    if (photos.length >= 5) { alert('最多上传 5 张'); return; }
+                    photoInput.click();
+                });
+                photoInput.addEventListener('change', function(e) {
+                    var f = e.target.files[0]; photoInput.value = '';
+                    if (!f || f.type.indexOf('image/') !== 0) { alert('只能上传图片'); return; }
+                    if (photos.length >= 5) { alert('最多上传 5 张'); return; }
+                    uploadImage(f).then(function(r) {
+                        var np = photos.concat([r.url]);
+                        return updateProfile({ profilePhotos: np }).then(function() { photos = np; renderPhotos(); });
+                    }).catch(function(err) { alert(err.message || '上传失败'); });
+                });
+                document.getElementById('profilePhotos').addEventListener('click', function(e) {
+                    var btn = e.target.closest ? e.target.closest('.photo-del') : null;
+                    if (!btn) return;
+                    var i = parseInt(btn.getAttribute('data-i'), 10);
+                    var np = photos.slice(); np.splice(i, 1);
+                    updateProfile({ profilePhotos: np }).then(function() { photos = np; renderPhotos(); });
+                });
 
                 var renderBalance = function() {
                     getMyBalance().then(function(res) {
@@ -1288,6 +1371,13 @@ function initChatDetail() {
                 if (m.senderId === 'system' || m.type === 'system') {
                     return '<div class="chat-message system">' + m.content + '</div>';
                 }
+                if (m.type === 'image') {
+                    var icls = isSelf ? 'chat-right' : 'chat-left';
+                    return '<div class="chat-message ' + icls + '" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
+                        '<img src="' + m.content + '" onclick="openImageOverlay(this.src)" style="max-width:180px;max-height:180px;border-radius:8px;cursor:pointer;display:block;" onerror="this.style.display=\'none\'">' +
+                        '<div class="chat-time">' + formatDateTime(m.time) + '</div>' +
+                    '</div>';
+                }
                 var cls = isSelf ? 'chat-right' : 'chat-left';
                 return '<div class="chat-message ' + cls + '" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
                     '<div>' + m.content + '</div>' +
@@ -1533,6 +1623,36 @@ function initChatDetail() {
                 e.preventDefault();
                 doSend();
             }
+        });
+
+        // 注入"图片"按钮：上传图片(文件存储)后作为图片消息发送
+        var imgBtn = document.createElement('button');
+        imgBtn.type = 'button';
+        imgBtn.className = 'btn btn-secondary';
+        imgBtn.textContent = '图片';
+        imgBtn.style.marginRight = '6px';
+        var imgInput = document.createElement('input');
+        imgInput.type = 'file';
+        imgInput.accept = 'image/*';
+        imgInput.style.display = 'none';
+        sendBtn.parentNode.insertBefore(imgBtn, sendBtn);
+        sendBtn.parentNode.insertBefore(imgInput, sendBtn);
+        imgBtn.addEventListener('click', function() { imgInput.click(); });
+        imgInput.addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            imgInput.value = '';
+            if (!file) return;
+            if (!file.type || file.type.indexOf('image/') !== 0) { alert('只能发送图片'); return; }
+            imgBtn.disabled = true; imgBtn.textContent = '上传中…';
+            uploadImage(file).then(function(res) {
+                return sendMessage(chatId, res.url, 'image');
+            }).then(function() {
+                renderMessages();
+            }).catch(function(err) {
+                alert(err.message || '图片发送失败');
+            }).then(function() {
+                imgBtn.disabled = false; imgBtn.textContent = '图片';
+            });
         });
     }
 
