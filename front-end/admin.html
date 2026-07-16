@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>管理后台 - 校园互助平台</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助平台</div>
+            <nav class="nav-links"></nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <h1 class="section-title">管理后台</h1>
+
+            <div class="admin-tabs">
+                <button type="button" class="btn admin-tab active" data-tab="disputes">待处理申诉</button>
+                <button type="button" class="btn admin-tab" data-tab="reports">举报处理</button>
+                <button type="button" class="btn admin-tab" data-tab="orders">全部订单</button>
+                <button type="button" class="btn admin-tab" data-tab="posts">帖子管理</button>
+            </div>
+
+            <div id="adminContent">
+                <!-- 内容由 initAdminPage 动态渲染 -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

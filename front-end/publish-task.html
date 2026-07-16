@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>发布互助 - 校园互助平台</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="js/utils.js" defer></script>
+    <script src="js/mock-data.js" defer></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <div class="logo">校园互助平台</div>
+            <nav class="nav-links">
+
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="container">
+            <div class="card form-container">
+                <h1 class="form-title">发布互助</h1>
+                <p class="note page-intro">先选择你是出钱找人帮忙，还是收钱帮别人做，再填写具体信息。带 <span class="required">*</span> 为必填项。</p>
+
+                <form>
+                    <div class="form-group">
+                        <label>我想发布 <span class="required">*</span></label>
+                        <div class="side-options">
+                            <label class="side-option">
+                                <input type="radio" name="publisherSide" value="payer" checked />
+                                <span>我出钱，请别人帮我做（悬赏求助）</span>
+                            </label>
+                            <label class="side-option">
+                                <input type="radio" name="publisherSide" value="earner" />
+                                <span>我收钱，帮别人做（提供服务）</span>
+                            </label>
+                            <label class="side-option">
+                                <input type="radio" name="publisherSide" value="none" />
+                                <span>不涉及金钱，找人一起做（组队/搭子）</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postTitle">标题 <span class="required">*</span></label>
+                        <input
+                            type="text"
+                            id="postTitle"
+                            class="form-control"
+                            placeholder="请输入标题"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postCategory">分类 <span class="required">*</span></label>
+                        <select id="postCategory" class="form-control placeholder-select" required>
+                            <option value="" selected disabled>请选择分类</option>
+                            <option value="errand">跑腿代办（快递、外卖、代买）</option>
+                            <option value="life-service">生活服务（搬运、打印、帮忙）</option>
+                            <option value="skill-help">技能帮助（维修、设计、编程）</option>
+                            <option value="study-help">学习互助（答疑、辅导、陪学）</option>
+                            <option value="material-share">资料共享（课件、笔记、资料）</option>
+                            <option value="item-trade">物品交易（二手、闲置、交换）</option>
+                            <option value="teamwork">组队协作（搭子、组队、合作）</option>
+                            <option value="other">其他（其他类型）</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postDesc">描述 <span class="required">*</span></label>
+                        <textarea
+                            id="postDesc"
+                            class="form-control"
+                            placeholder="请输入详细描述"
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group" id="rewardGroup">
+                        <label for="postReward" id="rewardLabel"><span class="reward-text">报酬金额</span> <span class="required">*</span></label>
+                        <input
+                            type="text"
+                            id="postReward"
+                            class="form-control"
+                            placeholder="请输入报酬金额"
+                        />
+                    </div>
+
+                    <!-- 仅"我出钱"显示 -->
+                    <div class="form-group" id="deadlineGroup">
+                        <label for="postDeadline">截止时间 <span class="required">*</span></label>
+                        <input
+                            type="datetime-local"
+                            id="postDeadline"
+                            class="form-control"
+                        />
+                    </div>
+
+                    <!-- 仅"我收钱"显示 -->
+                    <div class="form-group" id="serviceTimeGroup">
+                        <label for="postServiceTime">可服务时间（可选）</label>
+                        <input
+                            type="text"
+                            id="postServiceTime"
+                            class="form-control"
+                            placeholder="如 工作日晚间、周末全天"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postContact">联系方式（可选）</label>
+                        <input
+                            type="text"
+                            id="postContact"
+                            class="form-control"
+                            placeholder="请输入联系方式"
+                        />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-publish">发布</button>
+                        <button type="reset" class="btn btn-secondary">重置</button>
+                        <a href="task-hall.html" class="btn btn-gray">返回大厅</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>校园互助平台 © 2026</p>
+        </div>
+    </footer>
+</body>
+</html>
