@@ -1,5 +1,6 @@
 package com.example.keshe_backend.post.service;
 
+import static com.example.keshe_backend.transaction.service.WalletService.relPost;
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
@@ -239,7 +240,7 @@ public class PostService {
         if ("payer".equals(side)) {
             BigDecimal reward = task.getRewardValue() != null ? task.getRewardValue() : BigDecimal.ZERO;
             if (reward.signum() > 0) {
-                walletService.hold(userId, reward, "escrow_freeze", String.valueOf(task.getId()),
+                walletService.hold(userId, reward, "escrow_freeze", relPost(task.getId()),
                         "发布悬赏冻结报酬：" + task.getTitle());
             }
         }
@@ -274,6 +275,31 @@ public class PostService {
         taskRepository.save(task);
         reportService.markReportsHandled(postId);
         String r = reason == null ? "" : reason.trim();
+
+        // 取消该帖待接受的订单（与发布者撤回 ownerClosePost 语义一致）。
+        // 必须做：acceptOrder 只校验订单状态、不校验帖子状态，若留着 pending 订单，
+        // 下面把报酬退了之后对方仍能接受它 → 完成时 release 会把 frozen 扣成负数。
+        List<Order> pendings = orderRepository.findByPostIdAndStatusIn(postId, Arrays.asList("pending"));
+        for (Order o : pendings) {
+            o.setStatus("cancelled");
+            orderRepository.save(o);
+            chatService.addSystemMessage(o.getChatId(),
+                    "该互助「" + task.getTitle() + "」已被管理员下架，订单已取消",
+                    String.valueOf(task.getId()), task.getTitle());
+        }
+
+        // 悬赏帖：报酬在【发布时】就冻结了，下架后该帖再也无法成单，这笔钱必须退回发布者，
+        // 否则会永久冻在他账上（ownerClosePost 撤回时会退，这里此前漏了）。
+        // 悬赏帖被接单时 acceptOrder 会把帖子置为 closed，故能走到这里的 open 悬赏帖必然没有
+        // in_progress 订单占用这笔冻结，全额退回是安全的。
+        if ("payer".equals(task.getPublisherSide())) {
+            BigDecimal reward = task.getRewardValue() != null ? task.getRewardValue() : BigDecimal.ZERO;
+            if (reward.signum() > 0) {
+                walletService.refund(task.getPublisherId(), reward, "escrow_refund", relPost(task.getId()),
+                        "帖子被管理员下架，退回冻结报酬：" + task.getTitle());
+            }
+        }
+
         chatService.addSystemNotify(task.getPublisherId(),
                 "你发布的「" + task.getTitle() + "」已被管理员下架，大厅将不再展示。"
                         + (!r.isEmpty() ? "原因：" + r : "如有疑问请联系平台。"));
@@ -361,7 +387,7 @@ public class PostService {
         if ("payer".equals(task.getPublisherSide())) {
             BigDecimal reward = task.getRewardValue() != null ? task.getRewardValue() : BigDecimal.ZERO;
             if (reward.signum() > 0) {
-                walletService.refund(task.getPublisherId(), reward, "escrow_refund", String.valueOf(task.getId()),
+                walletService.refund(task.getPublisherId(), reward, "escrow_refund", relPost(task.getId()),
                         "撤回悬赏退回报酬：" + task.getTitle());
             }
         }

@@ -1,5 +1,6 @@
 package com.example.keshe_backend.common.sweep;
 
+import static com.example.keshe_backend.transaction.service.WalletService.relOrder;
 import com.example.keshe_backend.order.entity.Order;
 import com.example.keshe_backend.order.repository.OrderRepository;
 import com.example.keshe_backend.review.entity.Review;
@@ -75,7 +76,7 @@ public class SweepService {
                 if (earner != null) earnerName = earner.getUsername();
                 // 结算：释放冻结的报酬（付款方 frozen → 收款方 balance），保持资金守恒
                 walletService.release(order.getPayerId(), order.getEarnerId(), amount, "order",
-                        order.getId().toString(), "订单收入：" + swTitle + "（自动确认）");
+                        relOrder(order.getId()), "订单收入：" + swTitle + "（自动确认）");
             }
             // 释放该会话托管中的私信转账给各自接收方
             chatService.releaseEscrowedTransfers(order.getChatId());

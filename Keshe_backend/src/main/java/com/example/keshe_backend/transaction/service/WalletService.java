@@ -28,6 +28,16 @@ public class WalletService {
 
     private static BigDecimal nz(BigDecimal b) { return b == null ? BigDecimal.ZERO : b; }
 
+    /**
+     * related_id 的作用域前缀。
+     * 此前发布冻结存帖子 id、接单冻结存订单 id，两者同为 category="escrow_freeze"，
+     * 于是"帖子12"和"订单12"撞号——账单页只按 relatedId 分组（不看 category），
+     * 会把两笔毫不相干的钱并进同一条账单。加前缀后彻底区分。
+     */
+    public static String relPost(Long postId)   { return "post:" + postId; }
+    public static String relOrder(Long orderId) { return "order:" + orderId; }
+    public static String relMsg(Long msgId)     { return "msg:" + msgId; }
+
     private User load(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));

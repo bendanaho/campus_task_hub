@@ -1,5 +1,7 @@
 package com.example.keshe_backend.chat.service;
 
+import static com.example.keshe_backend.transaction.service.WalletService.relOrder;
+import static com.example.keshe_backend.transaction.service.WalletService.relMsg;
 import com.example.keshe_backend.chat.dto.*;
 import com.example.keshe_backend.chat.entity.Conversation;
 import com.example.keshe_backend.chat.entity.Message;
@@ -387,7 +389,7 @@ public class ChatService {
 
             if (escrow) {
                 // 冻结发送方：balance → frozen，待订单完成释放给对方 / 取消退回
-                walletService.hold(userId, amount, "escrow_transfer", activeOrder.getId().toString(),
+                walletService.hold(userId, amount, "escrow_transfer", relOrder(activeOrder.getId()),
                         "转账托管给 " + partner.getUsername());
                 payment.put("status", "escrowed");
                 payment.put("orderId", activeOrder.getId());
@@ -617,7 +619,7 @@ public class ChatService {
             Long payerId = toLong(p.get("payerId"));
             Long receiverId = toLong(p.get("receiverId"));
             BigDecimal amt = new BigDecimal(String.valueOf(p.get("amount")));
-            String rel = p.get("orderId") != null ? String.valueOf(p.get("orderId")) : m.getId().toString();
+            String rel = p.get("orderId") != null ? relOrder(toLong(p.get("orderId"))) : relMsg(m.getId());
             walletService.release(payerId, receiverId, amt, "escrow_transfer", rel, "转账到账（订单完成）");
             p.put("status", "released");
             m.setPayment(toJson(p));
@@ -637,7 +639,7 @@ public class ChatService {
             if (p == null || !"escrowed".equals(p.get("status"))) continue;
             Long payerId = toLong(p.get("payerId"));
             BigDecimal amt = new BigDecimal(String.valueOf(p.get("amount")));
-            String rel = p.get("orderId") != null ? String.valueOf(p.get("orderId")) : m.getId().toString();
+            String rel = p.get("orderId") != null ? relOrder(toLong(p.get("orderId"))) : relMsg(m.getId());
             walletService.refund(payerId, amt, "escrow_refund", rel, "转账退回（订单未成）");
             p.put("status", "refunded");
             m.setPayment(toJson(p));

@@ -1,5 +1,6 @@
 package com.example.keshe_backend.order.service;
 
+import static com.example.keshe_backend.transaction.service.WalletService.relOrder;
 import com.example.keshe_backend.common.api.ErrorCode;
 import com.example.keshe_backend.common.exception.BusinessException;
 import com.example.keshe_backend.common.security.SecurityUtils;
@@ -179,7 +180,7 @@ public class OrderService {
         // 冻结付款方报酬（纯互助 amount=0 跳过）：
         // 悬赏帖(payer)报酬在【发布时】已冻结，这里不重复冻；服务帖(earner)在【接单时】冻结付款方(接单者)。
         if (amount.compareTo(BigDecimal.ZERO) > 0 && !"payer".equals(post.getPublisherSide())) {
-            walletService.hold(order.getPayerId(), amount, "escrow_freeze", order.getId().toString(),
+            walletService.hold(order.getPayerId(), amount, "escrow_freeze", relOrder(order.getId()),
                     "订单冻结报酬：" + post.getTitle());
         }
 
@@ -298,7 +299,7 @@ public class OrderService {
             if (amount.compareTo(BigDecimal.ZERO) > 0) {
                 Task post = taskRepository.findById(order.getPostId()).orElse(null);
                 walletService.release(order.getPayerId(), order.getEarnerId(), amount, "order",
-                        order.getId().toString(), "订单收入：" + (post != null ? post.getTitle() : ""));
+                        relOrder(order.getId()), "订单收入：" + (post != null ? post.getTitle() : ""));
             }
             // 释放该会话托管中的私信转账给各自接收方
             chatService.releaseEscrowedTransfers(order.getChatId());
@@ -441,11 +442,11 @@ public class OrderService {
         // 报酬从付款方冻结中分配：退回付款方 payerGets、结算给收款方 earnerGets
         if (payerGets.compareTo(BigDecimal.ZERO) > 0) {
             walletService.refund(order.getPayerId(), payerGets, "escrow_refund",
-                    order.getId().toString(), "仲裁退款：" + title);
+                    relOrder(order.getId()), "仲裁退款：" + title);
         }
         if (earnerGets.compareTo(BigDecimal.ZERO) > 0) {
             walletService.release(order.getPayerId(), order.getEarnerId(), earnerGets, "order",
-                    order.getId().toString(), "订单收入（仲裁）：" + title);
+                    relOrder(order.getId()), "订单收入（仲裁）：" + title);
         }
         // 托管中的私信转账：全额退款 → 退回发送者；结算/部分 → 释放给接收方
         if ("refund".equals(decision)) {
