@@ -2385,12 +2385,19 @@ function initBills() {
     var catMap = { recharge: '充值', order: '订单结算', payment: '收付款',
         escrow_freeze: '冻结报酬', escrow_refund: '退回', escrow_transfer: '转账托管' };
 
-    // 账单标题：从备注取「：」后的任务/订单名，取不到则用订单号
+    // 账单标题：从备注取「：」后的任务/订单名，取不到则用编号兜底。
+    // relatedId 带作用域前缀（post:12 / order:3 / msg:9），避免帖子与订单撞号，
+    // 这里按前缀还原成人话。
     function billTitle(note, relId) {
         var s = String(note || '');
         var i = s.lastIndexOf('：');
         var t = i >= 0 ? s.slice(i + 1).trim() : s;
-        return t || ('订单 #' + relId);
+        if (t) return t;
+        var r = String(relId || '');
+        if (r.indexOf('post:') === 0) return '帖子 #' + r.slice(5);
+        if (r.indexOf('order:') === 0) return '订单 #' + r.slice(6);
+        if (r.indexOf('msg:') === 0) return '转账 #' + r.slice(4);
+        return '订单 #' + r;
     }
 
     Promise.all([getBalance().catch(function() { return null; }), getMyBills()]).then(function(arr) {
