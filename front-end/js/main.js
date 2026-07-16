@@ -713,6 +713,20 @@ function initTaskHall() {
         };
     }
 
+    // 用户「头像+名字」名片入口：点进 TA 的主页。头像缺省用名字首字兜底，加载失败也回退首字。
+    function userChip(userId, name, avatar, extraClass) {
+        var safe = (name == null || name === '') ? '用户' : String(name);
+        var letter = safe.charAt(0) || '?';
+        var cls = 'user-chip' + (extraClass ? ' ' + extraClass : '');
+        var img = avatar
+            ? '<img src="' + avatar + '" class="user-chip-ava" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+            : '';
+        var fb = '<span class="user-chip-ava user-chip-ava--fb"' + (avatar ? ' style="display:none"' : '') + '>' + letter + '</span>';
+        var inner = img + fb + '<span class="user-chip-name">' + safe + '</span>';
+        if (!userId) return '<span class="' + cls + ' user-chip--plain">' + inner + '</span>';
+        return '<a href="profile.html?userId=' + userId + '" class="' + cls + '" title="查看 TA 的主页">' + inner + '</a>';
+    }
+
     function renderTaskItem(task) {
         var typeLabel = task.publisherSide === 'payer' ? '悬赏求助' : (task.publisherSide === 'none' ? '组队互助' : '提供服务');
         var typeClass = task.publisherSide === 'payer' ? 'badge-demand' : (task.publisherSide === 'none' ? 'badge-mutual' : 'badge-service');
@@ -736,7 +750,8 @@ function initTaskHall() {
                     '<h3>' + task.title + '</h3>' +
                     '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                 '</div>' +
-                '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
+                '<div class="task-publisher">' + userChip(task.publisherId, task.publisherName, task.publisherAvatar) + '<span class="task-publisher-credit">信用 <span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span></span></div>' +
+                '<p class="meta">分类：' + catName + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
                 '<div class="task-item-body">' +
                     '<p class="task-desc">' + task.description + '</p>' +
                     bodyImages +
@@ -1015,6 +1030,7 @@ function initTaskDetail() {
         }
 
         var task = result.task;
+        var publisher = result.publisher || {};
         var catName = CATEGORY_MAP[task.category] || task.category;
         var typeLabel = task.publisherSide === 'payer' ? '悬赏求助（发布者出钱）' : (task.publisherSide === 'none' ? '组队互助（不涉及金钱）' : '提供服务（发布者收钱）');
         var expired = task.publisherSide === 'payer' && task.deadline && new Date(task.deadline).getTime() < Date.now();
@@ -1044,7 +1060,7 @@ function initTaskDetail() {
                 '<p><strong>类型：</strong>' + typeLabel + '</p>' +
                 '<p><strong>分类：</strong>' + catName + '</p>' +
                 '<p><strong>描述：</strong>' + task.description + '</p>' +
-                '<p><strong>发布者：</strong>' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
+                '<div class="detail-publisher"><strong>发布者：</strong>' + userChip(task.publisherId, task.publisherName, publisher.avatar, 'user-chip--lg') + '<span class="task-publisher-credit">信用 <span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span></span></div>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
                 (task.publisherSide === 'none' ? '' : '<p><strong>报酬金额：</strong>' + formatReward(task.reward) + '</p>') +
                 serviceTimeHtml +
