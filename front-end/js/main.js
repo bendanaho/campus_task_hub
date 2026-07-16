@@ -1060,6 +1060,19 @@ function initTaskDetail() {
                             : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>')) +
                     '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
                 '</div>';
+            // 管理员视角:若该任务有待处理举报,在详情底部展示举报内容(原因/举报人/时间)
+            if (typeof isAdminUser === 'function' && isAdminUser()) {
+                getAdminReports().then(function(list) {
+                    var rep = (list || []).find(function(it) { return it.post && String(it.post.id) === String(task.id); });
+                    if (!rep) return;
+                    var reasonsHtml = rep.reasons.map(function(r) {
+                        return '<li>' + (r.reporterName || '匿名') + '：' + (r.reason || '') + '<span class="msg-time"> （' + formatDateTime(r.createdAt) + '）</span></li>';
+                    }).join('');
+                    box.insertAdjacentHTML('beforeend', '<div class="card report-detail-block" style="margin-top:16px;">' +
+                        '<div class="msg-header"><h3>举报信息</h3><span class="status-badge status-action">被举报 ' + rep.reportCount + ' 次</span></div>' +
+                        '<ul class="report-reasons">' + reasonsHtml + '</ul></div>');
+                }).catch(function() {});
+            }
         }
     });
 }
@@ -2404,12 +2417,17 @@ function initAdminPage() {
     var content = document.getElementById('adminContent');
     var tabs = document.querySelectorAll('.admin-tab');
     if (!content) return;
-    var currentTab = 'disputes';
+    // tab 状态写 URL hash:从详情返回(history.back)时能回到原 tab,而非默认跳"待处理申诉"
+    var validTabs = ['disputes', 'reports', 'orders', 'posts'];
+    var hashTab = (location.hash || '').replace('#', '');
+    var currentTab = validTabs.indexOf(hashTab) >= 0 ? hashTab : 'disputes';
+    tabs.forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === currentTab); });
 
     tabs.forEach(function(btn) {
         btn.addEventListener('click', function() {
             currentTab = btn.getAttribute('data-tab');
             tabs.forEach(function(b) { b.classList.toggle('active', b === btn); });
+            history.replaceState(null, '', '#' + currentTab);
             render();
         });
     });
