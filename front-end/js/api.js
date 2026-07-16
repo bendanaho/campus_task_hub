@@ -115,6 +115,18 @@ async function getUserProfile(userId) {
     return _handleRes(res);
 }
 
+// 获取他人公开资料(他人主页用):后端仅返回可对外展示的字段,屏蔽手机/邮箱/实名/学号等敏感信息。
+// 注意 /api/users/{id} 已收紧为仅本人可查完整资料,查他人必须走 /api/users/{id}/profile。
+async function getUserPublicProfile(userId) {
+    if (USE_MOCK) {
+        return mockGetPublicProfile(userId);
+    }
+    var res = await fetch(API_BASE + '/users/' + userId + '/profile', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
 async function updatePhone(phone) {
     if (USE_MOCK) {
         return mockUpdatePhone(phone);
@@ -756,8 +768,8 @@ async function fetchUserById(id) {
             }, 50);
         });
     }
-    // 带上 token：后端 /api/users/{id} 需要登录（不在 permitAll 名单），匿名请求会被 403 拒绝
-    var res = await fetch(API_BASE + '/users/' + id, {
+    // /api/users/{id} 已收紧为仅本人可查完整资料;查他人(含聊天页取对方昵称)走公开接口 /api/users/{id}/profile
+    var res = await fetch(API_BASE + '/users/' + id + '/profile', {
         headers: { 'Authorization': 'Bearer ' + getToken() }
     });
     return _handleRes(res);
@@ -865,6 +877,30 @@ function mockGetUserProfile(userId) {
                 college: user.college,
                 className: user.className,
                 bio: user.bio
+            });
+        }, 100);
+    });
+}
+
+// 他人公开资料:屏蔽 phone/email/realName/studentId
+function mockGetPublicProfile(userId) {
+    return new Promise(function(resolve) {
+        setTimeout(function() {
+            var user = _mockGetUserById(userId);
+            if (!user) {
+                resolve(null);
+                return;
+            }
+            resolve({
+                id: user.id,
+                username: user.username,
+                avatar: user.avatar,
+                creditScore: user.creditScore,
+                authStatus: user.authStatus,
+                college: user.college,
+                className: user.className,
+                bio: user.bio,
+                profilePhotos: user.profilePhotos || null
             });
         }, 100);
     });

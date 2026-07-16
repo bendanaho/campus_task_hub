@@ -363,8 +363,17 @@ function initProfilePage() {
     var currentUser = getCurrentUser();
     if (!currentUser) return;
 
-    getUserProfile(currentUser.id).then(function(user) {
-        if (!user) return;
+    // URL 参数 userId 指定查看对象:有且不是自己 -> 他人主页(只读,无编辑入口)
+    var targetUserId = getUrlParam('userId');
+    var isSelf = !targetUserId || String(targetUserId) === String(currentUser.id);
+    var fetchPromise = isSelf ? getUserProfile(currentUser.id) : getUserPublicProfile(targetUserId);
+
+    fetchPromise.then(function(user) {
+        if (!user) { alert('用户不存在'); return; }
+
+        // 顶部标题区分自己/他人
+        var titleEl = document.querySelector('.section-title');
+        if (titleEl) titleEl.textContent = isSelf ? '个人中心' : (user.username || 'TA') + ' 的主页';
 
         var avatarEl = document.querySelector('.profile-avatar');
         if (avatarEl) {
@@ -372,32 +381,40 @@ function initProfilePage() {
                 var inner = u.avatar
                     ? '<img src="' + u.avatar + '" alt="' + (u.username || '') + '" class="avatar-img" onerror="this.style.display=\'none\'">'
                     : '<span class="avatar-fallback">' + (u.username || '') + '</span>';
-                avatarEl.innerHTML = inner + '<div class="avatar-edit-hint"><i>📷</i> 点击更换头像</div>';
+                return inner + (isSelf ? '<div class="avatar-edit-hint"><i>📷</i> 点击更换头像</div>' : '');
             };
-            fillAvatar(user);
-            avatarEl.style.cursor = 'pointer';
-            avatarEl.title = '点击更换头像';
-            var avaInput = document.createElement('input');
-            avaInput.type = 'file'; avaInput.accept = 'image/*'; avaInput.style.display = 'none';
-            document.body.appendChild(avaInput);
-            avatarEl.addEventListener('click', function() { avaInput.click(); });
-            avaInput.addEventListener('change', function(e) {
-                var f = e.target.files[0]; avaInput.value = '';
-                if (!f || f.type.indexOf('image/') !== 0) { alert('只能上传图片'); return; }
-                uploadImage(f).then(function(r) { return updateProfile({ avatar: r.url }); }).then(function(u) {
-                    fillAvatar(u);
-                    var cu = getCurrentUser(); if (cu) { cu.avatar = u.avatar; setCurrentUser(cu); if (typeof renderNav === 'function') renderNav(); }
-                    alert('头像已更新');
-                }).catch(function(err) { alert(err.message || '头像上传失败'); });
-            });
+            avatarEl.innerHTML = fillAvatar(user);
+            if (isSelf) {
+                avatarEl.style.cursor = 'pointer';
+                avatarEl.title = '点击更换头像';
+                var avaInput = document.createElement('input');
+                avaInput.type = 'file'; avaInput.accept = 'image/*'; avaInput.style.display = 'none';
+                document.body.appendChild(avaInput);
+                avatarEl.addEventListener('click', function() { avaInput.click(); });
+                avaInput.addEventListener('change', function(e) {
+                    var f = e.target.files[0]; avaInput.value = '';
+                    if (!f || f.type.indexOf('image/') !== 0) { alert('只能上传图片'); return; }
+                    uploadImage(f).then(function(r) { return updateProfile({ avatar: r.url }); }).then(function(u) {
+                        avatarEl.innerHTML = fillAvatar(u);
+                        var cu = getCurrentUser(); if (cu) { cu.avatar = u.avatar; setCurrentUser(cu); if (typeof renderNav === 'function') renderNav(); }
+                        alert('头像已更新');
+                    }).catch(function(err) { alert(err.message || '头像上传失败'); });
+                });
+            }
         }
 
         var usernameEl = document.getElementById('profileUsername');
         var phoneEl = document.getElementById('profilePhone');
         var emailEl = document.getElementById('profileEmail');
         if (usernameEl) usernameEl.textContent = user.username || '';
-        if (phoneEl) phoneEl.innerHTML = (user.phone || '') + ' <a href="javascript:void(0)" class="edit-link" id="editPhone">修改</a>';
-        if (emailEl) emailEl.innerHTML = (user.email || '') + ' <a href="javascript:void(0)" class="edit-link" id="editEmail">修改</a>';
+        if (isSelf) {
+            if (phoneEl) phoneEl.innerHTML = (user.phone || '') + ' <a href="javascript:void(0)" class="edit-link" id="editPhone">修改</a>';
+            if (emailEl) emailEl.innerHTML = (user.email || '') + ' <a href="javascript:void(0)" class="edit-link" id="editEmail">修改</a>';
+        } else {
+            // 他人主页不展示手机/邮箱(后端公开接口也不返回这两项)
+            if (phoneEl && phoneEl.parentElement) phoneEl.parentElement.style.display = 'none';
+            if (emailEl && emailEl.parentElement) emailEl.parentElement.style.display = 'none';
+        }
 
         var infoContainer = document.querySelector('.profile-info');
         if (infoContainer) {
@@ -422,9 +439,11 @@ function initProfilePage() {
                 infoContainer.insertBefore(createRow('学院', collegeText), insertBefore);
                 infoContainer.insertBefore(createRow('班级', classText), insertBefore);
                 infoContainer.insertBefore(createRow('信用评分', (user.creditScore || '5.0') + ' / 5.0'), insertBefore);
-                // 账户余额（平台虚拟钱包）+ 充值入口
-                infoContainer.insertBefore(createRow('账户余额',
-                    '<span id="balanceValue">…</span> 元 <a href="javascript:void(0)" class="edit-link" id="rechargeBtn">充值</a> <a href="bill.html" class="edit-link">查看账单</a>'), insertBefore);
+                if (isSelf) {
+                    // 账户余额（平台虚拟钱包）+ 充值入口(仅本人)
+                    infoContainer.insertBefore(createRow('账户余额',
+                        '<span id="balanceValue">…</span> 元 <a href="javascript:void(0)" class="edit-link" id="rechargeBtn">充值</a> <a href="bill.html" class="edit-link">查看账单</a>'), insertBefore);
+                }
                 // 个人简介 + 展示照片 → 渲染到右侧 .profile-extra
                 var extra = document.querySelector('.profile-extra');
                 var photos = [];
@@ -432,11 +451,11 @@ function initProfilePage() {
                 if (extra) {
                     extra.innerHTML =
                         '<div class="extra-block">' +
-                            '<div class="extra-head"><span>个人简介</span><a href="javascript:void(0)" class="edit-link" id="editBio">编辑</a></div>' +
+                            '<div class="extra-head"><span>个人简介</span>' + (isSelf ? '<a href="javascript:void(0)" class="edit-link" id="editBio">编辑</a>' : '') + '</div>' +
                             '<p id="bioValue" class="extra-bio">' + (user.bio ? user.bio.replace(/</g, '&lt;') : '（未填写）') + '</p>' +
                         '</div>' +
                         '<div class="extra-block">' +
-                            '<div class="extra-head"><span>展示照片 <em>最多5张</em></span><a href="javascript:void(0)" class="edit-link" id="addPhoto">添加</a></div>' +
+                            '<div class="extra-head"><span>展示照片 ' + (isSelf ? '<em>最多5张</em>' : '') + '</span>' + (isSelf ? '<a href="javascript:void(0)" class="edit-link" id="addPhoto">添加</a>' : '') + '</div>' +
                             '<div id="profilePhotos" class="photo-gallery"></div>' +
                         '</div>';
 
@@ -446,72 +465,81 @@ function initProfilePage() {
                         box.innerHTML = photos.length ? photos.map(function(url, i) {
                             return '<span class="photo-item">' +
                                 '<img src="' + url + '" onclick="openImageOverlay(this.src)">' +
-                                '<button type="button" data-i="' + i + '" class="photo-del">×</button></span>';
+                                (isSelf ? '<button type="button" data-i="' + i + '" class="photo-del">×</button>' : '') +
+                                '</span>';
                         }).join('') : '<span class="extra-empty">（未上传照片）</span>';
                     };
                     renderPhotos();
 
-                    document.getElementById('editBio').addEventListener('click', function() {
-                        var nb = prompt('编辑个人简介（最多500字）：', user.bio || '');
-                        if (nb === null) return;
-                        updateProfile({ bio: nb }).then(function(u) {
-                            user.bio = u.bio || '';
-                            document.getElementById('bioValue').textContent = user.bio || '（未填写）';
-                        }).catch(function(err) { alert(err.message || '保存失败'); });
-                    });
+                    if (isSelf) {
+                        document.getElementById('editBio').addEventListener('click', function() {
+                            var nb = prompt('编辑个人简介（最多500字）：', user.bio || '');
+                            if (nb === null) return;
+                            updateProfile({ bio: nb }).then(function(u) {
+                                user.bio = u.bio || '';
+                                document.getElementById('bioValue').textContent = user.bio || '（未填写）';
+                            }).catch(function(err) { alert(err.message || '保存失败'); });
+                        });
 
-                    var photoInput = document.createElement('input');
-                    photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.style.display = 'none';
-                    document.body.appendChild(photoInput);
-                    document.getElementById('addPhoto').addEventListener('click', function() {
-                        if (photos.length >= 5) { alert('最多上传 5 张'); return; }
-                        photoInput.click();
-                    });
-                    photoInput.addEventListener('change', function(e) {
-                        var f = e.target.files[0]; photoInput.value = '';
-                        if (!f || f.type.indexOf('image/') !== 0) { alert('只能上传图片'); return; }
-                        if (photos.length >= 5) { alert('最多上传 5 张'); return; }
-                        uploadImage(f).then(function(r) {
-                            var np = photos.concat([r.url]);
-                            return updateProfile({ profilePhotos: np }).then(function() { photos = np; renderPhotos(); });
-                        }).catch(function(err) { alert(err.message || '上传失败'); });
-                    });
-                    document.getElementById('profilePhotos').addEventListener('click', function(e) {
-                        var btn = e.target.closest ? e.target.closest('.photo-del') : null;
-                        if (!btn) return;
-                        var i = parseInt(btn.getAttribute('data-i'), 10);
-                        var np = photos.slice(); np.splice(i, 1);
-                        updateProfile({ profilePhotos: np }).then(function() { photos = np; renderPhotos(); });
-                    });
+                        var photoInput = document.createElement('input');
+                        photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.style.display = 'none';
+                        document.body.appendChild(photoInput);
+                        document.getElementById('addPhoto').addEventListener('click', function() {
+                            if (photos.length >= 5) { alert('最多上传 5 张'); return; }
+                            photoInput.click();
+                        });
+                        photoInput.addEventListener('change', function(e) {
+                            var f = e.target.files[0]; photoInput.value = '';
+                            if (!f || f.type.indexOf('image/') !== 0) { alert('只能上传图片'); return; }
+                            if (photos.length >= 5) { alert('最多上传 5 张'); return; }
+                            uploadImage(f).then(function(r) {
+                                var np = photos.concat([r.url]);
+                                return updateProfile({ profilePhotos: np }).then(function() { photos = np; renderPhotos(); });
+                            }).catch(function(err) { alert(err.message || '上传失败'); });
+                        });
+                        document.getElementById('profilePhotos').addEventListener('click', function(e) {
+                            var btn = e.target.closest ? e.target.closest('.photo-del') : null;
+                            if (!btn) return;
+                            var i = parseInt(btn.getAttribute('data-i'), 10);
+                            var np = photos.slice(); np.splice(i, 1);
+                            updateProfile({ profilePhotos: np }).then(function() { photos = np; renderPhotos(); });
+                        });
+                    }
                 }
 
-                var renderBalance = function() {
-                    getMyBalance().then(function(res) {
-                        var el = document.getElementById('balanceValue');
-                        if (el) el.textContent = (res && typeof res.balance === 'number') ? res.balance : 0;
-                    });
-                };
-                renderBalance();
-
-                var rechargeBtn = document.getElementById('rechargeBtn');
-                if (rechargeBtn) {
-                    rechargeBtn.addEventListener('click', function() {
-                        var input = prompt('请输入充值金额（元）。说明：本平台为校园虚拟余额，非真实支付。', '50');
-                        if (input === null) return;
-                        var amt = Number(input);
-                        if (!isFinite(amt) || amt <= 0) { alert('请输入正确的充值金额。'); return; }
-                        recharge(amt).then(function(res) {
-                            alert('充值成功！当前余额 ' + res.balance + ' 元');
-                            renderBalance();
-                        }).catch(function(err) {
-                            alert(err.message || '充值失败');
+                if (isSelf) {
+                    var renderBalance = function() {
+                        getMyBalance().then(function(res) {
+                            var el = document.getElementById('balanceValue');
+                            if (el) el.textContent = (res && typeof res.balance === 'number') ? res.balance : 0;
                         });
-                    });
+                    };
+                    renderBalance();
+
+                    var rechargeBtn = document.getElementById('rechargeBtn');
+                    if (rechargeBtn) {
+                        rechargeBtn.addEventListener('click', function() {
+                            var input = prompt('请输入充值金额（元）。说明：本平台为校园虚拟余额，非真实支付。', '50');
+                            if (input === null) return;
+                            var amt = Number(input);
+                            if (!isFinite(amt) || amt <= 0) { alert('请输入正确的充值金额。'); return; }
+                            recharge(amt).then(function(res) {
+                                alert('充值成功！当前余额 ' + res.balance + ' 元');
+                                renderBalance();
+                            }).catch(function(err) {
+                                alert(err.message || '充值失败');
+                            });
+                        });
+                    }
                 }
             }
 
+            // 操作按钮区(去实名认证/我的订单/退出登录):仅本人显示
+            var actionsEl = infoContainer.querySelector('.actions');
+            if (actionsEl) actionsEl.style.display = isSelf ? '' : 'none';
+
             var authBtn = infoContainer.querySelector('a[href="auth.html"]');
-            if (authBtn) {
+            if (authBtn && isSelf) {
                 if (user.authStatus === 'verified') {
                     authBtn.textContent = '已实名';
                     authBtn.className = 'btn btn-disabled';
@@ -525,42 +553,44 @@ function initProfilePage() {
                 }
             }
 
-            // 绑定修改手机号
-            var editPhone = document.getElementById('editPhone');
-            if (editPhone) {
-                editPhone.addEventListener('click', function() {
-                    var newPhone = prompt('请输入新的手机号：', user.phone || '');
-                    if (!newPhone || newPhone.trim() === user.phone) return;
-                    newPhone = newPhone.trim();
-                    if (!/^1\d{10}$/.test(newPhone)) {
-                        alert('请输入正确的 11 位手机号。'); return;
-                    }
-                    updatePhone(newPhone).then(function() {
-                        alert('手机号修改成功！');
-                        window.location.reload();
-                    }).catch(function(err) {
-                        alert(err.message || '修改失败');
+            if (isSelf) {
+                // 绑定修改手机号
+                var editPhone = document.getElementById('editPhone');
+                if (editPhone) {
+                    editPhone.addEventListener('click', function() {
+                        var newPhone = prompt('请输入新的手机号：', user.phone || '');
+                        if (!newPhone || newPhone.trim() === user.phone) return;
+                        newPhone = newPhone.trim();
+                        if (!/^1\d{10}$/.test(newPhone)) {
+                            alert('请输入正确的 11 位手机号。'); return;
+                        }
+                        updatePhone(newPhone).then(function() {
+                            alert('手机号修改成功！');
+                            window.location.reload();
+                        }).catch(function(err) {
+                            alert(err.message || '修改失败');
+                        });
                     });
-                });
-            }
+                }
 
-            // 绑定修改邮箱
-            var editEmail = document.getElementById('editEmail');
-            if (editEmail) {
-                editEmail.addEventListener('click', function() {
-                    var newEmail = prompt('请输入新的邮箱：', user.email || '');
-                    if (!newEmail || newEmail.trim() === user.email) return;
-                    newEmail = newEmail.trim();
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-                        alert('请输入正确的邮箱地址。'); return;
-                    }
-                    updateEmail(newEmail).then(function() {
-                        alert('邮箱修改成功！');
-                        window.location.reload();
-                    }).catch(function(err) {
-                        alert(err.message || '修改失败');
+                // 绑定修改邮箱
+                var editEmail = document.getElementById('editEmail');
+                if (editEmail) {
+                    editEmail.addEventListener('click', function() {
+                        var newEmail = prompt('请输入新的邮箱：', user.email || '');
+                        if (!newEmail || newEmail.trim() === user.email) return;
+                        newEmail = newEmail.trim();
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+                            alert('请输入正确的邮箱地址。'); return;
+                        }
+                        updateEmail(newEmail).then(function() {
+                            alert('邮箱修改成功！');
+                            window.location.reload();
+                        }).catch(function(err) {
+                            alert(err.message || '修改失败');
+                        });
                     });
-                });
+                }
             }
         }
     });
@@ -622,7 +652,7 @@ function initHomePage() {
                     '<div class="task-item-top">' +
                         '<h3>' + task.title + '</h3>' +
                     '</div>' +
-                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + formatReward(task.reward) + '</p>' +
+                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + formatReward(task.reward) + '</p>' +
                     '<div class="task-item-body">' +
                         '<p class="task-desc">' + task.description + '</p>' +
                         bodyImages +
@@ -693,7 +723,7 @@ function initTaskHall() {
                     '<h3>' + task.title + '</h3>' +
                     '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                 '</div>' +
-                '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + task.publisherName + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
+                '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span>）' + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
                 '<div class="task-item-body">' +
                     '<p class="task-desc">' + task.description + '</p>' +
                     bodyImages +
@@ -999,7 +1029,7 @@ function initTaskDetail() {
                 '<p><strong>类型：</strong>' + typeLabel + '</p>' +
                 '<p><strong>分类：</strong>' + catName + '</p>' +
                 '<p><strong>描述：</strong>' + task.description + '</p>' +
-                '<p><strong>发布者：</strong>' + task.publisherName + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
+                '<p><strong>发布者：</strong>' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
                 (task.publisherSide === 'none' ? '' : '<p><strong>报酬金额：</strong>' + formatReward(task.reward) + '</p>') +
                 serviceTimeHtml +
@@ -1093,7 +1123,7 @@ function initMessageCenter() {
                 '<h3>' + c.taskTitle + (item.roleText ? ' ｜ ' + item.roleText : '') + unreadBadge + '</h3>' +
                 '<span class="msg-time">' + timeAgo(c.lastTime) + '</span>' +
             '</div>' +
-            '<p class="meta">' + statusBadge + '聊天对象：' + c.partnerName + '</p>' +
+            '<p class="meta">' + statusBadge + '聊天对象：' + (c.partnerId ? '<a href="profile.html?userId=' + c.partnerId + '" class="user-link">' + c.partnerName + '</a>' : c.partnerName) + '</p>' +
             '<p class="msg-preview">' + item.msgPreview + '</p>' +
             '<div class="actions">' +
                 '<a href="chat-detail.html?chatId=' + c.id + '&partner=' + c.partnerId + '&task=' + (c.taskId || '') + '" class="btn">进入聊天</a>' +
@@ -1327,7 +1357,7 @@ function initChatDetail() {
                 var partner = await fetchUserById(partnerIdParam);
                 if (partner) partnerName = partner.username;
             }
-            metaEls[0].textContent = '聊天对象：' + partnerName;
+            metaEls[0].innerHTML = '聊天对象：' + (partnerIdParam ? '<a href="profile.html?userId=' + partnerIdParam + '" class="user-link">' + partnerName + '</a>' : partnerName);
             getTaskDetail(taskId).then(function(result) {
                 var task = result && result.task;
                 var roleText = '';
@@ -1937,7 +1967,7 @@ function initOrderCenter() {
         return '<div class="record-item order-row">' +
             '<div class="order-row-main">' +
                 '<h3 class="order-row-title">' + r.title + '</h3>' +
-                '<p class="meta"><span class="status-badge ' + badgeCls + '">' + badgeText + '</span>' + roleAmount(r) + ' · 对方 ' + r.partnerName + '</p>' +
+                '<p class="meta"><span class="status-badge ' + badgeCls + '">' + badgeText + '</span>' + roleAmount(r) + ' · 对方 ' + (r.partnerId ? '<a href="profile.html?userId=' + r.partnerId + '" class="user-link">' + r.partnerName + '</a>' : r.partnerName) + '</p>' +
             '</div>' +
             '<a href="' + primaryHref + '" class="btn btn-secondary order-row-btn">' + primaryText + '</a>' +
         '</div>';
@@ -1982,7 +2012,7 @@ function initOrderCenter() {
             }
             return '<div class="record-item">' +
                 '<h3>' + r.title + '</h3>' +
-                '<p class="meta"><span class="status-badge ' + st.className + '">' + st.text + '</span>' + roleAmount(r) + ' ｜ 时间：' + formatDateTime(o.createdAt) + ' ｜ 对方：' + r.partnerName + '</p>' +
+                '<p class="meta"><span class="status-badge ' + st.className + '">' + st.text + '</span>' + roleAmount(r) + ' ｜ 时间：' + formatDateTime(o.createdAt) + ' ｜ 对方：' + (r.partnerId ? '<a href="profile.html?userId=' + r.partnerId + '" class="user-link">' + r.partnerName + '</a>' : r.partnerName) + '</p>' +
                 '<div class="actions">' + actionsHtml + '</div>' +
             '</div>';
         }).join('');
