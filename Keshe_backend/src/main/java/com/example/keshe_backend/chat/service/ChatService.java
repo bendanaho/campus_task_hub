@@ -80,12 +80,18 @@ public class ChatService {
                 b.lastSenderName(convDto.getPartnerName());
             }
 
-            // 任务快照
+            // 任务快照。带上 status/deleted：消息中心据此把已下架帖的会话显示为"已下架/已结束"，
+            // 而不是误报成"待下单"（点进去其实已经下不了单了）。
             if (c.getTaskId() != null) {
                 Task task = taskRepository.findById(c.getTaskId()).orElse(null);
                 if (task != null) {
                     b.taskPublisherId(task.getPublisherId());
                     b.taskPublisherSide(task.getPublisherSide());
+                    b.taskStatus(task.getStatus());
+                    b.taskDeleted(task.getDeletedAt() != null);
+                } else {
+                    // 会话挂着任务但任务已不存在 → 同样按"已没了"处理
+                    b.taskDeleted(true);
                 }
             }
 

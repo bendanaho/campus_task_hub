@@ -22,6 +22,11 @@ public class EnrichedConversationDTO {
     private Long taskPublisherId;
     private String taskPublisherSide;
 
+    /** 任务状态 open/closed；供消息中心区分"还能下单"与"已下架/已结束" */
+    private String taskStatus;
+    /** 任务是否已被删除（软删或已不存在） */
+    private boolean taskDeleted;
+
     /** 关联订单快照(describeOrderStatus 用)，无订单时为 null */
     private OrderSnapshot order;
 
