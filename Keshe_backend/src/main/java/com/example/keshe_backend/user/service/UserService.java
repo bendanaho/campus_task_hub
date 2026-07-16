@@ -24,12 +24,28 @@ public class UserService {
     private final TransactionRepository transactionRepository;
 
     /**
-     * 获取用户公开资料
+     * 获取本人完整资料(含 phone / email / realName / studentId 等敏感字段)。
+     * 仅允许查询当前登录用户本人,查他人抛 FORBIDDEN —— 防止越权拖取他人隐私。
+     * 查他人公开资料请用 {@link #getPublicProfile(Long)}。
      */
     public UserProfileResponse getUserProfile(Long userId) {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        if (!userId.equals(currentUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看他人完整资料");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         return UserProfileResponse.from(user);
+    }
+
+    /**
+     * 获取用户公开资料(他人主页用):仅返回可对外展示的字段,
+     * 屏蔽 phone / email / realName / studentId / balance 等敏感信息。
+     */
+    public UserPublicProfileDTO getPublicProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        return UserPublicProfileDTO.from(user);
     }
 
     /**

@@ -16,11 +16,20 @@ public class UserController {
     private final UserService userService;
 
     /**
-     * 获取用户公开资料
+     * 获取本人完整资料(含敏感字段,仅本人可查)。
+     * 查他人完整资料会被拒绝 —— 访问他人主页请用 /api/users/{id}/profile。
      */
     @GetMapping("/users/{id}")
     public ApiResponse<UserProfileResponse> getUserProfile(@PathVariable Long id) {
         return ApiResponse.success(userService.getUserProfile(id));
+    }
+
+    /**
+     * 获取用户公开资料(他人主页用):仅公开字段,屏蔽手机/邮箱/实名/学号等敏感信息。
+     */
+    @GetMapping("/users/{id}/profile")
+    public ApiResponse<UserPublicProfileDTO> getUserPublicProfile(@PathVariable Long id) {
+        return ApiResponse.success(userService.getPublicProfile(id));
     }
 
     /**
