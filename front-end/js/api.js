@@ -438,6 +438,19 @@ async function adminClosePost(postId, reason) {
     return _handleRes(res);
 }
 
+// 管理员驳回（忽略）某帖的全部待处理举报：举报不成立时用，帖子保持原样
+async function adminDismissReports(postId, reason) {
+    if (USE_MOCK) {
+        return mockAdminDismissReports(postId, reason);
+    }
+    var res = await fetch(API_BASE + '/admin/reports/' + postId + '/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ reason: reason || '' })
+    });
+    return _handleRes(res);
+}
+
 // 普通用户举报帖子
 async function reportPost(postId, reason) {
     if (USE_MOCK) {
@@ -1787,6 +1800,31 @@ function mockAdminClosePost(postId, reason) {
     });
 }
 
+// 管理员驳回（忽略）某帖的全部 pending 举报：帖子保持原样，只通知举报人
+function mockAdminDismissReports(postId, reason) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var post = _findPostInDb(db, postId);
+            if (!post || post.deletedAt) { reject(new Error('帖子不存在')); return; }
+            if (!db.reports) db.reports = [];
+            var pending = db.reports.filter(function(x) { return x.postId === postId && x.status === 'pending'; });
+            if (pending.length === 0) { reject(new Error('该帖没有待处理的举报')); return; }
+            var reasonTxt = String(reason || '').trim();
+            pending.forEach(function(rep) {
+                rep.status = 'dismissed';
+                _addSystemNotify(db, rep.reporterId,
+                    '你举报的「' + post.title + '」经管理员核实未发现违规，该帖将继续展示。' +
+                    (reasonTxt ? '说明：' + reasonTxt : ''));
+            });
+            _mockSaveDB(db);
+            resolve(pending.length);
+        }, 200);
+    });
+}
+
 // ---------- 举报与删除 ----------
 
 // 普通用户举报帖子：登录、非本人帖、(postId,reporterId) 去重
@@ -1805,6 +1843,9 @@ function mockReportPost(postId, reason) {
             if (!db.reports) db.reports = [];
             var dup = db.reports.some(function(x) { return x.postId === postId && x.reporterId === currentUser.id && x.status === 'pending'; });
             if (dup) { reject(new Error('你已举报过该帖子，管理员会尽快处理')); return; }
+            // 已被管理员驳回过 → 不允许再提，防止反复刷举报（与后端一致）
+            var dismissed = db.reports.some(function(x) { return x.postId === postId && x.reporterId === currentUser.id && x.status === 'dismissed'; });
+            if (dismissed) { reject(new Error('你对该帖的举报经管理员核实未通过，无法重复举报')); return; }
             db.reports.push({
                 id: 'rep-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
                 postId: postId,

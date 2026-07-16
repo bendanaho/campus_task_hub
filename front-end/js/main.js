@@ -736,9 +736,10 @@ function initTaskHall() {
 
         var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
         var actionClass = task.publisherSide === 'payer' ? 'btn-demand' : (task.publisherSide === 'none' ? 'btn-mutual' : 'btn-service');
-        // 管理员为纯管理角色，大厅只读巡查：不显示接单/下单按钮
-        var actionBtn = isAdminUser() ? '' :
-            '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
+        // 管理员为纯管理角色、不参与交易：不显示接单/下单，改为就地下架入口（大厅只列 open 帖，故下架总是可用）
+        var actionBtn = isAdminUser()
+            ? '<button type="button" class="btn btn-danger" onclick="handleAdminClosePost(\'' + task.id + '\')">下架</button>'
+            : '<button type="button" class="btn ' + actionClass + '" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>';
 
         var bodyImages = task.images && task.images.length > 0 ? '<div class="task-images">' + task.images.slice(0, 3).map(function(img, idx) {
             var thumbSrc = (img && img.thumb) ? img.thumb : ((img && img.full) ? img.full : img);
@@ -789,6 +790,9 @@ function initTaskHall() {
     }
 
     function renderTasks() { fetchAndRender(true); }
+
+    // 管理员就地下架后重拉列表（被下架的帖会从大厅消失）
+    window.__adminOnPostChanged = renderTasks;
 
     renderTasks();
     // 暴露给 initWebSocket 的 NEW_TASK 局部插入新卡片用
@@ -1053,6 +1057,9 @@ function initTaskDetail() {
         if (box) {
             var currentUser = getCurrentUser();
             var isMine = currentUser && currentUser.id === task.publisherId;
+            var isAdminView = (typeof isAdminUser === 'function') && isAdminUser();
+            // 管理员就地下架后刷新本页（状态会变成已结束）
+            if (isAdminView) window.__adminOnPostChanged = function() { window.location.reload(); };
             var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
             var serviceTimeHtml = (task.publisherSide === 'earner' && task.serviceTime)
                 ? '<p><strong>可服务时间：</strong>' + task.serviceTime + '</p>' : '';
@@ -1071,11 +1078,16 @@ function initTaskDetail() {
                 '<p><strong>状态：</strong>' + statusText + '</p>' +
                 imagesHtml +
                 '<div class="actions">' +
-                    (isMine ? (task.status === 'open'
-                            ? '<span class="note">这是你发布的帖子</span> <button type="button" class="btn btn-small btn-secondary" onclick="handleOwnerClose(\'' + task.id + '\')">撤回</button>'
-                            : '<span class="note">这是你发布的帖子（已结束）</span>')
-                        : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
-                            : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>')) +
+                    // 管理员不参与交易：不给接单/下单（原先会显示但点了被 blockIfAdmin 拦住，纯白点），改为就地下架
+                    (isAdminView
+                        ? (task.status === 'open'
+                            ? '<button type="button" class="btn btn-danger" onclick="handleAdminClosePost(\'' + task.id + '\')">下架该帖</button>'
+                            : '<span class="note">该帖已下架/已结束</span>')
+                        : (isMine ? (task.status === 'open'
+                                ? '<span class="note">这是你发布的帖子</span> <button type="button" class="btn btn-small btn-secondary" onclick="handleOwnerClose(\'' + task.id + '\')">撤回</button>'
+                                : '<span class="note">这是你发布的帖子（已结束）</span>')
+                            : (expired ? '<span class="note">该悬赏已截止，无法接单</span>'
+                                : '<button type="button" class="btn" onclick="goToOrderChat(\'' + task.id + '\', \'' + task.publisherId + '\')">' + actionLabel + '</button>'))) +
                     '<button type="button" class="btn btn-secondary" onclick="goBack()">返回上一页</button>' +
                 '</div>';
             // 管理员视角:若该任务有待处理举报,在详情底部展示举报内容(原因/举报人/时间)
@@ -1591,9 +1603,40 @@ function initChatDetail() {
             return;
         }
         if (!taskId) { taskBar.style.display = 'none'; return; }
-        var result = await getTaskDetail(taskId);
+        // 帖子可能已被管理员删除(软删) → getTaskDetail 抛 404。此前这里没有兜底，
+        // 整个 renderTaskBar 会因异常中断，任务栏渲染不出来，当事人连"确认完成/申诉"都点不到。
+        // 后端已禁止删除有活跃订单的帖子，这里再兜一层：任务没了也要让订单能走完。
+        var result = null;
+        try {
+            result = await getTaskDetail(taskId);
+        } catch (e) {
+            result = null;
+        }
         var task = result && result.task;
-        if (!task) { taskBar.style.display = 'none'; return; }
+        if (!task) {
+            // 任务已不可见：仅凭订单本身（不依赖任务信息）让进行中的订单还能确认完成/申诉，
+            // 否则付款方的钱会一直冻结着、双方谁也点不了。
+            var lostOrder = null;
+            try { lostOrder = await getOrder(chatId); } catch (e2) { lostOrder = null; }
+            if (!lostOrder || lostOrder.status !== 'in_progress') {
+                taskBar.innerHTML = '<div class="task-bar-info"><span class="task-bar-status">该任务已被删除或不可见</span></div>';
+                taskBar.style.display = 'flex';
+                return;
+            }
+            var lostUser = getCurrentUser();
+            var lostIsPayer = lostUser && lostUser.id === lostOrder.payerId;
+            var lostMyConfirmed = lostIsPayer ? lostOrder.payerConfirmed : lostOrder.earnerConfirmed;
+            var lostActions = '<span class="task-bar-money">' +
+                (lostIsPayer ? '已支付 ' + lostOrder.amount + ' 元·冻结中' : '完成后到账 ' + lostOrder.amount + ' 元') + '</span>';
+            lostActions += lostMyConfirmed
+                ? '<span class="task-bar-waiting">等待对方确认...</span>'
+                : '<button type="button" class="btn btn-small" onclick="handleOrderConfirm(\'' + lostOrder.id + '\')">确认完成</button>';
+            lostActions += '<button type="button" class="btn btn-small btn-secondary" onclick="handleDispute(\'' + lostOrder.id + '\')">申诉</button>';
+            taskBar.innerHTML = '<div class="task-bar-info"><span class="task-bar-status">该任务已被删除，本单仍可继续处理</span></div>' +
+                '<div class="task-bar-actions">' + lostActions + '</div>';
+            taskBar.style.display = 'flex';
+            return;
+        }
         var currentUser = getCurrentUser();
 
         var order = await getOrder(chatId);
@@ -1901,6 +1944,49 @@ window.handleOrderCancel = function(orderId) {
 };
 
 // 确认完成（任一方，双方都确认才结算）
+// ==================== 管理员帖子操作（多页共用） ====================
+// 管理后台、互助大厅、任务详情都能下架帖子，故这些函数必须是顶层的
+// （原先定义在 initAdminPage 内部，而它只在 admin.html 运行，别的页面拿不到）。
+// 各页在自己的 init 里注册 __adminOnPostChanged，决定操作成功后怎么刷新。
+window.__adminOnPostChanged = null;
+function _afterAdminPostChange() {
+    if (typeof window.__adminOnPostChanged === 'function') window.__adminOnPostChanged();
+}
+
+window.handleAdminClosePost = function(postId) {
+    var reason = prompt('下架原因（将通过系统通知告知发布者；可留空）：');
+    if (reason === null) return; // 取消
+    adminClosePost(postId, reason).then(function() {
+        alert('已下架，已通知发布者。');
+        _afterAdminPostChange();
+    }).catch(function(err) {
+        alert(err.message || '操作失败');
+    });
+};
+
+window.handleAdminDeletePost = function(postId) {
+    var reason = prompt('删除原因（将通过系统通知告知发布者；可留空）。删除为软删除，全站不可见但记录保留：');
+    if (reason === null) return;
+    adminDeletePost(postId, reason).then(function() {
+        alert('已删除，已通知发布者。');
+        _afterAdminPostChange();
+    }).catch(function(err) {
+        alert(err.message || '操作失败');
+    });
+};
+
+// 忽略（驳回）某帖的全部待处理举报：举报不成立时用，帖子保持展示，只通知举报人
+window.handleAdminDismissReports = function(postId) {
+    var reason = prompt('忽略原因（将通知举报人；可留空）。帖子将保持正常展示：');
+    if (reason === null) return;
+    adminDismissReports(postId, reason).then(function(n) {
+        alert('已忽略该帖举报' + (n ? '（' + n + ' 条）' : '') + '，帖子保持展示，已通知举报人。');
+        _afterAdminPostChange();
+    }).catch(function(err) {
+        alert(err.message || '操作失败');
+    });
+};
+
 // 普通用户举报帖子：填理由 → 提交给管理员处理
 window.handleReport = function(postId) {
     if (!isLoggedIn()) {
@@ -1984,6 +2070,7 @@ function initOrderCenter() {
 
     var allOrders = [];          // getMyOrders 全量（已附 reviewed）
     var myOpenPosts = [];        // 我发布的 open 帖子
+    var myClosedPosts = [];      // 我发布的已下架/已结束帖子
     var activeTab = 'action';
     var counts = { action: 0, progress: 0, mine: 0 };
 
@@ -2048,6 +2135,21 @@ function initOrderCenter() {
         '</div>';
     }
 
+    // 我发布的·已下架/已结束 卡：只读，不给撤回（已经不在大厅了）
+    function closedPostCard(p) {
+        var typeLabel = p.publisherSide === 'payer' ? '悬赏求助' : (p.publisherSide === 'none' ? '组队互助' : '提供服务');
+        var rewardText = p.publisherSide === 'none' ? '不涉及金钱' : ('报酬 ' + formatReward(p.reward));
+        return '<div class="record-item order-row">' +
+            '<div class="order-row-main">' +
+                '<h3 class="order-row-title">' + p.title + '</h3>' +
+                '<p class="meta"><span class="status-badge status-cancelled">已下架/已结束</span>' + typeLabel + ' · ' + rewardText + ' · ' + timeAgo(p.publishTime) + '</p>' +
+            '</div>' +
+            '<div class="order-row-actions">' +
+                '<a href="task-detail.html?id=' + p.id + '" class="btn btn-secondary btn-small">详情</a>' +
+            '</div>' +
+        '</div>';
+    }
+
     // 全部订单：详细卡 + 筛选
     async function renderAllTab() {
         var moneyRole = (filterSelect && (filterSelect.value === 'payer' || filterSelect.value === 'earner')) ? filterSelect.value : undefined;
@@ -2087,7 +2189,7 @@ function initOrderCenter() {
         var tabs = [
             { key: 'action', label: '需要我处理', count: counts.action, danger: true },
             { key: 'progress', label: '进行中', count: counts.progress },
-            { key: 'mine', label: '我发布的·待响应', count: counts.mine },
+            { key: 'mine', label: '我发布的', count: counts.mine },
             { key: 'all', label: '全部订单' }
         ];
         tabsEl.innerHTML = tabs.map(function(t) {
@@ -2099,9 +2201,20 @@ function initOrderCenter() {
         filterBar.style.display = (activeTab === 'all') ? '' : 'none';
         if (activeTab === 'all') { renderAllTab(); return; }
         if (activeTab === 'mine') {
-            panel.innerHTML = myOpenPosts.length
+            if (!myOpenPosts.length && !myClosedPosts.length) {
+                panel.innerHTML = '<div class="card empty-state"><p>你还没有发布过互助</p></div>';
+                return;
+            }
+            var mineHtml = '';
+            mineHtml += '<h3 class="mine-group-title">待响应（' + myOpenPosts.length + '）</h3>';
+            mineHtml += myOpenPosts.length
                 ? myOpenPosts.map(openPostCard).join('')
                 : '<div class="card empty-state"><p>没有待响应的发布</p></div>';
+            if (myClosedPosts.length) {
+                mineHtml += '<h3 class="mine-group-title">已下架 / 已结束（' + myClosedPosts.length + '）</h3>';
+                mineHtml += myClosedPosts.map(closedPostCard).join('');
+            }
+            panel.innerHTML = mineHtml;
             return;
         }
         var arr = allOrders.filter(activeTab === 'action' ? isNeedsAction : isInProgress);
@@ -2117,7 +2230,13 @@ function initOrderCenter() {
             var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
             return Object.assign({}, r, { reviewed: reviewed });
         }));
-        try { myOpenPosts = ((await getMyPosts()) || []).filter(function(p) { return p.status === 'open'; }); } catch (e) { myOpenPosts = []; }
+        // 我发布的帖子拆两组：open=待响应(可撤回)；其余=已下架/已结束。
+        // 后者以前无处可看——发布者收到"已被管理员下架"的通知，却在自己页面找不到那个帖子。
+        try {
+            var allMyPosts = (await getMyPosts()) || [];
+            myOpenPosts = allMyPosts.filter(function(p) { return p.status === 'open'; });
+            myClosedPosts = allMyPosts.filter(function(p) { return p.status !== 'open'; });
+        } catch (e) { myOpenPosts = []; myClosedPosts = []; }
         counts = {
             action: allOrders.filter(isNeedsAction).length,
             progress: allOrders.filter(isInProgress).length,
@@ -2506,8 +2625,10 @@ function initAdminPage() {
                 '<ul class="report-reasons">' + reasons + '</ul>' +
                 '<div class="actions">' +
                     '<a href="task-detail.html?id=' + t.id + '" class="btn btn-small btn-secondary">查看详情</a>' +
+                    // 举报处理是二元裁决：成立→下架，不成立→忽略。
+                    // 删除是高危动作（会让该帖已有订单失去任务详情），只保留在「帖子管理」里。
                     '<button type="button" class="btn btn-small" onclick="handleAdminClosePost(\'' + t.id + '\')">下架</button>' +
-                    '<button type="button" class="btn btn-small btn-danger" onclick="handleAdminDeletePost(\'' + t.id + '\')">删除</button>' +
+                    '<button type="button" class="btn btn-small btn-secondary" onclick="handleAdminDismissReports(\'' + t.id + '\')">忽略</button>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -2605,27 +2726,8 @@ function initAdminPage() {
         });
     };
 
-    window.handleAdminClosePost = function(postId) {
-        var reason = prompt('下架原因（将通过系统通知告知发布者；可留空）：');
-        if (reason === null) return; // 取消
-        adminClosePost(postId, reason).then(function() {
-            alert('已下架，已通知发布者。');
-            render();
-        }).catch(function(err) {
-            alert(err.message || '操作失败');
-        });
-    };
-
-    window.handleAdminDeletePost = function(postId) {
-        var reason = prompt('删除原因（将通过系统通知告知发布者；可留空）。删除为软删除，全站不可见但记录保留：');
-        if (reason === null) return;
-        adminDeletePost(postId, reason).then(function() {
-            alert('已删除，已通知发布者。');
-            render();
-        }).catch(function(err) {
-            alert(err.message || '操作失败');
-        });
-    };
+    // 帖子被下架/删除/举报被忽略后刷新本页列表（管理员操作函数是多页共用的顶层函数）
+    window.__adminOnPostChanged = render;
 
     render();
 }

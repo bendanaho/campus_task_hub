@@ -1684,6 +1684,15 @@ textarea.form-control {
 .ov-card.ov-accent .ov-num { color: var(--coral); }
 .ov-card.ov-progress .ov-num { color: var(--ink-soft); }
 
+/* 「我发布的」内部分组标题（待响应 / 已下架·已结束） */
+.mine-group-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-mute);
+    margin: 18px 0 8px;
+}
+.mine-group-title:first-child { margin-top: 0; }
+
 .order-tabs {
     display: flex;
     gap: 4px;
