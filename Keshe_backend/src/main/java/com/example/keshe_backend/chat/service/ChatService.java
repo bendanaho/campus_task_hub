@@ -58,14 +58,48 @@ public class ChatService {
      * 消息中心聚合：一次返回每个会话渲染所需的原始数据（会话 + 任务/订单快照 + 是否已评价 + 未读 + 发送者名），
      * 替代前端逐会话 N+1 请求。查询在服务端本地库完成，前端只需一次 HTTP。
      */
+    /**
+     * 消息中心聚合接口。这个接口当初就是为了消灭前端 N+1（40 个 HTTP 请求 → 1 个）而生的，
+     * 但 SQL 层的 N+1 原样搬了进来：每个会话仍要查 未读数/任务/订单/是否已评价 共 4 次。
+     * 现在全部改为批量预取，固定 4 次查询。
+     */
     public List<EnrichedConversationDTO> getEnrichedConversations() {
         Long userId = SecurityUtils.getCurrentUserId();
         List<Conversation> conversations = conversationRepository
                 .findByUser1IdOrUser2IdOrderByLastTimeDesc(userId, userId);
+        if (conversations.isEmpty()) return new ArrayList<>();
+
+        List<String> chatIds = conversations.stream().map(Conversation::getId).collect(Collectors.toList());
+
+        // 预取①：各会话未读数（一次 GROUP BY）
+        Map<String, Long> unreadByChat = new HashMap<>();
+        for (Object[] row : messageRepository.countUnreadGroupedByChatId(chatIds, userId)) {
+            unreadByChat.put((String) row[0], ((Number) row[1]).longValue());
+        }
+        // 预取②：各会话最新订单（一次 IN 查询，升序遍历后写入即最新）
+        Map<String, Order> latestOrderByChat = new HashMap<>();
+        for (Order o : orderRepository.findByChatIdInOrderByCreatedAtAsc(chatIds)) {
+            latestOrderByChat.put(o.getChatId(), o);
+        }
+        // 预取③：相关任务
+        Set<Long> taskIds = conversations.stream()
+                .map(Conversation::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Task> taskById = new HashMap<>();
+        if (!taskIds.isEmpty()) {
+            for (Task t : taskRepository.findAllById(taskIds)) taskById.put(t.getId(), t);
+        }
+        // 预取④：我已评价过的订单（只针对已完成的订单）
+        List<Long> completedOrderIds = latestOrderByChat.values().stream()
+                .filter(o -> "completed".equals(o.getStatus()))
+                .map(Order::getId).collect(Collectors.toList());
+        Set<Long> reviewedOrderIds = completedOrderIds.isEmpty()
+                ? new HashSet<>()
+                : new HashSet<>(reviewRepository.findReviewedOrderIds(userId, completedOrderIds));
+
         List<EnrichedConversationDTO> result = new ArrayList<>();
         for (Conversation c : conversations) {
             ConversationDTO convDto = toConversationDTO(c, userId);
-            long unread = messageRepository.countUnreadByChatIdAndUserId(c.getId(), userId);
+            long unread = unreadByChat.getOrDefault(c.getId(), 0L);
             EnrichedConversationDTO.EnrichedConversationDTOBuilder b = EnrichedConversationDTO.builder()
                     .conversation(convDto)
                     .unread(unread);
@@ -85,7 +119,7 @@ public class ChatService {
             // 任务快照。带上 status/deleted：消息中心据此把已下架帖的会话显示为"已下架/已结束"，
             // 而不是误报成"待下单"（点进去其实已经下不了单了）。
             if (c.getTaskId() != null) {
-                Task task = taskRepository.findById(c.getTaskId()).orElse(null);
+                Task task = taskById.get(c.getTaskId());
                 if (task != null) {
                     b.taskPublisherId(task.getPublisherId());
                     b.taskPublisherSide(task.getPublisherSide());
@@ -98,7 +132,7 @@ public class ChatService {
             }
 
             // 订单快照 + 是否已评价
-            Order order = orderRepository.findTopByChatIdOrderByCreatedAtDesc(c.getId()).orElse(null);
+            Order order = latestOrderByChat.get(c.getId());
             if (order != null) {
                 b.order(EnrichedConversationDTO.OrderSnapshot.builder()
                         .id(order.getId())
@@ -109,7 +143,7 @@ public class ChatService {
                         .earnerConfirmed(order.getEarnerConfirmed())
                         .build());
                 if ("completed".equals(order.getStatus())) {
-                    b.reviewed(reviewRepository.existsByOrderIdAndFromUserId(order.getId(), userId));
+                    b.reviewed(reviewedOrderIds.contains(order.getId()));
                 }
             }
             result.add(b.build());
@@ -577,24 +611,55 @@ public class ChatService {
         return MessageDTO.from(msg);
     }
 
+    /**
+     * 导航栏未读红点：每个页面加载都会调用，是全站最高频的接口之一。
+     * 因此这里必须批量取数——原先是"每个会话查未读COUNT + 查订单 + 查任务"的 1+3N，
+     * 一个有 20 个会话的用户每打开一个页面就要 61 次查询。现固定为 3 次。
+     */
     public UnreadCountResponse getUnreadCounts() {
         Long userId = SecurityUtils.getCurrentUserId();
         List<Conversation> conversations = conversationRepository
                 .findByUser1IdOrUser2IdOrderByLastTimeDesc(userId, userId);
+        if (conversations.isEmpty()) {
+            return UnreadCountResponse.builder().total(0L).byChat(new LinkedHashMap<>()).build();
+        }
+
+        List<String> chatIds = conversations.stream().map(Conversation::getId).collect(Collectors.toList());
+
+        // 查询①：一次 GROUP BY 算完所有会话的未读数
+        Map<String, Long> unreadByChat = new HashMap<>();
+        for (Object[] row : messageRepository.countUnreadGroupedByChatId(chatIds, userId)) {
+            unreadByChat.put((String) row[0], ((Number) row[1]).longValue());
+        }
+
+        // 查询②：一次取回这些会话的全部订单，内存里保留每个会话最新的一条
+        Map<String, Order> latestOrderByChat = new HashMap<>();
+        for (Order o : orderRepository.findByChatIdInOrderByCreatedAtAsc(chatIds)) {
+            latestOrderByChat.put(o.getChatId(), o);   // 升序遍历，后写入的即最新
+        }
+
+        // 查询③：一次取回相关任务，用于判断"我是不是发布者"
+        Set<Long> taskIds = conversations.stream()
+                .map(Conversation::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Task> taskById = new HashMap<>();
+        if (!taskIds.isEmpty()) {
+            for (Task t : taskRepository.findAllById(taskIds)) taskById.put(t.getId(), t);
+        }
+
         Map<String, Long> byChat = new LinkedHashMap<>();
         long total = 0;
         long actionCount = 0;
         for (Conversation c : conversations) {
-            long count = messageRepository.countUnreadByChatIdAndUserId(c.getId(), userId);
+            long count = unreadByChat.getOrDefault(c.getId(), 0L);
             if (count > 0) {
                 byChat.put(c.getId(), count);
                 total += count;
             }
             // #4：待操作(待我接受/待我确认)也计入未读总数——即便该会话没有未读消息
             if (c.getTaskId() != null && (c.getId() == null || !c.getId().startsWith("sys-notify-"))) {
-                Order order = orderRepository.findTopByChatIdOrderByCreatedAtDesc(c.getId()).orElse(null);
+                Order order = latestOrderByChat.get(c.getId());
                 if (order != null) {
-                    Task task = taskRepository.findById(c.getTaskId()).orElse(null);
+                    Task task = taskById.get(c.getTaskId());
                     Long pubId = task != null ? task.getPublisherId() : null;
                     if (userNeedsAction(order, userId, pubId)) {
                         actionCount++;

@@ -27,7 +27,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -535,12 +539,26 @@ public class OrderService {
         String kw = keyword == null ? "" : keyword.trim().toLowerCase();
         boolean filterStatus = status != null && !status.isBlank() && !"all".equals(status);
 
-        List<MyOrderResponse> result = new ArrayList<>();
-        for (Order order : orders) {
-            // 状态过滤
-            if (filterStatus && !status.equals(order.getStatus())) continue;
+        // 先按状态过滤，再批量预取帖子与对方用户——原先是逐单 findById(post)+findById(partner)
+        // 的 1+2N；现固定为 3 次查询。
+        List<Order> candidates = filterStatus
+                ? orders.stream().filter(o -> status.equals(o.getStatus())).collect(Collectors.toList())
+                : orders;
+        if (candidates.isEmpty()) return new ArrayList<>();
 
-            Task post = taskRepository.findById(order.getPostId()).orElse(null);
+        Set<Long> postIds = candidates.stream().map(Order::getPostId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Task> postById = new HashMap<>();
+        if (!postIds.isEmpty()) for (Task t : taskRepository.findAllById(postIds)) postById.put(t.getId(), t);
+
+        Set<Long> partnerIds = candidates.stream()
+                .map(o -> o.getPayerId().equals(userId) ? o.getEarnerId() : o.getPayerId())
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, User> userById = new HashMap<>();
+        if (!partnerIds.isEmpty()) for (User u : userRepository.findAllById(partnerIds)) userById.put(u.getId(), u);
+
+        List<MyOrderResponse> result = new ArrayList<>();
+        for (Order order : candidates) {
+            Task post = postById.get(order.getPostId());
             String myRole;
             Long partnerId;
             String partnerName;
@@ -553,7 +571,7 @@ public class OrderService {
                 partnerId = order.getPayerId();
             }
 
-            User partner = userRepository.findById(partnerId).orElse(null);
+            User partner = userById.get(partnerId);
             partnerName = partner != null ? partner.getUsername() : "";
             String title = post != null ? post.getTitle() : "";
 
@@ -567,7 +585,8 @@ public class OrderService {
 
             result.add(MyOrderResponse.builder()
                     .order(OrderDTO.from(order))
-                    .post(post != null ? PostDTO.from(post) : null)
+                    // fromLite：订单列表只需缩略图，原图点开详情再按需取（与大厅口径一致）
+                    .post(post != null ? PostDTO.fromLite(post) : null)
                     .title(title)
                     .myRole(myRole)
                     .partnerId(partnerId)

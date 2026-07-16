@@ -13,6 +13,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByChatIdOrderByCreatedAtAsc(String chatId);
 
+    /**
+     * 批量取多个会话的订单（按创建时间升序），调用方在内存里取每个会话的最后一条，
+     * 替代"每个会话查一次 findTopByChatId"的 N+1。
+     */
+    List<Order> findByChatIdInOrderByCreatedAtAsc(List<String> chatIds);
+
     Optional<Order> findTopByChatIdOrderByCreatedAtDesc(String chatId);
 
     List<Order> findByPayerIdOrEarnerIdOrderByCreatedAtDesc(Long payerId, Long earnerId);
