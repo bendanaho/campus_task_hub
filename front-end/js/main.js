@@ -647,7 +647,7 @@ function initHomePage() {
                 var thumbSrc = (img && img.thumb) ? img.thumb : ((img && img.full) ? img.full : img);
                 return '<img src="' + thumbSrc + '" data-postid="' + task.id + '" data-idx="' + idx + '" class="task-image-thumb" loading="lazy" onerror="this.style.display=\'none\'">';
             }).join('') + '</div>' : '';
-            return '<div class="task-item">' +
+            return '<div class="task-item task-side-' + (task.publisherSide || 'none') + '">' +
                 '<div class="task-item-main">' +
                     '<div class="task-item-top">' +
                         '<h3>' + task.title + '</h3>' +
@@ -717,7 +717,7 @@ function initTaskHall() {
             var thumbSrc = (img && img.thumb) ? img.thumb : ((img && img.full) ? img.full : img);
             return '<img src="' + thumbSrc + '" data-postid="' + task.id + '" data-idx="' + idx + '" class="task-image-thumb" loading="lazy" onerror="this.style.display=\'none\'">';
         }).join('') + '</div>' : '';
-        return '<div class="task-item" data-postid="' + task.id + '" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
+        return '<div class="task-item task-side-' + task.publisherSide + '" data-postid="' + task.id + '" data-side="' + task.publisherSide + '" data-category="' + task.category + '">' +
             '<div class="task-item-main">' +
                 '<div class="task-item-top">' +
                     '<h3>' + task.title + '</h3>' +
@@ -1025,7 +1025,9 @@ function initTaskDetail() {
             var actionLabel = task.publisherSide === 'payer' ? '接单赚钱' : (task.publisherSide === 'none' ? '报名参加' : '下单找他');
             var serviceTimeHtml = (task.publisherSide === 'earner' && task.serviceTime)
                 ? '<p><strong>可服务时间：</strong>' + task.serviceTime + '</p>' : '';
-            box.innerHTML = '<p><strong>标题：</strong>' + task.title + '</p>' +
+            var sideClass = task.publisherSide === 'payer' ? 'side-payer' : (task.publisherSide === 'none' ? 'side-none' : 'side-earner');
+            box.innerHTML = '<div class="detail-banner ' + sideClass + '">' + typeLabel + '</div>' +
+                '<p><strong>标题：</strong>' + task.title + '</p>' +
                 '<p><strong>类型：</strong>' + typeLabel + '</p>' +
                 '<p><strong>分类：</strong>' + catName + '</p>' +
                 '<p><strong>描述：</strong>' + task.description + '</p>' +
