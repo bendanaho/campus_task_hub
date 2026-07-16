@@ -1824,29 +1824,58 @@ function initChatDetail() {
         return '<button type="button" class="btn btn-small" onclick="handleOrderCreate(\'' + task.id + '\', \'' + chatId + '\')">' + label + '</button>';
     }
 
+    // 订单是否仍"活跃"：钱还托管着、事情没了结 → 它独占这个会话，不给下单入口。
+    // 终态(已取消/已完成/已结案)一律应能再次下单，与首次进入完全一致。
+    // 之所以把它抽成一条规则：此前"能否再下单"散落在各状态分支里，每加一个状态就漏一次
+    // ——completed 漏过一次、closed 又漏一次。后端 createOrder 用同一口径。
+    var ACTIVE_ORDER_STATUSES = ['pending', 'in_progress', 'disputed'];
+
+    // 返回"不能下单的原因"HTML；可以下单则返回 null。所有终态共用这一套判断。
+    function reorderBlocker(task, isPublisher) {
+        // 帖子已下架/结束：后端 createOrder 会以"任务不存在或已取消"拒掉，
+        // 这里提前说清楚，别给一个点了必然失败的下单按钮（大厅卡片可能还没被实时移除）
+        if (task.status === 'closed') {
+            return '<span class="task-bar-status">该任务已下架或结束，无法下单</span>';
+        }
+        // 悬赏帖过了截止时间：不再允许接单
+        if (task.publisherSide === 'payer' && task.deadline && new Date(task.deadline).getTime() < Date.now()) {
+            return '<span class="task-bar-status">该悬赏已截止</span>';
+        }
+        if (isPublisher) {
+            return '<span class="task-bar-waiting">等待对方发起订单...</span>';
+        }
+        return null;
+    }
+
     // 按"在这笔订单里我是付款方还是收款方 + 订单状态"决定按钮（2 角色，取代原来的 4 角色分支）
     async function buildTaskBarActions(task, order, currentUser) {
         var isPublisher = currentUser && currentUser.id === task.publisherId;
+        var isPayer = currentUser && order && currentUser.id === order.payerId;
 
-        // 尚无有效订单
-        if (!order || order.status === 'cancelled') {
-            // 帖子已下架/结束：后端 createOrder 会以"任务不存在或已取消"拒掉，
-            // 这里提前说清楚，别给一个点了必然失败的下单按钮（大厅卡片可能还没被实时移除）
-            if (task.status === 'closed') {
-                return '<span class="task-bar-status">该任务已下架或结束，无法下单</span>';
+        // ───── 无活跃订单(从没下过 / 已取消 / 已完成 / 已结案)：
+        //       上一单的收尾信息(若有) + 统一的下单入口 ─────
+        if (!order || ACTIVE_ORDER_STATUSES.indexOf(order.status) < 0) {
+            var tail = '';
+            if (order && order.status === 'completed') {
+                var toUserId = isPayer ? order.earnerId : order.payerId;
+                var reviewed = await hasReviewed(order.id);
+                tail = reviewed
+                    ? '<span class="task-bar-waiting">已完成</span>'
+                    : '<a href="review.html?order=' + order.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
+            } else if (order && order.status === 'closed') {
+                var resMap = { refund: '全额退款', settle: '全额结算', partial: '部分结算' };
+                var resText = resMap[order.resolution] || '';
+                tail = '<span class="task-bar-waiting">已结案' + (resText ? ' · ' + resText : '') +
+                    (order.resolutionNote ? '（' + order.resolutionNote + '）' : '') + '</span>';
             }
-            // 悬赏帖过了截止时间：不再允许接单
-            if (task.publisherSide === 'payer' && task.deadline && new Date(task.deadline).getTime() < Date.now()) {
-                return '<span class="task-bar-status">该悬赏已截止</span>';
-            }
-            if (isPublisher) {
-                return '<span class="task-bar-waiting">等待对方发起订单...</span>';
-            }
+            // cancelled / 无订单：没有收尾信息，直接给入口
+            var blocker = reorderBlocker(task, isPublisher);
             // 响应者发起：悬赏帖→我接单收钱；服务帖→我下单付钱；纯互助→报名参加
-            return orderCreateButton(task);
+            if (!blocker) return tail + orderCreateButton(task);
+            // 不能下单时：有收尾信息就只说收尾，别再叠加"无法下单"的噪音
+            // （悬赏帖被接单时就已 closed，完成后只该显示"已完成"，不该再说"该任务已下架"）
+            return tail || blocker;
         }
-
-        var isPayer = currentUser && currentUser.id === order.payerId;
 
         if (order.status === 'pending') {
             if (isPublisher) {
@@ -1875,35 +1904,8 @@ function initChatDetail() {
             return actions;
         }
 
-        if (order.status === 'disputed') {
-            return '<span class="task-bar-status">争议处理中，资金已冻结，等待管理员裁决</span>';
-        }
-
-        if (order.status === 'closed') {
-            var resMap = { refund: '全额退款', settle: '全额结算', partial: '部分结算' };
-            var resText = resMap[order.resolution] || '';
-            return '<span class="task-bar-waiting">已结案' + (resText ? ' · ' + resText : '') +
-                (order.resolutionNote ? '（' + order.resolutionNote + '）' : '') + '</span>';
-        }
-
-        if (order.status === 'completed') {
-            var toUserId = isPayer ? order.earnerId : order.payerId;
-            var reviewed = await hasReviewed(order.id);
-            var doneHtml = reviewed
-                ? '<span class="task-bar-waiting">已完成</span>'
-                : '<a href="review.html?order=' + order.id + '&to=' + toUserId + '" class="btn btn-small">去评价</a>';
-            // 上一单完成后，只要帖子还在架就该能再下一单——服务帖本就可反复下单，
-            // 此前这里评价完直接 return"已完成"，把路堵死了(后端其实一直允许：
-            // 重复守卫只看 pending/in_progress，completed 不拦)。
-            // 悬赏帖被接单时就已 closed，走不到这里；发布者自己不下单。
-            if (task.status === 'open' && !isPublisher) {
-                doneHtml += orderCreateButton(task);
-            }
-            return doneHtml;
-        }
-
-        // disputed / closed（阶段二）
-        return '<span class="task-bar-status">' + getOrderStatusText(order.status) + '</span>';
+        // disputed：钱冻着等裁决，不给任何操作
+        return '<span class="task-bar-status">争议处理中，资金已冻结，等待管理员裁决</span>';
     }
 
     renderMessages();
