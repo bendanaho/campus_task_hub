@@ -699,6 +699,48 @@ function userChip(userId, name, avatar, extraClass) {
     return '<a href="profile.html?userId=' + userId + '" class="' + cls + '" title="查看 TA 的主页">' + inner + '</a>';
 }
 
+// ==================== 通用分页条 ====================
+// 页码式分页:上一页 | 1 2 … N | 下一页 + "第 X / Y 页 · 共 N 条"。
+// page 为 0-based。onGo(page) 由各页决定怎么翻:
+//   大厅 → 重新请求后端(真·服务端分页);消息中心/我的订单 → 本地切片。
+function renderPager(container, opts) {
+    if (!container) return;
+    var page = opts.page || 0;
+    var totalPages = opts.totalPages || 0;
+    var total = opts.total || 0;
+    if (totalPages <= 1) { container.innerHTML = ''; container.style.display = 'none'; return; }
+    container.style.display = '';
+
+    // 页码窗口:当前页左右各 2 个,两端补首尾页与省略号,避免页数多时排满一屏
+    var nums = [];
+    var start = Math.max(0, page - 2), end = Math.min(totalPages - 1, page + 2);
+    if (start > 0) { nums.push(0); if (start > 1) nums.push('gap'); }
+    for (var i = start; i <= end; i++) nums.push(i);
+    if (end < totalPages - 1) { if (end < totalPages - 2) nums.push('gap'); nums.push(totalPages - 1); }
+
+    var html = '<button type="button" class="pager-btn" data-go="' + (page - 1) + '"' + (page === 0 ? ' disabled' : '') + '>上一页</button>';
+    html += nums.map(function(n) {
+        if (n === 'gap') return '<span class="pager-gap">…</span>';
+        return '<button type="button" class="pager-btn pager-num' + (n === page ? ' active' : '') + '" data-go="' + n + '">' + (n + 1) + '</button>';
+    }).join('');
+    html += '<button type="button" class="pager-btn" data-go="' + (page + 1) + '"' + (page >= totalPages - 1 ? ' disabled' : '') + '>下一页</button>';
+    html += '<span class="pager-info">第 ' + (page + 1) + ' / ' + totalPages + ' 页 · 共 ' + total + ' 条</span>';
+    container.innerHTML = html;
+
+    container.onclick = function(e) {
+        var b = e.target.closest ? e.target.closest('.pager-btn') : null;
+        if (!b || b.disabled) return;
+        var go = parseInt(b.getAttribute('data-go'), 10);
+        if (isNaN(go) || go < 0 || go >= totalPages || go === page) return;
+        opts.onGo(go);
+    };
+}
+
+// 本地分页:把整份数组切出第 page 页(消息中心/我的订单用)
+function pageSlice(arr, page, size) {
+    return arr.slice(page * size, page * size + size);
+}
+
 // ==================== 互助大厅 ====================
 
 function initTaskHall() {
@@ -710,8 +752,7 @@ function initTaskHall() {
 
     var currentPage = 0;
     var pageSize = 10;
-    var loadMoreBtn = document.getElementById('loadMoreBtn');
-    var loadMoreWrap = document.getElementById('loadMoreWrap');
+    var pagerEl = document.getElementById('hallPager');
 
     function buildFilters() {
         var typeFilter = document.getElementById('taskTypeFilter');
@@ -774,24 +815,35 @@ function initTaskHall() {
     }
 
     // reset=true：回到首页并清空列表（筛选/排序/搜索变化时）；reset=false：加载下一页追加
+    // 大厅是真·服务端分页:每翻一页就带 page 重新请求，只渲染当页(不再追加)。
+    // reset=true 表示筛选/搜索变了 → 回到第 1 页。
     function fetchAndRender(reset) {
-        if (reset) {
-            currentPage = 0;
-            taskList.innerHTML = '';
-        }
+        if (reset) currentPage = 0;
         var filters = buildFilters();
         filters.page = currentPage;
         filters.size = pageSize;
         getTasks(filters).then(function(res) {
             var tasks = (res && res.list) ? res.list : [];
-            var hasMore = res ? res.hasMore : false;
+            var total = (res && typeof res.total === 'number') ? res.total : tasks.length;
+            window.__hallCurrentPage = currentPage;   // 供 WebSocket 新任务插卡判断是否在第 1 页
             if (tasks.length === 0 && currentPage === 0) {
+                taskList.innerHTML = '';
                 if (emptyState) emptyState.style.display = 'block';
-            } else {
-                if (emptyState) emptyState.style.display = 'none';
-                taskList.innerHTML += tasks.map(renderTaskItem).join('');
+                renderPager(pagerEl, { page: 0, totalPages: 0, total: 0, onGo: function() {} });
+                return;
             }
-            if (loadMoreWrap) loadMoreWrap.style.display = hasMore ? '' : 'none';
+            if (emptyState) emptyState.style.display = 'none';
+            taskList.innerHTML = tasks.map(renderTaskItem).join('');
+            renderPager(pagerEl, {
+                page: currentPage,
+                totalPages: Math.ceil(total / pageSize),
+                total: total,
+                onGo: function(p) {
+                    currentPage = p;
+                    fetchAndRender(false);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
         });
     }
 
@@ -831,7 +883,6 @@ function initTaskHall() {
     }
     if (typeFilter) typeFilter.addEventListener('change', renderTasks);
     if (sortSelect) sortSelect.addEventListener('change', renderTasks);
-    if (loadMoreBtn) loadMoreBtn.addEventListener('click', function() { currentPage++; fetchAndRender(false); });
     categoryInputs.forEach(function(input) {
         input.addEventListener('change', function() {
             updateFilterText();
@@ -1167,6 +1218,9 @@ function initMessageCenter() {
     var enriched = [];
     var counts = { action: 0, progress: 0, unread: 0 };
     var activeTab = 'action';
+    var pagerEl = document.getElementById('msgPager');
+    var msgPage = 0;            // 当前标签页内的页码(0-based)
+    var msgPageSize = 8;
 
     function renderRow(item) {
         var c = item.c;
@@ -1198,8 +1252,21 @@ function initMessageCenter() {
         '</div>';
     }
 
+    // 分页渲染：标签页的分类计数必须基于「整份会话列表」才准确，所以这里是本地分页——
+    // 后端一次批量返回全量(已优化为 4 次查询)，前端按当前标签切片显示。
     function renderList(arr, emptyText) {
-        list.innerHTML = arr.length ? arr.map(renderRow).join('') : '<div class="card empty-state"><p>' + (emptyText || '暂无消息') + '</p></div>';
+        if (!arr.length) {
+            list.innerHTML = '<div class="card empty-state"><p>' + (emptyText || '暂无消息') + '</p></div>';
+            renderPager(pagerEl, { page: 0, totalPages: 0, total: 0, onGo: function() {} });
+            return;
+        }
+        var totalPages = Math.ceil(arr.length / msgPageSize);
+        if (msgPage > totalPages - 1) msgPage = totalPages - 1;   // 数据变少时夹住页码
+        list.innerHTML = pageSlice(arr, msgPage, msgPageSize).map(renderRow).join('');
+        renderPager(pagerEl, {
+            page: msgPage, totalPages: totalPages, total: arr.length,
+            onGo: function(p) { msgPage = p; renderList(arr, emptyText); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        });
     }
 
     // 「全部」标签的筛选（状态/角色/关键词）
@@ -1266,7 +1333,7 @@ function initMessageCenter() {
             return '<button type="button" class="order-tab' + (activeTab === t.key ? ' active' : '') + '" data-tab="' + t.key + '">' + t.label + badge + '</button>';
         }).join('');
     }
-    function switchTab(key) { activeTab = key; renderTabs(); renderPanel(); }
+    function switchTab(key) { activeTab = key; msgPage = 0; renderTabs(); renderPanel(); }
 
     function convScore(item) {
         var si = item.statusInfo || {};
@@ -1365,10 +1432,12 @@ function initMessageCenter() {
 
     if (overviewEl) overviewEl.addEventListener('click', function(e) { var c = e.target.closest && e.target.closest('.ov-card'); if (c) switchTab(c.getAttribute('data-tab')); });
     if (tabsEl) tabsEl.addEventListener('click', function(e) { var b = e.target.closest && e.target.closest('.order-tab'); if (b) switchTab(b.getAttribute('data-tab')); });
-    if (statusFilter) statusFilter.addEventListener('change', applyFilters);
-    if (roleFilter) roleFilter.addEventListener('change', applyFilters);
-    if (searchBtn) searchBtn.addEventListener('click', applyFilters);
-    if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); applyFilters(); } });
+    // 筛选条件变了 → 结果集变了，页码必须回到第 1 页，否则可能停在一个已不存在的页上
+    function applyFiltersFromPage1() { msgPage = 0; applyFilters(); }
+    if (statusFilter) statusFilter.addEventListener('change', applyFiltersFromPage1);
+    if (roleFilter) roleFilter.addEventListener('change', applyFiltersFromPage1);
+    if (searchBtn) searchBtn.addEventListener('click', applyFiltersFromPage1);
+    if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); applyFiltersFromPage1(); } });
 }
 
 // 消息中心「暂不评价」：本地记住用户主动跳过的订单，不再在消息中心提示待评价
@@ -2081,6 +2150,9 @@ function initOrderCenter() {
     if (!protectPage(['order-center.html'])) return;
 
     var panel = document.getElementById('orderPanel');
+    var orderPagerEl = document.getElementById('orderPager');
+    var orderPage = 0;          // 当前标签页内的页码(0-based)
+    var orderPageSize = 8;
     var tabsEl = document.getElementById('orderTabs');
     var overviewEl = document.getElementById('orderOverview');
     var filterBar = document.getElementById('orderFilterBar');
@@ -2182,11 +2254,23 @@ function initOrderCenter() {
         var statusValue = statusSelect ? statusSelect.value : 'all';
         var keyword = keywordInput ? keywordInput.value.trim() : '';
         var records = await getMyOrders(moneyRole, keyword, statusValue);
-        if (!records || records.length === 0) { panel.innerHTML = '<div class="card empty-state"><p>暂无符合条件的订单</p></div>'; return; }
-        var enriched = await Promise.all(records.map(async function(r) {
+        if (!records || records.length === 0) {
+            panel.innerHTML = '<div class="card empty-state"><p>暂无符合条件的订单</p></div>';
+            renderPager(orderPagerEl, { page: 0, totalPages: 0, total: 0, onGo: function() {} });
+            return;
+        }
+        var allTp = Math.ceil(records.length / orderPageSize);
+        if (orderPage > allTp - 1) orderPage = allTp - 1;
+        // 只对当前页的记录查"是否已评价"，避免为整份列表逐单发请求
+        var pageRecords = pageSlice(records, orderPage, orderPageSize);
+        var enriched = await Promise.all(pageRecords.map(async function(r) {
             var reviewed = r.order.status === 'completed' ? await hasReviewed(r.order.id) : false;
             return { r: r, reviewed: reviewed };
         }));
+        renderPager(orderPagerEl, {
+            page: orderPage, totalPages: allTp, total: records.length,
+            onGo: function(p) { orderPage = p; renderAllTab(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        });
         panel.innerHTML = enriched.map(function(item) {
             var r = item.r, o = r.order;
             var isPublisher = r.post ? r.post.publisherId === myId : false;
@@ -2229,6 +2313,7 @@ function initOrderCenter() {
         if (activeTab === 'mine') {
             if (!myOpenPosts.length && !myClosedPosts.length) {
                 panel.innerHTML = '<div class="card empty-state"><p>你还没有发布过互助</p></div>';
+                renderPager(orderPagerEl, { page: 0, totalPages: 0, total: 0, onGo: function() {} });
                 return;
             }
             var mineHtml = '';
@@ -2241,14 +2326,25 @@ function initOrderCenter() {
                 mineHtml += myClosedPosts.map(closedPostCard).join('');
             }
             panel.innerHTML = mineHtml;
+            // 「我发布的」是分组视图(待响应/已下架)，分页会把组标题切散，故不分页
+            renderPager(orderPagerEl, { page: 0, totalPages: 0, total: 0, onGo: function() {} });
             return;
         }
         var arr = allOrders.filter(activeTab === 'action' ? isNeedsAction : isInProgress);
-        panel.innerHTML = arr.length
-            ? arr.map(compactCard).join('')
-            : '<div class="card empty-state"><p>' + (activeTab === 'action' ? '没有需要处理的订单' : '没有进行中的订单') + '</p></div>';
+        if (!arr.length) {
+            panel.innerHTML = '<div class="card empty-state"><p>' + (activeTab === 'action' ? '没有需要处理的订单' : '没有进行中的订单') + '</p></div>';
+            renderPager(orderPagerEl, { page: 0, totalPages: 0, total: 0, onGo: function() {} });
+            return;
+        }
+        var tp = Math.ceil(arr.length / orderPageSize);
+        if (orderPage > tp - 1) orderPage = tp - 1;
+        panel.innerHTML = pageSlice(arr, orderPage, orderPageSize).map(compactCard).join('');
+        renderPager(orderPagerEl, {
+            page: orderPage, totalPages: tp, total: arr.length,
+            onGo: function(p) { orderPage = p; renderPanel(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        });
     }
-    function switchTab(key) { activeTab = key; renderTabs(); renderPanel(); }
+    function switchTab(key) { activeTab = key; orderPage = 0; renderTabs(); renderPanel(); }
 
     async function loadAll() {
         var records = await getMyOrders();
@@ -2281,10 +2377,12 @@ function initOrderCenter() {
 
     tabsEl.addEventListener('click', function(e) { var b = e.target.closest && e.target.closest('.order-tab'); if (b) switchTab(b.getAttribute('data-tab')); });
     overviewEl.addEventListener('click', function(e) { var c = e.target.closest && e.target.closest('.ov-card'); if (c) switchTab(c.getAttribute('data-tab')); });
-    if (filterSelect) filterSelect.addEventListener('change', renderAllTab);
-    if (statusSelect) statusSelect.addEventListener('change', renderAllTab);
-    if (searchBtn) searchBtn.addEventListener('click', renderAllTab);
-    if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); renderAllTab(); } });
+    // 筛选条件变了 → 结果集变了，页码回到第 1 页
+    function renderAllTabFromPage1() { orderPage = 0; renderAllTab(); }
+    if (filterSelect) filterSelect.addEventListener('change', renderAllTabFromPage1);
+    if (statusSelect) statusSelect.addEventListener('change', renderAllTabFromPage1);
+    if (searchBtn) searchBtn.addEventListener('click', renderAllTabFromPage1);
+    if (keywordInput) keywordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); renderAllTabFromPage1(); } });
 
     loadAll();
     // 同消息中心：bfcache 恢复后重新拉取，避免订单状态/数字停留在离开前
@@ -2870,7 +2968,9 @@ function initWebSocket() {
             
             // 场景一：有新任务发布（广播给所有正在浏览大厅的用户）--大厅局部插入新卡片，不 reload、不丢滚动
             if (data.type === 'NEW_TASK') {
-                if (window.location.pathname.includes('task-hall.html') && data.postId) {
+                // 改为页码分页后，只有停在第 1 页时插新卡才合理；在第 3 页插一张最新的会让分页错乱
+                if (window.location.pathname.includes('task-hall.html') && data.postId
+                        && !window.__hallCurrentPage) {
                     fetchTaskById(data.postId).then(function(res) {
                         var task = res && res.task;
                         if (!task) return;
