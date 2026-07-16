@@ -1571,17 +1571,44 @@ function initChatDetail() {
     updateChatHeader();
 
     // 渲染一张收款/转账卡片（气泡按发送者左右对齐，卡片自带样式）
+    //
+    // 后端一共会写入 6 种 payment.status：
+    //   pending(待支付的收款) / paid(即时到账) / cancelled(收款被取消)
+    //   escrowed(订单进行中的转账→冻结托管) / released(订单完成→到账) / refunded(订单未成→退回)
+    // 此前这里只处理了 paid 和 cancelled，其余三种全部掉进"pending"那个 else 分支——
+    // 于是一笔【钱已经冻结的托管转账】会显示成"待你支付 + 支付按钮"，
+    // 钱都冻完了界面还催你再付一次，看着就像"托管逻辑没生效"。
     function paymentCardHTML(m, currentUser, isSelf, myBalance) {
         var p = m.payment;
         var side = isSelf ? 'chat-right' : 'chat-left';
         var kindLabel = p.kind === 'request' ? '收款' : '转账';
-        var statusText = '', actions = '';
-        if (p.status === 'paid') {
-            statusText = '已完成';
+        var iAmPayer = currentUser && currentUser.id === p.payerId;
+        var iAmReceiver = currentUser && currentUser.id === p.receiverId;
+
+        // 方向标题：谁付给谁，一眼看明白（只靠气泡左右对齐分不清是谁发起的）
+        var dirText;
+        if (p.kind === 'request') {
+            // 收款卡片：发起者是收款方
+            dirText = isSelf ? '我向对方收款' : (p.payerName ? '对方向我收款' : '收款');
+        } else {
+            dirText = iAmPayer ? ('我转给 ' + (p.receiverName || '对方'))
+                : (iAmReceiver ? ((p.payerName || '对方') + ' 转给我') : '转账');
+        }
+
+        var statusText = '', actions = '', stateClass = p.status;
+        if (p.status === 'escrowed') {
+            // 钱已从付款方余额冻结，等订单完成才释放给收款方
+            statusText = iAmPayer ? '已冻结托管中 · 任务完成后自动付给对方'
+                : '已冻结托管中 · 任务完成后自动到账';
+        } else if (p.status === 'released') {
+            statusText = iAmPayer ? '任务完成，已付给对方' : '任务完成，已到账';
+        } else if (p.status === 'refunded') {
+            statusText = iAmPayer ? '任务未成，已退回给你' : '任务未成，已退回对方';
+        } else if (p.status === 'paid') {
+            statusText = iAmPayer ? '已付款' : (iAmReceiver ? '已到账' : '已完成');
         } else if (p.status === 'cancelled') {
             statusText = '已取消';
         } else { // pending：仅收款卡片会处于此状态
-            var iAmPayer = currentUser && currentUser.id === p.payerId;
             if (iAmPayer) {
                 // 余额预判：不足则禁用支付按钮，避免点了才被后端拒绝（myBalance 为 null 时放行，交后端兜底）
                 var insufficient = (myBalance !== null && myBalance !== undefined) && (Number(myBalance) < Number(p.amount));
@@ -1599,10 +1626,19 @@ function initChatDetail() {
                 }
             }
         }
+        // 金额方向：出账标红、入账标绿，扫一眼就知道钱是进是出
+        var amountClass = 'pay-card-amount';
+        if (p.status !== 'cancelled') {
+            if (iAmPayer && p.status !== 'refunded') amountClass += ' pay-out';
+            else if (iAmReceiver && p.status !== 'refunded') amountClass += ' pay-in';
+        }
+        var sign = (iAmPayer && p.status !== 'cancelled' && p.status !== 'refunded') ? '-' : '';
+
         return '<div class="chat-message chat-payment ' + side + '">' +
-            '<div class="pay-card pay-' + p.status + '">' +
-                '<div class="pay-card-head">' + kindLabel + '</div>' +
-                '<div class="pay-card-amount">¥' + p.amount + '</div>' +
+            '<div class="pay-card pay-' + stateClass + '">' +
+                '<div class="pay-card-head"><span class="pay-card-kind">' + kindLabel + '</span>' +
+                    '<span class="pay-card-dir">' + dirText + '</span></div>' +
+                '<div class="' + amountClass + '">' + sign + '¥' + p.amount + '</div>' +
                 '<div class="pay-card-status">' + statusText + '</div>' +
                 (actions ? '<div class="pay-card-actions">' + actions + '</div>' : '') +
             '</div>' +

@@ -1062,11 +1062,22 @@ textarea.form-control {
     box-shadow: 0 4px 12px -3px rgba(253, 186, 116, 0.4);
 }
 .pay-card-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
     color: #9a3412;
     font-weight: 700;
     letter-spacing: 0.5px;
 }
+/* 「转账/收款」类型标签 */
+.pay-card-kind {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(154, 52, 18, 0.12);
+}
+/* 「我转给 xxx」/「xxx 转给我」——只靠气泡左右对齐分不清是谁发起的，这行把方向写死 */
+.pay-card-dir { font-weight: 600; opacity: 0.9; }
 .pay-card-amount {
     font-family: var(--font-display);
     font-size: 26px;
@@ -1090,6 +1101,35 @@ textarea.form-control {
     box-shadow: none;
 }
 .pay-card.pay-cancelled .pay-card-amount { color: #9ca3af; text-decoration: line-through; }
+
+/* 托管中：钱已冻结、等订单完成才释放。用蓝色与"已到账"的绿色区分开，
+   避免被当成已完成 —— 这正是之前分不清的地方 */
+.pay-card.pay-escrowed {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    box-shadow: 0 4px 12px -3px rgba(147, 197, 253, 0.4);
+}
+.pay-card.pay-escrowed .pay-card-head { color: #1e40af; }
+.pay-card.pay-escrowed .pay-card-kind { background: rgba(30, 64, 175, 0.12); }
+.pay-card.pay-escrowed .pay-card-amount { color: #2563eb; }
+/* 已释放到账：与 paid 同一套绿色 */
+.pay-card.pay-released {
+    background: #f0fdf4;
+    border-color: #86efac;
+    box-shadow: 0 4px 12px -3px rgba(134, 239, 172, 0.4);
+}
+.pay-card.pay-released .pay-card-amount { color: var(--success); }
+/* 已退回：钱回到付款方，中性灰 */
+.pay-card.pay-refunded {
+    background: #f5f5f5;
+    border-color: #d4d4d4;
+    box-shadow: none;
+}
+.pay-card.pay-refunded .pay-card-amount { color: #6b7280; }
+
+/* 金额进出方向：出账红、入账绿，扫一眼知道钱是进是出 */
+.pay-card .pay-card-amount.pay-out { color: #dc2626 !important; }
+.pay-card .pay-card-amount.pay-in { color: var(--success) !important; }
 
 .chat-pay-actions { display: flex; gap: 8px; margin-top: 12px; }
 
