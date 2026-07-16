@@ -43,6 +43,14 @@ public class OrderService {
 
     private static final int AUTO_DAYS = 2;
 
+    /**
+     * "活跃"订单状态：钱还托管着、事情没了结。这三种状态下不允许再下新单。
+     * 终态(cancelled/completed/closed)都应允许重新下单——与前端任务栏同口径，
+     * 前端 ACTIVE_ORDER_STATUSES 必须与此保持一致。
+     */
+    private static final List<String> ACTIVE_ORDER_STATUSES =
+            Arrays.asList("pending", "in_progress", "disputed");
+
     private final OrderRepository orderRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
@@ -95,7 +103,7 @@ public class OrderService {
         // 悬赏帖(payer)：一个悬赏只会被一个人接，故按【帖子】限制同时只能有一笔活跃订单
         if ("payer".equals(post.getPublisherSide())) {
             List<Order> active = orderRepository.findByPostIdAndStatusIn(
-                    request.getPostId(), Arrays.asList("pending", "in_progress"));
+                    request.getPostId(), ACTIVE_ORDER_STATUSES);
             if (!active.isEmpty()) {
                 throw new BusinessException(ErrorCode.DUPLICATE_ORDER);
             }
@@ -106,7 +114,7 @@ public class OrderService {
             // 而聊天页/消息中心只认最新一笔(findTopByChatIdOrderByCreatedAtDesc)，
             // 早先那些订单在聊天里根本看不见 → 无法确认/申诉 → 付款方的钱永久冻结。
             List<Order> activeInChat = orderRepository.findByChatIdAndStatusIn(
-                    request.getChatId(), Arrays.asList("pending", "in_progress"));
+                    request.getChatId(), ACTIVE_ORDER_STATUSES);
             if (!activeInChat.isEmpty()) {
                 throw new BusinessException(ErrorCode.DUPLICATE_ORDER,
                         "你与对方在该任务下已有进行中的订单，请先完成或取消它再下新单");
