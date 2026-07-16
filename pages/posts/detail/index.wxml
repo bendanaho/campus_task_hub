@@ -5,7 +5,8 @@
     <view class="card section">
       <view class="space-between">
         <view class="tag">{{task.sideText}}</view>
-        <view class="reward">¥{{task.moneyText}}</view>
+        <view wx:if="{{task.hasPrice}}" class="reward">¥{{task.moneyText}}<text wx:if="{{task.priceHint}}" class="reward-hint">{{task.priceHint}}</text></view>
+        <view wx:else class="reward-alt">{{task.priceAlt}}</view>
       </view>
       <view class="title">{{task.title}}</view>
       <view class="desc">{{task.description}}</view>
@@ -61,9 +62,10 @@
     </view>
 
     <view class="section actions" wx:if="{{!isMine}}">
-      <button class="btn secondary" bindtap="contactPublisher">联系 TA</button>
-      <button class="btn" bindtap="respondPost">响应帖子</button>
+      <button class="btn secondary" bindtap="contactPublisher" disabled="{{acting}}" loading="{{contacting}}">联系 TA</button>
+      <button class="btn" bindtap="respondPost" disabled="{{acting}}" loading="{{responding}}">{{respondText || '响应帖子'}}</button>
     </view>
+    <view wx:if="{{!isMine}}" class="action-hint">「联系 TA」只是聊聊，不创建订单；「{{respondText || '响应帖子'}}」将创建订单</view>
     <view class="section actions" wx:else>
       <button wx:if="{{task.status === 'open'}}" class="btn warn" bindtap="closeMyPost">下架帖子</button>
       <button class="btn secondary" bindtap="repost">再发一单</button>
@@ -84,4 +86,13 @@
       <view wx:if="{{reviewsTotal > 2}}" class="reviews-more" hover-class="btn-hover" bindtap="goAllReviews">查看全部 {{reviewsTotal}} 条评价 ›</view>
     </view>
   </block>
+
+  <empty-state
+    wx:elif="{{loadError}}"
+    emoji="⚠️"
+    title="加载失败"
+    sub="网络异常或服务暂时不可用"
+    btn-text="点击重试"
+    bind:action="loadDetail"
+  />
 </view>

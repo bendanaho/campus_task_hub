@@ -2,6 +2,7 @@
   "navigationBarTitleText": "帖子详情",
   "enablePullDownRefresh": true,
   "usingComponents": {
-    "ua-avatar": "/components/avatar/index"
+    "ua-avatar": "/components/avatar/index",
+    "empty-state": "/components/empty-state/index"
   }
 }

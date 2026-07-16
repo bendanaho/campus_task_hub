@@ -1,4 +1,6 @@
 <view class="page {{themeCls}}">
+  <view wx:if="{{offline}}" class="offline-banner">网络连接已断开，请检查网络</view>
+  <view wx:elif="{{authExpired}}" class="auth-expired-banner" bindtap="onReLogin">登录已过期，点此重新登录</view>
   <view wx:if="{{!loggedIn}}" class="card guest">
     <view class="guest-title">还没有登录</view>
     <view class="muted">登录后可以发布任务、查看订单和消息。</view>
@@ -7,7 +9,10 @@
 
   <block wx:else>
     <view class="profile card section">
-      <ua-avatar avatar="{{user.avatarShow}}" name="{{user.username}}" uid="{{user.id}}" size="{{100}}" />
+      <view class="avatar-wrap" bindtap="changeAvatar" aria-role="button" aria-label="点击更换头像">
+        <ua-avatar avatar="{{user.avatarShow}}" name="{{user.username}}" uid="{{user.id}}" size="{{100}}" />
+        <view class="avatar-edit">换</view>
+      </view>
       <view class="profile-main">
         <view class="name">{{user.username}}</view>
         <view class="muted">信用分 {{user.creditScore}}</view>
@@ -21,6 +26,7 @@
       <view>
         <view class="muted">账户余额</view>
         <view class="balance">¥{{balance}}</view>
+        <view wx:if="{{balanceError}}" class="balance-error" bindtap="reloadBalance" aria-role="button" aria-label="余额更新失败，点击重试">更新失败 · 点击重试</view>
       </view>
       <button class="btn secondary small" bindtap="goWallet">充值</button>
     </view>
@@ -28,12 +34,20 @@
     <view class="card section">
       <view class="appearance-title">外观</view>
       <view class="mode-seg">
-        <view class="mode-item {{theme.mode === 'light' ? 'on' : ''}}" bindtap="setLight">浅色</view>
-        <view class="mode-item {{theme.mode === 'dark' ? 'on' : ''}}" bindtap="setDark">深色</view>
+        <view class="mode-item {{theme.mode === 'light' ? 'on' : ''}}" bindtap="setLight" aria-role="button" aria-label="浅色模式{{theme.mode === 'light' ? '，已选中' : ''}}">浅色</view>
+        <view class="mode-item {{theme.mode === 'dark' ? 'on' : ''}}" bindtap="setDark" aria-role="button" aria-label="深色模式{{theme.mode === 'dark' ? '，已选中' : ''}}">深色</view>
       </view>
       <block wx:if="{{theme.mode === 'light'}}">
-        <view class="appearance-sub">背景色</view>
-        <view class="bg-swatches">
+        <view class="palette-row">
+          <view class="appearance-sub">背景色</view>
+          <view
+            class="palette-toggle {{showPalette ? 'on' : ''}}"
+            bindtap="togglePalette"
+            aria-role="button"
+            aria-label="{{showPalette ? '收起调色盘' : '展开调色盘'}}"
+          >🎨</view>
+        </view>
+        <view wx:if="{{showPalette}}" class="bg-swatches">
           <view
             wx:for="{{bgs}}"
             wx:key="value"
@@ -41,6 +55,8 @@
             style="background: {{item.color}};"
             bindtap="pickBg"
             data-value="{{item.value}}"
+            aria-role="button"
+            aria-label="背景色 {{item.label}}{{theme.bg === item.value ? '，已选中' : ''}}"
           ></view>
         </view>
       </block>

@@ -1,68 +1,161 @@
 <view class="page {{themeCls}}">
+  <view wx:if="{{offline}}" class="offline-banner">网络连接已断开，请检查网络</view>
+  <view wx:elif="{{authExpired}}" class="auth-expired-banner" bindtap="onReLogin">登录已过期，点此重新登录</view>
   <view wx:if="{{!loggedIn}}" class="card guest">
     <view class="guest-title">登录后查看订单</view>
     <button class="btn guest-btn" bindtap="goLogin">去登录</button>
   </view>
 
   <block wx:else>
+    <!-- 三大主标签：我发布的 / 我卖出的 / 我买到的 -->
     <view class="tabs section">
-      <view wx:for="{{tabs}}" wx:key="value" class="tab {{tabIndex == index ? 'active' : ''}}" data-index="{{index}}" bindtap="switchTab">
-        {{item.label}}
+      <view wx:for="{{mainTabs}}" wx:key="value" class="tab {{mainIndex == index ? 'active' : ''}}" data-index="{{index}}" bindtap="switchMain">
+        <text class="tab-icon">{{item.icon}}</text>
+        <text class="tab-text">{{item.label}}</text>
       </view>
     </view>
 
+    <!-- 搜索 + 筛选漏斗（三个标签通用） -->
     <view class="toolbar section">
       <view class="search-box">
         <view class="search-icon"></view>
-        <input class="search-input" placeholder="搜索标题、对方或状态" value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" bindfocus="onSearchFocus" bindblur="onSearchBlur" />
+        <input class="search-input" placeholder="搜索标题或对方昵称" value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" bindfocus="onSearchFocus" bindblur="onSearchBlur" />
       </view>
-      <picker range="{{sorts}}" range-key="label" value="{{sortIndex}}" bindchange="onSortChange">
-        <view class="sort-entry">{{sorts[sortIndex].label}}<text class="sort-caret">▾</text></view>
-      </picker>
+      <view class="filter-entry {{filterActive ? 'active' : ''}}" catchtap="toggleFilter" aria-role="button" aria-label="筛选">
+        <view class="funnel"></view>
+      </view>
     </view>
 
+    <!-- 搜索历史 -->
     <view wx:if="{{searchFocus && !keyword && searchHistory.length > 0}}" class="hist-row">
       <view wx:for="{{searchHistory}}" wx:key="*this" class="hist-chip" catchtap="onHistTap" data-term="{{item}}">{{item}}</view>
       <view class="hist-clear" catchtap="onHistClear">清空</view>
     </view>
 
-    <skeleton wx:if="{{loading && orders.length === 0}}" count="3" />
-
-    <empty-state
-      wx:elif="{{!loading && orders.length === 0}}"
-      emoji="📋"
-      title="还没有订单"
-      sub="去大厅接第一单吧"
-      btn-text="去大厅"
-      bind:action="goHall"
-    />
-
-    <view wx:for="{{orders}}" wx:key="id" class="order card section" hover-class="card-hover" data-chat="{{item.order.chatId}}" bindtap="goDetail">
-      <view class="space-between">
-        <view class="tag">{{item.order.statusText}}</view>
-        <view class="amount">¥{{item.order.amountText}}</view>
+    <!-- 筛选面板：时间区间 + 排序 -->
+    <view wx:if="{{filterPanelOpen}}" class="filter-panel section">
+      <view class="fp-title">时间区间</view>
+      <view class="chip-row">
+        <view wx:for="{{timeRanges}}" wx:key="value" class="chip {{timeRangeIndex == index ? 'on' : ''}}" data-index="{{index}}" catchtap="onTimeRange">{{item.label}}</view>
       </view>
-      <view class="title">{{item.title}}</view>
-      <view class="meta">
-        <text>{{item.roleText}}</text>
-        <text>对方：{{item.partnerName}}</text>
-        <text>{{item.order.createdText}}</text>
-      </view>
-
-      <view wx:if="{{item.waitingText}}" class="waiting-tip">{{item.waitingText}}</view>
-      <view wx:if="{{item.disputeText}}" class="waiting-tip">{{item.disputeText}}</view>
-
-      <view class="actions">
-        <button class="btn ghost small" data-chat="{{item.order.chatId}}" catchtap="goChat">会话</button>
-        <button wx:if="{{item.canAccept}}" class="btn small" data-id="{{item.order.id}}" catchtap="acceptOrder">接受</button>
-        <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" catchtap="cancelOrder">取消</button>
-        <button wx:if="{{item.canConfirm}}" class="btn small" data-index="{{index}}" catchtap="confirmOrder">确认完成</button>
-        <button wx:if="{{item.canReview}}" class="btn secondary small" data-index="{{index}}" catchtap="goReview">评价</button>
-        <button wx:if="{{item.canDispute}}" class="btn ghost small" data-id="{{item.order.id}}" catchtap="disputeOrder">申诉</button>
-        <view wx:if="{{item.canDelete}}" class="order-del-hit" data-id="{{item.order.id}}" catchtap="deleteOrder" aria-role="button" aria-label="删除记录">
-          <view class="order-del">✕</view>
-        </view>
+      <view class="fp-title">排序</view>
+      <view class="chip-row">
+        <view wx:for="{{sorts}}" wx:key="value" class="chip {{sortIndex == index ? 'on' : ''}}" data-index="{{index}}" catchtap="onSortPick">{{item.label}}</view>
       </view>
     </view>
+
+    <!-- 二级筛选 chip -->
+    <view class="subtabs section">
+      <view wx:for="{{subTabs}}" wx:key="value" class="subchip {{subIndex == index ? 'on' : ''}}" data-index="{{index}}" bindtap="switchSub">{{item.label}}</view>
+    </view>
+
+    <!-- 隐藏订单入口：仅订单标签 -->
+    <view wx:if="{{curMain !== 'published' && (showHidden || roleHiddenCount > 0)}}" class="hidden-bar section">
+      <text class="hidden-tip">{{showHidden ? '已隐藏的订单 ' + roleHiddenCount + ' 单，可恢复' : ''}}</text>
+      <view class="hidden-toggle" catchtap="toggleHidden">{{showHidden ? '返回订单列表' : '显示已隐藏(' + roleHiddenCount + ')'}}</view>
+    </view>
+
+    <!-- 我发布的 -->
+    <block wx:if="{{curMain === 'published'}}">
+      <!-- 草稿筛选 -->
+      <block wx:if="{{curSub === 'draft'}}">
+        <view wx:if="{{draftCard}}" class="order card section" hover-class="card-hover" bindtap="editDraft">
+          <view class="space-between">
+            <view class="tag">草稿</view>
+            <view class="post-status closed">未发布</view>
+          </view>
+          <view class="title">{{draftCard.title}}</view>
+          <view wx:if="{{draftCard.desc}}" class="meta"><text>{{draftCard.desc}}</text></view>
+          <view class="meta"><text>上次编辑 {{draftCard.timeText}}</text></view>
+          <view class="actions">
+            <button class="btn small" catchtap="editDraft">继续编辑草稿</button>
+          </view>
+        </view>
+        <empty-state
+          wx:else
+          emoji="{{empty.emoji}}"
+          title="{{empty.title}}"
+          sub="{{empty.sub}}"
+          btn-text="{{empty.btn}}"
+          bind:action="goPublish"
+        />
+      </block>
+
+      <!-- 在卖 / 已下架 -->
+      <block wx:else>
+        <skeleton wx:if="{{postsLoading && posts.length === 0}}" count="3" />
+
+        <empty-state
+          wx:elif="{{!postsLoading && posts.length === 0}}"
+          emoji="{{empty.emoji}}"
+          title="{{empty.title}}"
+          sub="{{empty.sub}}"
+          btn-text="{{empty.btn}}"
+          bind:action="goPublish"
+        />
+
+        <view wx:for="{{posts}}" wx:key="id" class="order card section" hover-class="card-hover" data-id="{{item.id}}" bindtap="openPost">
+          <view class="space-between">
+            <view class="tag {{item.sideClass}}">{{item.sideText}}</view>
+            <view class="post-status {{item.isOpen ? 'open' : 'closed'}}">{{item.statusText}}</view>
+          </view>
+          <view class="title">{{item.title}}</view>
+          <view class="meta">
+            <text wx:if="{{item.hasPrice}}" class="post-reward">¥{{item.moneyText}}</text>
+            <text wx:else>{{item.priceAlt}}</text>
+            <text>{{item.timeText}}</text>
+          </view>
+          <view wx:if="{{item.isOpen}}" class="waiting-tip">尚无人接单，等待响应中。可撤回，冻结报酬将退回。</view>
+          <view class="actions">
+            <button wx:if="{{item.isOpen}}" class="btn warn small" data-id="{{item.id}}" catchtap="withdrawPost">撤回</button>
+            <button class="btn ghost small" data-id="{{item.id}}" catchtap="openPost">查看详情</button>
+          </view>
+        </view>
+      </block>
+    </block>
+
+    <!-- 我卖出的 / 我买到的 -->
+    <block wx:else>
+      <skeleton wx:if="{{loading && orders.length === 0}}" count="3" />
+
+      <empty-state
+        wx:elif="{{!loading && orders.length === 0}}"
+        emoji="{{empty.emoji}}"
+        title="{{empty.title}}"
+        sub="{{empty.sub}}"
+        btn-text="{{empty.btn}}"
+        bind:action="goHall"
+      />
+
+      <view wx:for="{{orders}}" wx:key="id" class="order card section" hover-class="card-hover" data-chat="{{item.order.chatId}}" bindtap="goDetail">
+        <view class="space-between">
+          <view class="tag">{{item.order.statusText}}</view>
+          <view class="amount">¥{{item.order.amountText}}</view>
+        </view>
+        <view class="title">{{item.title}}</view>
+        <view class="meta">
+          <text>{{item.roleText}}</text>
+          <text>对方：{{item.partnerName}}</text>
+          <text>{{item.order.createdText}}</text>
+        </view>
+
+        <view wx:if="{{item.waitingText}}" class="waiting-tip">{{item.waitingText}}</view>
+        <view wx:if="{{item.disputeText}}" class="waiting-tip">{{item.disputeText}}</view>
+
+        <view class="actions">
+          <button class="btn ghost small" data-chat="{{item.order.chatId}}" catchtap="goChat">会话</button>
+          <button wx:if="{{item.canAccept}}" class="btn small" data-id="{{item.order.id}}" catchtap="acceptOrder">接受</button>
+          <button wx:if="{{item.canCancel}}" class="btn warn small" data-id="{{item.order.id}}" catchtap="cancelOrder">取消</button>
+          <button wx:if="{{item.canConfirm}}" class="btn small" data-index="{{index}}" catchtap="confirmOrder">确认完成</button>
+          <button wx:if="{{item.canReview && !item.reviewed}}" class="btn secondary small" data-index="{{index}}" catchtap="goReview">评价</button>
+          <button wx:if="{{item.canReview && item.reviewed}}" class="btn ghost small" disabled="true">已评价</button>
+          <button wx:if="{{item.canDispute}}" class="btn ghost small" data-id="{{item.order.id}}" catchtap="disputeOrder">申诉</button>
+          <button wx:if="{{item.isHidden}}" class="btn ghost small" data-id="{{item.order.id}}" catchtap="restoreOrder">恢复</button>
+          <view wx:if="{{item.canDelete && !item.isHidden}}" class="order-del-hit" data-id="{{item.order.id}}" catchtap="deleteOrder" aria-role="button" aria-label="删除记录">
+            <view class="order-del">✕</view>
+          </view>
+        </view>
+      </view>
+    </block>
   </block>
 </view>

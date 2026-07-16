@@ -1,4 +1,5 @@
 const reviewService = require('../../../services/reviews')
+const userService = require('../../../services/user')
 const format = require('../../../utils/format')
 const imageUtil = require('../../../utils/image')
 
@@ -47,6 +48,7 @@ Page({
     filter: 'all',
     filters: FILTERS,
     summary: null,
+    creditScore: '',
     reviews: []
   },
 
@@ -68,7 +70,14 @@ Page({
 
   loadReviews() {
     this.setData({ loading: true })
-    return reviewService.list(this.data.userId).then((list) => {
+    // 信用分与个人主页同口径：按 userId 拉后端 creditScore，与客户端现算平均分并列
+    const creditTask = this.data.userId
+      ? userService.getPublicProfile(this.data.userId).then((profile) => {
+          this.setData({ creditScore: Number((profile && profile.creditScore) || 0).toFixed(1) })
+        }).catch(function () {
+        })
+      : Promise.resolve()
+    const reviewsTask = reviewService.list(this.data.userId).then((list) => {
       // setData 单次上限 1MB：base64 评价图限单张 150KB、全页累计 600KB，超出丢弃
       let imageBudget = 600 * 1024
       const reviews = (list || []).map(function (item) {
@@ -101,7 +110,8 @@ Page({
       })
       this.applyFilter()
     }).catch(function () {
-    }).finally(() => {
+    })
+    return Promise.all([reviewsTask, creditTask]).finally(() => {
       this.setData({ loading: false })
     })
   },
@@ -112,6 +122,15 @@ Page({
       return
     }
     this.setData({ filter: value })
+    this.applyFilter()
+  },
+
+  // 从「该筛选下暂无评价」空态清空筛选，回到全部
+  onShowAll() {
+    if (this.data.filter === 'all') {
+      return
+    }
+    this.setData({ filter: 'all' })
     this.applyFilter()
   },
 

@@ -12,21 +12,35 @@
   margin-top: 28rpx;
 }
 
+/* 三大主标签 */
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
 .tab {
-  min-height: 66rpx;
-  border-radius: 10rpx;
+  position: relative;
+  min-height: 108rpx;
+  border-radius: 12rpx;
   background: var(--surface);
   border: 1rpx solid var(--line);
   color: var(--muted);
+  font-size: 26rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6rpx;
+}
+
+.tab-icon {
+  font-size: 40rpx;
+  line-height: 1;
+}
+
+.tab-text {
+  font-size: 26rpx;
 }
 
 .tab.active {
@@ -36,10 +50,163 @@
   font-weight: 700;
 }
 
+/* 二级筛选 chip */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.subchip {
+  font-size: 24rpx;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  border-radius: 999rpx;
+  padding: 10rpx 26rpx;
+}
+
+.subchip.on {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+/* 筛选漏斗入口 */
+.filter-entry {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-entry.active {
+  background: var(--brand-soft);
+}
+
+.funnel {
+  position: relative;
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.funnel::before {
+  content: '';
+  position: absolute;
+  top: 6rpx;
+  left: 2rpx;
+  width: 0;
+  height: 0;
+  border-left: 12rpx solid transparent;
+  border-right: 12rpx solid transparent;
+  border-top: 13rpx solid var(--muted);
+}
+
+.funnel::after {
+  content: '';
+  position: absolute;
+  top: 17rpx;
+  left: 12rpx;
+  width: 4rpx;
+  height: 9rpx;
+  background: var(--muted);
+  border-radius: 2rpx;
+}
+
+.filter-entry.active .funnel::before {
+  border-top-color: var(--brand);
+}
+
+.filter-entry.active .funnel::after {
+  background: var(--brand);
+}
+
+/* 筛选激活小红点 */
+.filter-entry.active::after {
+  content: '';
+  position: absolute;
+  top: 10rpx;
+  right: 10rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: var(--reward);
+}
+
+/* 筛选面板 */
+.filter-panel {
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-field);
+  box-shadow: var(--shadow-card);
+  padding: 24rpx;
+}
+
+.filter-panel .fp-title {
+  margin: 22rpx 0 14rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.filter-panel .fp-title:first-child {
+  margin-top: 0;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.chip {
+  font-size: 24rpx;
+  color: var(--muted);
+  background: var(--field);
+  border-radius: 999rpx;
+  padding: 10rpx 26rpx;
+}
+
+.chip.on {
+  background: var(--brand);
+  color: #ffffff;
+  font-weight: 700;
+}
+
 .amount {
   color: var(--reward);
   font-size: 34rpx;
   font-weight: 850;
+}
+
+/* 我发布的：帖子状态标 + 报酬 */
+.post-status {
+  font-size: 22rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  padding: 6rpx 18rpx;
+}
+
+.post-status.open {
+  background: var(--green-soft);
+  color: #0A9463;
+}
+
+.post-status.closed {
+  background: var(--field);
+  color: var(--faint);
+}
+
+.post-reward {
+  color: var(--reward);
+  font-weight: 700;
 }
 
 .title {
@@ -104,24 +271,6 @@
   line-height: 72rpx;
 }
 
-.sort-entry {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  font-size: 24rpx;
-  color: var(--muted);
-  background: var(--surface);
-  border-radius: 999rpx;
-  padding: 14rpx 22rpx;
-  box-shadow: var(--shadow-card);
-}
-
-.sort-caret {
-  font-size: 18rpx;
-  color: var(--faint);
-}
-
 .waiting-tip {
   margin-top: 18rpx;
   background: var(--amber-soft);
@@ -135,18 +284,18 @@
 .actions {
   margin-top: 22rpx;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14rpx;
 }
 
-/* 原生 button 默认撑满整行，这里压回弹性等分，横向一排 */
+/* 原生 button 默认撑满整行，这里压回弹性布局；允许换行避免多按钮时被挤窄截断 */
 .actions .btn {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 150rpx;
   width: auto;
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: 12rpx;
+  padding-right: 12rpx;
 }
 
 .order-del-hit {
@@ -171,6 +320,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.hidden-bar {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.hidden-tip {
+  flex: 1;
+  min-width: 0;
+  font-size: 23rpx;
+  color: var(--faint);
+}
+
+.hidden-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 24rpx;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 999rpx;
+  padding: 10rpx 24rpx;
 }
 
 .hist-row {

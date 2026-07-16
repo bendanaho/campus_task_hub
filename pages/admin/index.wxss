@@ -1,6 +1,6 @@
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12rpx;
 }
 
@@ -84,4 +84,66 @@
 .d-actions .btn {
   flex: 1;
   margin-top: 0;
+}
+
+/* 下架/删除等下线状态用中性灰，避免与品牌蓝混淆（举报/帖子管理共用） */
+.tag.gray {
+  background: var(--field);
+  color: var(--faint);
+}
+
+/* ---- 帖子管理：本地关键词 + 状态筛选 ---- */
+.pm-filter {
+  margin-bottom: 20rpx;
+}
+
+.pm-search {
+  position: relative;
+}
+
+.pm-search .input {
+  padding-right: 64rpx;
+}
+
+.pm-placeholder {
+  color: var(--faint);
+}
+
+.pm-clear {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 64rpx;
+  height: 76rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  font-size: 26rpx;
+}
+
+.pm-segs {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 12rpx;
+}
+
+.pm-seg {
+  flex: 1;
+  min-height: 60rpx;
+  border-radius: 10rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  color: var(--muted);
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pm-seg.on {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+  font-weight: 700;
 }

@@ -2,27 +2,57 @@
   <view class="card section">
     <view class="label">头像</view>
     <view class="avatar-row">
-      <ua-avatar avatar="{{avatarValue}}" name="{{username}}" uid="{{uid}}" size="{{140}}" />
+      <ua-avatar avatar="{{avatarSrc}}" name="{{username}}" uid="{{uid}}" size="{{140}}" />
       <view class="avatar-ops">
-        <view class="btn secondary small avatar-btn" hover-class="btn-hover" bindtap="pickAvatarImage">上传图片</view>
-        <view wx:if="{{hasCustomAvatar}}" class="avatar-reset" bindtap="resetAvatar">恢复默认</view>
+        <view class="btn secondary small avatar-btn" hover-class="btn-hover" bindtap="pickAvatarImage" aria-role="button" aria-label="上传头像图片">上传图片</view>
+        <view wx:if="{{hasCustomAvatar}}" class="avatar-reset" bindtap="resetAvatar" aria-role="button" aria-label="恢复默认头像">恢复默认</view>
       </view>
     </view>
     <view class="label swatch-label">纯色模板</view>
     <view class="swatches">
       <view
-        wx:for="{{colors}}"
-        wx:key="*this"
-        class="swatch {{avatarValue === 'color:' + item ? 'on' : ''}}"
-        style="background: {{item}};"
+        wx:for="{{swatches}}"
+        wx:key="value"
+        class="swatch {{avatarValue === 'color:' + item.value ? 'on' : ''}}"
+        style="background: {{item.value}};"
         bindtap="pickColor"
-        data-color="{{item}}"
+        data-color="{{item.value}}"
+        aria-role="button"
+        aria-label="头像颜色 {{item.label}}{{avatarValue === 'color:' + item.value ? '，已选中' : ''}}"
       ></view>
     </view>
-    <view class="avatar-tip">头像暂时只保存在本机（后端还没有头像接口，就绪后可同步）</view>
+    <view class="avatar-tip">上传的头像会同步到服务器，所有人可见；纯色模板仅本机显示。</view>
+  </view>
+
+  <view class="card section">
+    <view class="label">个人简介</view>
+    <textarea
+      class="bio-input"
+      placeholder="介绍一下自己（擅长的技能、经历等），最多{{maxBio}}字"
+      value="{{bio}}"
+      maxlength="{{maxBio}}"
+      bindinput="onBioInput"
+    />
+    <view class="bio-foot">
+      <text class="bio-count">{{bioLen}}/{{maxBio}}</text>
+      <button class="btn secondary small bio-save" disabled="{{bioSaving}}" loading="{{bioSaving}}" bindtap="saveBio">保存简介</button>
+    </view>
+  </view>
+
+  <view class="card section">
+    <view class="label">展示照片</view>
+    <view class="photo-tip">可展示技能证书、作品等，最多 {{maxPhotos}} 张（{{photos.length}}/{{maxPhotos}}）</view>
+    <view class="photo-grid">
+      <view class="photo-cell" wx:for="{{photosShow}}" wx:key="index">
+        <image class="photo-img" src="{{item}}" mode="aspectFill" bindtap="previewPhoto" data-index="{{index}}" />
+        <view class="photo-del" catchtap="removePhoto" data-index="{{index}}" aria-role="button" aria-label="删除第{{index + 1}}张照片">×</view>
+      </view>
+      <view wx:if="{{photos.length < maxPhotos}}" class="photo-add" bindtap="addPhotos" aria-role="button" aria-label="添加展示照片">＋</view>
+    </view>
   </view>
 
   <view class="card form section">
+    <view class="form-hint">联系方式修改后需点下方按钮保存；留空的项不会被修改。</view>
     <view class="field">
       <text class="label">手机号</text>
       <view class="current">当前：{{phoneMasked}}</view>
@@ -30,7 +60,7 @@
         class="input"
         type="number"
         maxlength="11"
-        placeholder="{{phoneMasked}}"
+        placeholder="输入新手机号，留空不修改"
         value="{{phone}}"
         data-key="phone"
         bindinput="onInput"
@@ -41,13 +71,55 @@
       <view class="current">当前：{{emailMasked}}</view>
       <input
         class="input"
-        placeholder="{{emailMasked}}"
+        placeholder="输入新邮箱，留空不修改"
         value="{{email}}"
         data-key="email"
         bindinput="onInput"
       />
     </view>
-    <button class="btn" disabled="{{submitting}}" loading="{{submitting}}" bindtap="save">保存</button>
+    <button class="btn" disabled="{{submitting}}" loading="{{submitting}}" bindtap="save">更新联系方式</button>
+  </view>
+
+  <view class="card form section">
+    <view class="pwd-head">
+      <view class="label">修改密码</view>
+      <view class="pwd-eye" bindtap="togglePwdVisible" aria-role="button" aria-label="{{pwdVisible ? '隐藏密码' : '显示密码'}}">{{pwdVisible ? '隐藏' : '显示'}}</view>
+    </view>
+    <view class="form-hint">为保护账户安全，需先验证旧密码。新密码至少6位，且不能与旧密码相同。</view>
+    <view class="field">
+      <text class="label">旧密码</text>
+      <input
+        class="input"
+        password="{{!pwdVisible}}"
+        placeholder="输入当前密码"
+        value="{{oldPwd}}"
+        data-key="oldPwd"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="field">
+      <text class="label">新密码</text>
+      <input
+        class="input"
+        password="{{!pwdVisible}}"
+        placeholder="至少6位"
+        value="{{newPwd}}"
+        data-key="newPwd"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="field">
+      <text class="label">确认新密码</text>
+      <input
+        class="input"
+        password="{{!pwdVisible}}"
+        placeholder="再次输入新密码"
+        value="{{newPwd2}}"
+        data-key="newPwd2"
+        bindinput="onInput"
+      />
+    </view>
+    <button class="btn" disabled="{{submittingPwd}}" loading="{{submittingPwd}}" bindtap="changePassword">修改密码</button>
   </view>
 
   <view class="card section">

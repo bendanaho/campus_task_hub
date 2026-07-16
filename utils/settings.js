@@ -2,9 +2,10 @@
 const KEY = 'campus_chat_settings'
 
 const DEFAULTS = {
-  fontSize: 'std',      // 聊天字号: small / std / large
-  badgeEnabled: true,   // tabBar 未读角标
-  autoRead: true        // 进入会话自动标记已读
+  fontSize: 'std',            // 聊天字号: small / std / large
+  badgeEnabled: true,         // tabBar 未读角标
+  autoRead: true,             // 进入会话自动标记已读
+  interactionEnabled: true    // 接收互动消息（订单/评价等互动通知）
 }
 
 function getSettings() {

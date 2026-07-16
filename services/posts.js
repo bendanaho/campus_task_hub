@@ -19,6 +19,12 @@ function detail(id) {
   return request({ url: '/api/posts/' + id, method: 'GET' })
 }
 
+// 按需获取某帖原图列表 [{full, thumb}]：列表/详情只下发缩略图，
+// 点击缩略图放大时才单独拉原图，避免打开页面就下载数 MB 原图。
+function images(id) {
+  return request({ url: '/api/posts/' + id + '/images', method: 'GET', showLoading: true })
+}
+
 function create(data) {
   return request({
     url: '/api/posts',
@@ -51,6 +57,7 @@ module.exports = {
   report,
   list,
   detail,
+  images,
   create,
   mine,
   closePost

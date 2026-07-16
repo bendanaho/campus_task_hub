@@ -157,19 +157,24 @@
   line-height: 72rpx;
 }
 
+/* 操作按钮拉开间距、放大点击区，破坏性「下架」与「再发一单」不再紧挨易误触（spec 修复11） */
 .mine-ops {
   margin-left: auto;
   display: flex;
-  gap: 14rpx;
+  gap: 24rpx;
 }
 
 .mine-op {
-  font-size: 23rpx;
+  min-height: 64rpx;
+  box-sizing: border-box;
+  font-size: 24rpx;
   font-weight: 600;
   color: var(--brand);
   background: var(--brand-soft);
   border-radius: 999rpx;
-  padding: 8rpx 20rpx;
+  padding: 18rpx 30rpx;
+  display: flex;
+  align-items: center;
 }
 
 .mine-op.warn {

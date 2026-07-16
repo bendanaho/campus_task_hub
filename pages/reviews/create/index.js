@@ -3,15 +3,18 @@ const reviewService = require('../../../services/reviews')
 const imageUtil = require('../../../utils/image')
 
 const MAX_IMAGES = 3
+const MAX_CONTENT = 200
 
 Page({
   data: {
     orderId: '',
     toUserId: '',
     toUserName: '',
-    ratingIndex: 4,
-    ratings: [1, 2, 3, 4, 5],
+    rating: 0,
+    stars: [1, 2, 3, 4, 5],
     content: '',
+    contentLen: 0,
+    maxContent: MAX_CONTENT,
     hasReviewed: false,
     images: [],
     maxImages: MAX_IMAGES,
@@ -38,15 +41,22 @@ Page({
     }
   },
 
-  onRatingChange(e) {
-    this.setData({ ratingIndex: Number(e.detail.value) })
+  onStarTap(e) {
+    if (this.data.hasReviewed) {
+      return
+    }
+    this.setData({ rating: Number(e.currentTarget.dataset.value) || 0 })
   },
 
   onContentInput(e) {
-    this.setData({ content: e.detail.value })
+    const value = e.detail.value || ''
+    this.setData({ content: value, contentLen: value.length })
   },
 
   addImage() {
+    if (this.data.hasReviewed) {
+      return
+    }
     const remain = MAX_IMAGES - this.data.images.length
     if (remain <= 0) {
       return
@@ -79,12 +89,16 @@ Page({
       wx.showToast({ title: '该订单已评价', icon: 'none' })
       return
     }
+    if (!this.data.rating) {
+      wx.showToast({ title: '请先选择评分', icon: 'none' })
+      return
+    }
     this.setData({ submitting: true })
     reviewService.submit({
       orderId: Number(this.data.orderId),
       toUserId: Number(this.data.toUserId),
       toUserName: this.data.toUserName || '对方',
-      rating: this.data.ratings[this.data.ratingIndex],
+      rating: this.data.rating,
       content: this.data.content,
       images: this.data.images
     }).then(() => {

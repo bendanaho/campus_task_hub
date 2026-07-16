@@ -3,7 +3,7 @@
     <view class="head-row">
       <view class="strong">{{partnerName || '会话'}}</view>
       <text wx:if="{{tradeDone}}" class="mini-tag">交易成功</text>
-      <text wx:if="{{hasNewReview}}" class="mini-tag" bindtap="goMyReviews">有新评价 ›</text>
+      <view wx:if="{{hasNewReview}}" class="review-link" hover-class="btn-hover" bindtap="goMyReviews" aria-role="button" aria-label="查看我的新评价">有新评价 ›</view>
     </view>
     <view wx:if="{{!isSystemChat}}" class="muted">{{taskTitle || '未关联帖子'}}</view>
     <view wx:if="{{activeOrder}}" class="order-line">
@@ -15,7 +15,7 @@
     </view>
   </view>
 
-  <scroll-view class="messages section {{fontClass}}" scroll-y scroll-into-view="{{intoView}}" enhanced show-scrollbar="{{false}}">
+  <scroll-view class="messages section {{fontClass}}" scroll-y scroll-into-view="{{intoView}}" enhanced show-scrollbar="{{false}}" bindscroll="onMessagesScroll">
     <block wx:if="{{loading}}">
       <view class="sk-bubble side-other"></view>
       <view class="sk-bubble side-mine"></view>
@@ -23,30 +23,47 @@
     </block>
     <view wx:elif="{{messages.length == 0}}" class="empty">暂无消息</view>
     <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.withdrawn ? 'withdrawn-msg' : (item.isSystem ? 'system-msg' : item.bubbleClass)}}">
-      <view class="msg-time">{{item.timeText}}</view>
+      <view wx:if="{{item.showTime}}" class="msg-time">{{item.showTime}}</view>
       <view wx:if="{{item.withdrawn}}" class="withdrawn-tip">消息已撤回</view>
       <view wx:elif="{{item.isSystem}}" class="system-tip">{{item.content}}</view>
-      <view wx:else class="bubble-row">
-        <view wx:if="{{item.failed}}" class="failed-badge" data-id="{{item.id}}" bindtap="resendLocal">!</view>
-        <view class="bubble {{item.pending ? 'pending' : ''}}" data-id="{{item.id}}" bindlongpress="onBubbleLongpress">
-          <block wx:if="{{item.type == 'payment'}}">
-            <view class="payment-title">{{item.paymentTitle}}</view>
-            <view class="payment-money">¥{{item.paymentAmountText}}</view>
-            <view class="muted">状态：{{item.paymentStatusText}}</view>
-            <view class="payment-actions">
-              <button wx:if="{{item.canPay}}" class="btn small" data-id="{{item.id}}" bindtap="payCard">支付</button>
-              <button wx:if="{{item.canCancelPayment}}" class="btn warn small" data-id="{{item.id}}" bindtap="cancelCard">取消</button>
-            </view>
-          </block>
-          <block wx:else>
-            <view>{{item.content}}</view>
-          </block>
+      <block wx:else>
+        <view class="bubble-row">
+          <view class="bubble {{item.isImage ? 'is-image' : ''}} {{item.pending ? 'pending' : ''}} {{item.failed ? 'is-failed' : ''}}" data-id="{{item.id}}" bindtap="onBubbleTap" bindlongpress="onBubbleLongpress">
+            <block wx:if="{{item.type == 'payment'}}">
+              <view class="pay-headline">
+                <text class="pay-kind">{{item.paymentTitle}}</text>
+                <text class="pay-amount">¥{{item.paymentAmountText}}</text>
+              </view>
+              <view wx:if="{{item.paymentNote}}" class="pay-note">{{item.paymentNote}}</view>
+              <view class="pay-status">{{item.paymentStatusText}}</view>
+              <view wx:if="{{item.canPay || item.canCancelPayment}}" class="payment-actions">
+                <button wx:if="{{item.canPay}}" class="btn small" data-id="{{item.id}}" bindtap="payCard">支付</button>
+                <button wx:if="{{item.canCancelPayment}}" class="btn warn small" data-id="{{item.id}}" bindtap="cancelCard">取消</button>
+              </view>
+            </block>
+            <block wx:elif="{{item.isImage}}">
+              <image
+                class="msg-image"
+                src="{{item.imageUrl}}"
+                mode="widthFix"
+                catchtap="onImageTap"
+                binderror="onImageLoadError"
+                data-id="{{item.id}}"
+                data-index="{{index}}"
+              />
+              <view wx:if="{{item.imageFailed}}" class="img-fail-hint" catchtap="onImageTap" data-id="{{item.id}}">图片加载失败{{item.imageFailMsg ? '（' + item.imageFailMsg + '）' : ''}} · 点击查看</view>
+            </block>
+            <block wx:else>
+              <view>{{item.content}}</view>
+            </block>
+          </view>
         </view>
-      </view>
+        <view wx:if="{{item.failed}}" class="failed-hint" data-id="{{item.id}}" bindtap="resendLocal" aria-role="button" aria-label="发送失败，点击重发">发送失败 点击重发</view>
+      </block>
     </view>
   </scroll-view>
 
-  <view wx:if="{{!isSystemChat}}" class="card section pay-box">
+  <view wx:if="{{!isSystemChat && showPay}}" class="card section pay-box">
     <view class="pay-title">支付卡片</view>
     <view class="pay-row">
       <picker range="{{paymentKinds}}" range-key="label" value="{{paymentKindIndex}}" bindchange="onKindChange">
@@ -57,26 +74,42 @@
     </view>
   </view>
 
-  <scroll-view wx:if="{{!isSystemChat}}" class="quick-row" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+  <scroll-view wx:if="{{!isSystemChat && inputFocused}}" class="quick-row" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
     <view class="quick-inner">
       <view wx:for="{{quickPhrases}}" wx:key="*this" class="quick-chip" hover-class="btn-hover" bindtap="sendQuick" data-text="{{item}}">{{item}}</view>
     </view>
   </scroll-view>
 
-  <view wx:if="{{!isSystemChat}}" class="input-bar">
-    <view class="emoji-toggle" hover-class="btn-hover" bindtap="toggleEmoji">😊</view>
-    <input class="message-input" placeholder="输入消息（长按气泡可撤回）" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="sendText" />
-    <button class="btn small" bindtap="sendText">发送</button>
+  <view wx:if="{{showEmoji && !isSystemChat}}" class="emoji-panel">
+    <scroll-view class="emoji-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="emoji-grid">
+        <view
+          wx:for="{{emojis}}"
+          wx:key="*this"
+          class="emoji-item"
+          hover-class="btn-hover"
+          bindtap="onEmojiTap"
+          data-emoji="{{item}}"
+        >{{item}}</view>
+      </view>
+    </scroll-view>
+    <view wx:if="{{input}}" class="emoji-send" catchtap="sendText" aria-role="button" aria-label="发送">发送</view>
   </view>
 
-  <view wx:if="{{showEmoji && !isSystemChat}}" class="emoji-panel">
-    <view
-      wx:for="{{emojis}}"
-      wx:key="*this"
-      class="emoji-item"
-      hover-class="btn-hover"
-      bindtap="onEmojiTap"
-      data-emoji="{{item}}"
-    >{{item}}</view>
+  <view wx:if="{{showMore && !isSystemChat}}" class="more-panel">
+    <view class="more-item" hover-class="btn-hover" bindtap="onMoreTransfer" aria-role="button" aria-label="转账">
+      <view class="more-icon">💰</view>
+      <view class="more-label">转账</view>
+    </view>
+    <view class="more-item" hover-class="btn-hover" bindtap="onMoreImage" aria-role="button" aria-label="发送图片">
+      <view class="more-icon">🖼️</view>
+      <view class="more-label">图片</view>
+    </view>
+  </view>
+
+  <view wx:if="{{!isSystemChat}}" class="input-bar">
+    <input class="message-input" placeholder="输入消息，回车发送" value="{{input}}" bindinput="onInput" bindfocus="onInputFocus" bindblur="onInputBlur" confirm-type="send" confirm-hold="{{true}}" bindconfirm="sendText" />
+    <view class="io-btn" hover-class="btn-hover" bindtap="toggleEmoji" aria-role="button" aria-label="表情">😊</view>
+    <view class="io-btn io-plus {{showMore ? 'active' : ''}}" hover-class="btn-hover" bindtap="toggleMore" aria-role="button" aria-label="更多，转账或图片">＋</view>
   </view>
 </view>

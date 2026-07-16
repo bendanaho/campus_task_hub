@@ -1,5 +1,5 @@
 <view class="page {{themeCls}}">
-  <view class="summary section">
+  <view wx:if="{{loaded}}" class="summary section">
     <view class="summary-item card">
       <text class="muted">总收入</text>
       <text class="money in">¥{{totalIn}}</text>
@@ -11,6 +11,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="empty">正在加载账单...</view>
+  <view wx:elif="{{error}}" class="empty retry" bindtap="loadBills" aria-role="button" aria-label="加载失败，点击重试">加载失败 · 点击重试</view>
   <empty-state wx:elif="{{list.length == 0}}" emoji="🧾" title="暂无账单" />
 
   <view wx:for="{{list}}" wx:key="id" class="bill card section">

@@ -38,6 +38,7 @@
         <button class="btn ghost" hover-class="btn-hover" bindtap="goChat">进入会话</button>
         <button wx:if="{{active.canCancel}}" class="btn warn" hover-class="btn-hover" bindtap="cancelOrder">取消订单</button>
         <button wx:if="{{active.canConfirm}}" class="btn" hover-class="btn-hover" bindtap="confirmOrder">确认完成</button>
+        <button wx:if="{{active.canReview}}" class="btn secondary" hover-class="btn-hover" bindtap="goReview">评价</button>
         <button wx:if="{{active.canDispute}}" class="btn ghost" hover-class="btn-hover" bindtap="disputeOrder">申诉</button>
       </view>
     </view>

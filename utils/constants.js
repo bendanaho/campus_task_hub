@@ -5,10 +5,11 @@ const sideOptions = [
   { label: '互助', value: 'none' }
 ]
 
+// 与大厅筛选/卡片标签同一套叫法（悬赏/服务/互助），括号补方向说明，避免新用户对不上号
 const publishSideOptions = [
-  { label: '我付钱找人帮忙', value: 'payer' },
-  { label: '我提供服务收钱', value: 'earner' },
-  { label: '纯互助不涉及费用', value: 'none' }
+  { label: '悬赏 · 我出钱找人帮忙', value: 'payer' },
+  { label: '服务 · 我提供服务收钱', value: 'earner' },
+  { label: '互助 · 不涉及费用', value: 'none' }
 ]
 
 const sortOptions = [

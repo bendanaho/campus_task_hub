@@ -6,6 +6,7 @@ const auth = require('../../../utils/auth')
 const confirmUtil = require('../../../utils/confirm')
 const format = require('../../../utils/format')
 const imageUtil = require('../../../utils/image')
+const upload = require('../../../utils/upload')
 
 function buildChatId(postId, currentUserId, partnerId) {
   const a = Math.min(Number(currentUserId), Number(partnerId))
@@ -21,7 +22,11 @@ Page({
     reviews: [],
     reviewsTotal: 0,
     user: null,
-    loading: true
+    loading: true,
+    loadError: false,
+    acting: false,
+    contacting: false,
+    responding: false
   },
 
   onLoad(options) {
@@ -57,7 +62,7 @@ Page({
   },
 
   loadDetail() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: false })
     return postService.detail(this.data.id).then((data) => {
       const task = data.task || {}
       const publisher = data.publisher || {}
@@ -65,17 +70,27 @@ Page({
       task.publishText = format.formatTime(task.publishTime)
       task.deadlineText = format.formatTime(task.deadline)
       task.moneyText = format.formatMoney(task.rewardValue)
-      // 新版后端 images 为 [{full, thumb}]，旧版为字符串数组：
-      // 页面网格渲染 thumb（体积小），原图存实例属性供预览，不进 setData
+      // 与列表/我的发布一致：rewardValue>0 才显示 ¥，否则 none→免费互助 / 其余→面议
+      task.hasPrice = Number(task.rewardValue) > 0
+      task.priceAlt = task.publisherSide === 'none' ? '免费互助' : (task.reward || '面议')
+      // 金额方向标 + 按类型的响应动词：悬赏=接单(完成可得)、服务=下单(需支付)、互助=参加
+      task.priceHint = task.hasPrice ? (task.publisherSide === 'payer' ? '完成可得' : (task.publisherSide === 'earner' ? '需支付' : '')) : ''
+      const respondText = task.publisherSide === 'payer' ? '我来接单'
+        : (task.publisherSide === 'earner' ? '我要下单' : '我要参加')
+      // 新版后端列表/详情只下发缩略图 thumb（full 已被剥离，体积小）。
+      // 网格渲染 thumb；点击放大时再按需拉原图（/posts/{id}/images），此处先重置缓存。
       const rawImages = Array.isArray(task.images) ? task.images : []
-      this.fullImages = rawImages.map(function (img) {
-        return typeof img === 'string' ? img : (img.full || img.thumb || '')
-      }).filter(Boolean)
+      this.originalImages = null
       task.images = rawImages.map(function (img) {
         return typeof img === 'string' ? img : (img.thumb || img.full || '')
       }).filter(Boolean)
       publisher.avatarText = publisher.username ? publisher.username.slice(0, 1) : '同'
+      // 头像可能是 /uploads/xxx 相对路径：ua-avatar 只把 http/data 视作图片，
+      // 故先补全为完整 URL；'color:' 模板与空值原样传入，交由组件走首字色块兜底
+      const rawAvatar = publisher.avatar || ''
+      publisher.avatar = (rawAvatar && rawAvatar.indexOf('color:') !== 0) ? upload.fullUrl(rawAvatar) : rawAvatar
       this.setData({
+        respondText: respondText,
         task: task,
         publisher: publisher
       })
@@ -94,15 +109,42 @@ Page({
         reviews: list.slice(0, 2),
         reviewsTotal: list.length
       })
-    }).catch(function () {
+    }).catch(() => {
+      // 详情加载失败：置 loadError 驱动错误空态分支，避免整页白屏（spec 修复1）
+      if (!this.data.task) {
+        this.setData({ loadError: true })
+      }
     }).finally(() => {
       this.setData({ loading: false })
     })
   },
 
   previewImage(e) {
-    const full = this.fullImages && this.fullImages.length ? this.fullImages : this.data.task.images
-    imageUtil.preview(full, Number(e.currentTarget.dataset.index))
+    const index = Number(e.currentTarget.dataset.index)
+    const thumbs = (this.data.task && this.data.task.images) || []
+    // 已拉过原图则直接放大
+    if (this.originalImages && this.originalImages.length) {
+      imageUtil.preview(this.originalImages, index)
+      return
+    }
+    const self = this
+    const taskId = this.data.task && this.data.task.id
+    if (!taskId) {
+      imageUtil.preview(thumbs, index)
+      return
+    }
+    // 详情只下发缩略图，点击放大时按需拉原图
+    postService.images(taskId).then(function (list) {
+      const fulls = (list || []).map(function (img) {
+        if (typeof img === 'string') return img
+        return (img && (img.full || img.thumb)) || ''
+      }).filter(Boolean)
+      self.originalImages = fulls.length ? fulls : thumbs
+      imageUtil.preview(self.originalImages, index)
+    }).catch(function () {
+      // 拉原图失败退回用缩略图预览，至少能看
+      imageUtil.preview(thumbs, index)
+    })
   },
 
   // 下架自己的帖子（软下架，进行中订单不受影响）
@@ -232,11 +274,17 @@ Page({
     if (!auth.requireLogin()) {
       return
     }
+    if (this.data.acting) {
+      return
+    }
+    this.setData({ acting: true, contacting: true })
     this.ensureChat().then((chatId) => {
       wx.navigateTo({
         url: '/pages/chat/room/index?chatId=' + encodeURIComponent(chatId)
       })
     }).catch(function () {
+    }).finally(() => {
+      this.setData({ acting: false, contacting: false })
     })
   },
 
@@ -248,25 +296,48 @@ Page({
     if (!task) {
       return
     }
+    if (this.data.acting) {
+      return
+    }
+    // 入口即置位，覆盖整个「确认弹窗 + 建会话 + 下单」链路，防连点重复下单（spec 修复8）
+    this.setData({ acting: true, responding: true })
+    // 弹窗写清这一步会发生什么（建单/资金托管/到账时机），不让新用户盲点
+    const side = task.publisherSide
+    const money = task.hasPrice ? '¥' + task.moneyText : ''
+    let title, content
+    if (side === 'payer') {
+      title = '确认接单'
+      content = '将创建订单，等待发布者接受。'
+        + (money ? '对方接受时赏金 ' + money + ' 由平台冻结托管，你完成任务、双方确认后打给你。' : '')
+    } else if (side === 'earner') {
+      title = '确认下单'
+      content = '将创建订单，等待对方接受。'
+        + (money ? '对方接受时服务费 ' + money + ' 将从你的余额冻结托管，服务完成、双方确认后支付给对方。' : '费用面议，可先在会话中沟通。')
+    } else {
+      title = '确认参加'
+      content = '将向发起者申请参加并建立会话，不涉及任何费用。'
+    }
     confirmUtil.confirm({
-      title: '确认响应',
-      content: '确认响应「' + task.title + '」？'
+      title: title,
+      content: content
     }).then((ok) => {
       if (!ok) {
         return
       }
-      this.ensureChat().then((chatId) => {
+      return this.ensureChat().then((chatId) => {
         return orderService.create({
           postId: this.data.task.id,
           chatId: chatId
         }).then(function () {
-          wx.showToast({ title: '已提交响应', icon: 'success' })
+          wx.showToast({ title: '已提交，等待对方接受', icon: 'none' })
           wx.navigateTo({
             url: '/pages/chat/room/index?chatId=' + encodeURIComponent(chatId)
           })
         })
-      }).catch(function () {
       })
+    }).catch(function () {
+    }).finally(() => {
+      this.setData({ acting: false, responding: false })
     })
   }
 })

@@ -1,16 +1,20 @@
 <view class="page {{themeCls}}">
   <view class="card balance-card section">
     <view class="muted">当前余额</view>
-    <view class="balance">¥{{balance}}</view>
+    <view wx:if="{{balanceError}}" class="balance-retry" bindtap="loadBalance" aria-role="button" aria-label="余额加载失败，点击重试">加载失败 · 点击重试</view>
+    <view wx:else class="balance">¥{{balance}}</view>
+    <view wx:if="{{hasFrozen}}" class="frozen-line">其中冻结 ¥{{frozenBalance}}（发布担保 / 托管转账占用）</view>
+    <view class="balance-note">余额仅用于平台内支付，暂不支持提现</view>
   </view>
 
   <view class="card section">
     <view class="label">充值金额</view>
     <view class="quick-amounts">
-      <view wx:for="{{[10, 20, 50, 100]}}" wx:key="*this" class="quick-amount {{amount == item ? 'on' : ''}}" bindtap="pickAmount" data-value="{{item}}">¥{{item}}</view>
+      <view wx:for="{{[10, 20, 50, 100]}}" wx:key="*this" class="quick-amount {{amount == item ? 'on' : ''}}" bindtap="pickAmount" data-value="{{item}}" aria-role="button" aria-label="快捷金额 {{item}} 元">¥{{item}}</view>
     </view>
     <input class="input" type="digit" placeholder="0.01 - 100000，或点上方快捷金额" value="{{amount}}" bindinput="onAmountInput" />
     <button class="btn recharge" disabled="{{submitting}}" loading="{{submitting}}" bindtap="recharge">确认充值</button>
+    <view class="recharge-note">模拟充值：仅用于平台内体验，不接入真实支付、不会实际扣款</view>
   </view>
 
   <button class="btn secondary" bindtap="goBills">查看账单流水</button>

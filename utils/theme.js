@@ -7,7 +7,12 @@ const BGS = [
   { label: '米白', value: 'b2', color: '#FAF6EF' },
   { label: '浅绿', value: 'b3', color: '#EFF7F1' },
   { label: '浅蓝', value: 'b4', color: '#EFF4FE' },
-  { label: '浅粉', value: 'b5', color: '#FBF3F5' }
+  { label: '浅粉', value: 'b5', color: '#FBF3F5' },
+  { label: '浅紫', value: 'b6', color: '#F4F0FC' },
+  { label: '薄荷', value: 'b7', color: '#EAF7F3' },
+  { label: '浅橙', value: 'b8', color: '#FEF2E9' },
+  { label: '云灰', value: 'b9', color: '#ECEEF2' },
+  { label: '奶黄', value: 'b10', color: '#FCF7E4' }
 ]
 
 const DARK_PAPER = '#12161F'

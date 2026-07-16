@@ -1,21 +1,22 @@
 <view class="page auth-page {{themeCls}}">
   <view class="brand">
     <view class="brand-title">校园互助</view>
-    <view class="brand-subtitle">使用后端账号登录，不启用微信登录</view>
+    <view class="brand-subtitle">登录后即可发布任务、接单互助</view>
   </view>
 
   <view class="card form">
     <view class="field">
       <text class="label">账号</text>
-      <input class="input" placeholder="用户名 / 手机号 / 邮箱" value="{{account}}" bindinput="onAccountInput" />
+      <input class="input" placeholder="用户名 / 手机号 / 邮箱" value="{{account}}" bindinput="onAccountInput" focus="{{true}}" maxlength="40" confirm-type="next" />
     </view>
     <view class="field">
       <text class="label">密码</text>
-      <input class="input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" confirm-type="done" bindconfirm="submit" />
+      <view class="pwd-wrap">
+        <input class="input" password="{{!showPwd}}" placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" maxlength="32" confirm-type="done" bindconfirm="submit" />
+        <view class="pwd-eye {{showPwd ? '' : 'off'}}" bindtap="togglePwd" aria-label="{{showPwd ? '隐藏密码' : '显示密码'}}">👁</view>
+      </view>
     </view>
     <button class="btn submit" bindtap="submit" disabled="{{submitting}}" loading="{{submitting}}">登录</button>
     <button class="register-link" bindtap="goRegister">还没有账号，去注册</button>
   </view>
-
-  <view class="demo muted">开发种子账号可试：张三 / 1，李四 / 1</view>
 </view>

@@ -16,11 +16,16 @@
 }
 
 .in {
-  color: #23824a;
+  color: var(--green);
 }
 
 .out {
-  color: #d94a1f;
+  color: var(--reward);
+}
+
+.retry {
+  color: var(--brand);
+  font-weight: 600;
 }
 
 .time {

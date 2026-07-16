@@ -65,6 +65,26 @@
   background: linear-gradient(155deg, #F49BBB 0%, #EC7AA4 45%, #D95C8C 100%);
 }
 
+.theme-light.bg-b6 .hall-header {
+  background: linear-gradient(155deg, #A78BE8 0%, #7D5FD1 45%, #5E43B0 100%);
+}
+
+.theme-light.bg-b7 .hall-header {
+  background: linear-gradient(155deg, #43C7B0 0%, #0FA189 45%, #077E6B 100%);
+}
+
+.theme-light.bg-b8 .hall-header {
+  background: linear-gradient(155deg, #F5A063 0%, #E9752E 45%, #C25A1B 100%);
+}
+
+.theme-light.bg-b9 .hall-header {
+  background: linear-gradient(155deg, #7C8AA0 0%, #566378 45%, #3D485A 100%);
+}
+
+.theme-light.bg-b10 .hall-header {
+  background: linear-gradient(155deg, #E4BC4A 0%, #C99A15 45%, #A17A0C 100%);
+}
+
 .theme-dark .hall-header {
   background: linear-gradient(155deg, #3A4C7A 0%, #2A3A63 45%, #1C2947 100%);
 }
@@ -114,6 +134,19 @@
   color: var(--faint);
 }
 
+.search-clear {
+  flex: 0 0 auto;
+  width: 44rpx;
+  height: 44rpx;
+  margin-right: 6rpx;
+  border-radius: 50%;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 24rpx;
+  line-height: 44rpx;
+  text-align: center;
+}
+
 .search-go {
   flex: 0 0 auto;
   background: var(--brand);
@@ -122,6 +155,35 @@
   font-weight: 600;
   border-radius: 999rpx;
   padding: 14rpx 28rpx;
+}
+
+/* 切换筛选/排序时的顶部加载反馈 */
+.list-switching {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  padding: 12rpx 0 20rpx;
+}
+
+.switching-bar {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 5rpx solid var(--brand-soft);
+  border-top-color: var(--brand);
+  animation: switching-spin 0.8s linear infinite;
+}
+
+.switching-text {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+@keyframes switching-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 实时新帖提示胶囊 */
@@ -452,6 +514,11 @@
   flex: 0 0 auto;
 }
 
+/* 真实头像图：占位底色避免加载空档闪白 */
+.ava-img {
+  background: var(--field);
+}
+
 .pub-name {
   color: var(--muted);
   font-weight: 600;
@@ -505,4 +572,74 @@
   font-size: 22rpx;
   color: var(--faint);
   margin-left: auto;
+}
+
+/* 金额方向标：悬赏「完成可得」/ 服务「需支付」 */
+.price-hint {
+  margin-left: 8rpx;
+  font-size: 20rpx;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* ===== 首次启动新手引导 ===== */
+.ob-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(23, 35, 61, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ob-card {
+  width: 600rpx;
+  background: var(--surface);
+  border-radius: 28rpx;
+  padding: 36rpx 32rpx 32rpx;
+  box-shadow: 0 24rpx 60rpx rgba(13, 24, 56, 0.35);
+}
+
+.ob-swiper {
+  height: 420rpx;
+}
+
+.ob-slide {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  padding: 0 20rpx;
+  text-align: center;
+}
+
+.ob-emoji {
+  font-size: 76rpx;
+  line-height: 1;
+}
+
+.ob-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.ob-text {
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.ob-text-strong {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.ob-btn {
+  margin-top: 18rpx;
+  width: 100%;
 }

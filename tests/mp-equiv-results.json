@@ -1,0 +1,145 @@
+{
+  "base": "http://182.92.133.163:8081",
+  "pass": 18,
+  "total": 23,
+  "results": [
+    {
+      "tc": "TC_LOG_008",
+      "point": "有效标准登录",
+      "backend": "后端放行（success=true, HTTP 200）",
+      "pass": true
+    },
+    {
+      "tc": "TC_LOG_012",
+      "point": "错误密码登录",
+      "backend": "后端拦截（用户名/手机号/邮箱或密码错误）",
+      "pass": true
+    },
+    {
+      "tc": "TC_AUTH_NOTOKEN",
+      "point": "无 token 访问受保护接口",
+      "backend": "后端拦截（HTTP 403）",
+      "pass": true
+    },
+    {
+      "tc": "TC_ADM_PRIV",
+      "point": "普通用户越权访问管理员接口",
+      "backend": "后端拦截（HTTP 403）",
+      "pass": true
+    },
+    {
+      "tc": "TC_REG_002",
+      "point": "两次密码不一致",
+      "backend": "后端放行（success=true, HTTP 200）",
+      "pass": false
+    },
+    {
+      "tc": "TC_REG_003",
+      "point": "确认密码为空/缺失",
+      "backend": "后端放行（success=true, HTTP 200）",
+      "pass": false
+    },
+    {
+      "tc": "TC_REG_005",
+      "point": "昵称超长(35字)",
+      "backend": "后端放行（success=true, HTTP 200）",
+      "pass": false
+    },
+    {
+      "tc": "TC_REG_006",
+      "point": "昵称含敏感词",
+      "backend": "后端放行（success=true, HTTP 200）",
+      "pass": false
+    },
+    {
+      "tc": "TC_PROF_002",
+      "point": "邮箱缺少 @",
+      "backend": "后端拦截（邮箱格式不正确）",
+      "pass": true
+    },
+    {
+      "tc": "TC_PROF_003",
+      "point": "邮箱缺少域名后缀(student@tongji)",
+      "backend": "后端放行（success=true, HTTP 200）",
+      "pass": false
+    },
+    {
+      "tc": "TC_PROF_004",
+      "point": "邮箱空值保存",
+      "backend": "后端拦截（邮箱不能为空）",
+      "pass": true
+    },
+    {
+      "tc": "TC_WAL_003",
+      "point": "充值负数金额(-20)",
+      "backend": "后端拦截（充值金额需大于 0）",
+      "pass": true
+    },
+    {
+      "tc": "TC_WAL_004",
+      "point": "充值非数字字符串",
+      "backend": "后端拦截（服务器内部错误）",
+      "pass": true
+    },
+    {
+      "tc": "TC_WAL_005",
+      "point": "充值超大金额(99999999)",
+      "backend": "后端拦截（单笔充值不能超过 100,000）",
+      "pass": true
+    },
+    {
+      "tc": "TC_WAL_006",
+      "point": "充值小数位过多(10.123)",
+      "backend": "后端拦截（金额最多支持两位小数）",
+      "pass": true
+    },
+    {
+      "tc": "TC_AUTH_002",
+      "point": "学号为空提交",
+      "backend": "后端拦截（学号不能为空）",
+      "pass": true
+    },
+    {
+      "tc": "TC_AUTH_003",
+      "point": "学号超长(35位)",
+      "backend": "后端拦截（学号格式不合法）",
+      "pass": true
+    },
+    {
+      "tc": "TC_ORD_002",
+      "point": "发布者对自己帖子下单(自接单)",
+      "backend": "后端拦截（不能对自己发布的帖子下单/接单）",
+      "pass": true
+    },
+    {
+      "tc": "TC_ORD_003",
+      "point": "未实名账户下单",
+      "backend": "后端拦截（请先完成实名认证后再操作）",
+      "pass": true
+    },
+    {
+      "tc": "TC_ORD_FORBID",
+      "point": "越权接受不存在/他人订单(id=999999)",
+      "backend": "后端拦截（订单不存在）",
+      "pass": true
+    },
+    {
+      "tc": "TC_DIS_003",
+      "point": "越权对他人订单发起申诉(id=999999)",
+      "backend": "后端拦截（订单不存在）",
+      "pass": true
+    },
+    {
+      "tc": "TC_REP_002",
+      "point": "举报原因为空提交",
+      "backend": "后端拦截（请填写举报理由）",
+      "pass": true
+    },
+    {
+      "tc": "TC_HALL_003",
+      "point": "大厅乱码无结果检索",
+      "backend": "后端正常返回空集(list=0, HTTP 200)",
+      "pass": true
+    }
+  ]
+}

@@ -1,4 +1,6 @@
 <view class="hall {{themeCls}}">
+  <view wx:if="{{offline}}" class="offline-banner">网络连接已断开，请检查网络</view>
+  <view wx:elif="{{authExpired}}" class="auth-expired-banner" bindtap="onReLogin">登录已过期，点此重新登录</view>
   <view class="hall-header {{collapsed ? 'collapsed' : ''}}" style="padding-top: {{statusBarHeight}}px;">
     <view class="hall-nav"></view>
     <view class="hall-title">校园互助</view>
@@ -16,6 +18,7 @@
         confirm-type="search"
         bindconfirm="onSearch"
       />
+      <view wx:if="{{keyword}}" class="search-clear" catchtap="onClearKeyword">✕</view>
       <view wx:if="{{keyword}}" class="search-go" catchtap="onSearch">搜索</view>
     </view>
   </view>
@@ -68,6 +71,12 @@
       <view class="login-banner-btn" hover-class="btn-hover" bindtap="goLogin">去登录</view>
     </view>
 
+    <!-- 已有数据时切换筛选/排序：顶部细条即时反馈，避免弱网下像点了没反应（spec 修复7） -->
+    <view wx:if="{{loading && posts.length > 0}}" class="list-switching">
+      <view class="switching-bar"></view>
+      <text class="switching-text">加载中…</text>
+    </view>
+
     <skeleton wx:if="{{loading && posts.length === 0}}" count="3" />
 
     <empty-state
@@ -89,7 +98,10 @@
     >
       <view class="post-top">
         <view class="side-tag {{item.sideClass}}">{{item.sideText}}</view>
-        <view wx:if="{{item.hasPrice}}" class="price"><text class="price-yuan">¥</text>{{item.moneyText}}</view>
+        <view wx:if="{{item.hasPrice}}" class="price">
+          <text class="price-yuan">¥</text>{{item.moneyText}}
+          <text wx:if="{{item.priceHint}}" class="price-hint">{{item.priceHint}}</text>
+        </view>
         <view wx:else class="price-alt">{{item.priceAlt}}</view>
       </view>
       <view class="post-mid">
@@ -100,7 +112,15 @@
         <image wx:if="{{item.thumb}}" class="post-thumb" src="{{item.thumb}}" mode="aspectFill" />
       </view>
       <view class="post-foot">
-        <view class="ava" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
+        <image
+          wx:if="{{item.avatarUrl}}"
+          class="ava ava-img"
+          src="{{item.avatarUrl}}"
+          mode="aspectFill"
+          binderror="onAvatarError"
+          data-index="{{index}}"
+        />
+        <view wx:else class="ava" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
         <text class="pub-name">{{item.publisherName}}</text>
         <text class="credit">★ {{item.creditText}}</text>
         <text wx:if="{{item.publishText}}" class="pub-time">· {{item.publishText}}</text>
@@ -108,7 +128,8 @@
       </view>
     </view>
 
-    <view wx:if="{{hasMore}}" class="list-end">加载中…</view>
+    <view wx:if="{{loadingMore}}" class="list-end">加载中…</view>
+    <view wx:elif="{{hasMore}}" class="list-end">上拉加载更多</view>
     <view wx:elif="{{posts.length > 0}}" class="list-end">— 到底啦 —</view>
   </view>
 
@@ -127,6 +148,38 @@
     <view class="sheet-actions">
       <view class="btn ghost sheet-btn" hover-class="btn-hover" bindtap="resetTemp">重置</view>
       <view class="btn sheet-btn" hover-class="btn-hover" bindtap="applyFilter">确定{{tempCount > 0 ? '（' + tempCount + '）' : ''}}</view>
+    </view>
+  </view>
+
+  <!-- 首次启动新手引导：3 页说清 是什么 / 三种帖子 / 虚拟余额 -->
+  <view wx:if="{{showOnboard}}" class="ob-mask">
+    <view class="ob-card">
+      <swiper class="ob-swiper" indicator-dots indicator-active-color="#5B8CFF" circular="{{false}}" bindchange="onObSwipe">
+        <swiper-item>
+          <view class="ob-slide">
+            <view class="ob-emoji">🤝</view>
+            <view class="ob-title">校园互助</view>
+            <view class="ob-text">同学之间发任务、互相搭把手的小社区：取快递、辅导答疑、组队学习都可以。</view>
+          </view>
+        </swiper-item>
+        <swiper-item>
+          <view class="ob-slide">
+            <view class="ob-emoji">🏷️</view>
+            <view class="ob-title">三种帖子</view>
+            <view class="ob-text">悬赏：我出钱请人帮忙，接单完成可得赏金</view>
+            <view class="ob-text">服务：TA 提供服务，下单需要付费</view>
+            <view class="ob-text">互助：免费搭把手，不涉及钱</view>
+          </view>
+        </swiper-item>
+        <swiper-item>
+          <view class="ob-slide">
+            <view class="ob-emoji">💰</view>
+            <view class="ob-text-strong">余额是虚拟的，充值不花真钱</view>
+            <view class="ob-text">交易金额会先由平台冻结托管，双方确认完成后才到账，安心交易。</view>
+          </view>
+        </swiper-item>
+      </swiper>
+      <button class="btn ob-btn" bindtap="closeOnboard">{{obIndex >= 2 ? '开始使用' : '我知道了'}}</button>
     </view>
   </view>
 </view>

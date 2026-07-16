@@ -153,9 +153,9 @@
   font-size: 22rpx;
 }
 
-.task {
+.partner {
   margin-top: 8rpx;
-  color: var(--brand);
+  color: var(--muted);
   font-size: 24rpx;
 }
 
@@ -202,4 +202,98 @@
   font-size: 22rpx;
   color: var(--faint);
   margin-left: auto;
+}
+
+/* 顶部两概览：待我处理（优先） + 未读 */
+.overview {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.ov-card {
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 22rpx 26rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  border: 2rpx solid transparent;
+}
+
+.ov-card.active {
+  border-color: var(--brand);
+}
+
+.ov-num {
+  font-size: 46rpx;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.ov-card.primary .ov-num {
+  color: var(--brand);
+}
+
+.ov-label {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+/* 三标签：待处理 / 未读 / 全部 */
+.tabs {
+  display: flex;
+  gap: 8rpx;
+  background: var(--field);
+  border-radius: 999rpx;
+  padding: 6rpx;
+  margin-bottom: 20rpx;
+}
+
+.tab {
+  flex: 1;
+  height: 60rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+}
+
+.tab.on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: var(--shadow-card);
+}
+
+.tab-dot {
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  background: #e84f3d;
+  color: #ffffff;
+  font-size: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 会话行内的待处理标签 */
+.todo-tag {
+  display: inline-block;
+  margin-left: 10rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 999rpx;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 20rpx;
+  font-weight: 600;
+  vertical-align: middle;
 }

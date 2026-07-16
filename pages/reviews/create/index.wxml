@@ -4,24 +4,32 @@
     <view wx:if="{{hasReviewed}}" class="reviewed">你已经评价过该订单</view>
     <view class="field">
       <text class="label">评分</text>
-      <picker range="{{ratings}}" value="{{ratingIndex}}" bindchange="onRatingChange">
-        <view class="picker-box">{{ratings[ratingIndex]}} 星</view>
-      </picker>
+      <view class="stars {{hasReviewed ? 'stars-off' : ''}}">
+        <view
+          wx:for="{{stars}}"
+          wx:key="*this"
+          class="star {{item <= rating ? 'on' : ''}}"
+          data-value="{{item}}"
+          catchtap="onStarTap"
+        >★</view>
+        <text class="star-hint">{{rating ? rating + ' 星' : '请点击星星评分'}}</text>
+      </view>
     </view>
     <view class="field">
       <text class="label">评价内容</text>
-      <textarea class="textarea" placeholder="说说这次互助体验" value="{{content}}" bindinput="onContentInput" />
+      <textarea class="textarea" placeholder="说说这次互助体验" value="{{content}}" maxlength="{{maxContent}}" auto-height disabled="{{hasReviewed}}" bindinput="onContentInput" />
+      <view class="char-count">{{contentLen}}/{{maxContent}}</view>
     </view>
     <view class="field">
       <text class="label">图片（选填，最多 {{maxImages}} 张）</text>
       <view class="img-grid">
         <view wx:for="{{images}}" wx:key="index" class="img-cell">
           <image src="{{item}}" mode="aspectFill" bindtap="previewImage" data-index="{{index}}" />
-          <view class="img-del" catchtap="removeImage" data-index="{{index}}">✕</view>
+          <view wx:if="{{!hasReviewed}}" class="img-del" catchtap="removeImage" data-index="{{index}}">✕</view>
         </view>
-        <view wx:if="{{images.length < maxImages}}" class="img-add" hover-class="btn-hover" bindtap="addImage">＋</view>
+        <view wx:if="{{images.length < maxImages && !hasReviewed}}" class="img-add" hover-class="btn-hover" bindtap="addImage">＋</view>
       </view>
     </view>
-    <button class="btn" bindtap="submit" disabled="{{submitting}}" loading="{{submitting}}">提交评价</button>
+    <button class="btn" bindtap="submit" disabled="{{submitting || hasReviewed}}" loading="{{submitting}}">{{hasReviewed ? '已评价' : '提交评价'}}</button>
   </view>
 </view>

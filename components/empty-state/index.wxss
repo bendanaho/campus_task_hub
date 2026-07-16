@@ -20,13 +20,16 @@
 .es-sub {
   margin-top: 10rpx;
   font-size: 25rpx;
-  color: var(--faint);
+  /* --faint(#98A2B5)≈2.56:1 不达 WCAG AA，提到 --muted(#66718A)≈4.7:1（修复7-a11y） */
+  color: var(--muted);
   text-align: center;
   line-height: 1.5;
 }
 
 .es-btn {
   margin-top: 32rpx;
+  /* 改用 <button> 补无障碍语义（修复9）；button 默认整宽，这里 width:auto 保留胶囊形 */
+  width: auto;
   min-width: 200rpx;
   min-height: 60rpx;
   padding: 0 32rpx;

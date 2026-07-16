@@ -1,4 +1,6 @@
 <view class="page {{themeCls}}">
+  <view wx:if="{{offline}}" class="offline-banner">网络连接已断开，请检查网络</view>
+  <view wx:elif="{{authExpired}}" class="auth-expired-banner" bindtap="onReLogin">登录已过期，点此重新登录</view>
   <view class="chat-header">
     <view class="chat-title">聊天</view>
     <view class="chat-tools">
@@ -17,55 +19,67 @@
       <view class="search-icon"></view>
       <input class="search-input" placeholder="搜索联系人、任务或消息" value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" bindfocus="onSearchFocus" bindblur="onSearchBlur" />
     </view>
-
     <view wx:if="{{searchFocus && !keyword && searchHistory.length > 0}}" class="hist-row">
       <view wx:for="{{searchHistory}}" wx:key="*this" class="hist-chip" catchtap="onHistTap" data-term="{{item}}">{{item}}</view>
       <view class="hist-clear" catchtap="onHistClear">清空</view>
     </view>
-    <view class="conversation card section sys-entry" bindtap="openSystem" hover-class="card-hover">
-      <view class="avatar sys-avatar">🔔</view>
-      <view class="main">
-        <view class="space-between">
-          <text class="name">系统通知</text>
-          <text wx:if="{{sysConv}}" class="muted time">{{sysConv.lastTimeText}}</text>
-        </view>
-        <view class="last">{{sysConv.lastMessage || '订单动态和平台通知会显示在这里'}}</view>
-      </view>
-      <view wx:if="{{sysConv.unreadCount > 0}}" class="badge">{{sysConv.unreadCount}}</view>
-    </view>
 
     <view wx:if="{{loading && conversations.length == 0}}" class="empty">正在加载会话...</view>
-    <empty-state
-      wx:elif="{{conversations.length == 0 && !keyword}}"
-      emoji="💬"
-      title="暂无会话"
-      sub="去大厅找任务，联系发布者"
-      btn-text="去大厅"
-      bind:action="goHall"
-    />
-    <view wx:elif="{{conversations.length == 0 && keyword}}" class="empty">没有匹配「{{keyword}}」的会话</view>
+    <block wx:elif="{{conversations.length == 0}}">
+      <view wx:if="{{keyword}}" class="empty">没有匹配「{{keyword}}」的会话</view>
+      <empty-state
+        wx:else
+        emoji="💬"
+        title="暂无会话"
+        sub="去大厅找任务，联系发布者"
+        btn-text="去大厅"
+        bind:action="goHall"
+      />
+    </block>
 
-    <view wx:for="{{conversations}}" wx:key="id" class="swipe-item section">
-      <view class="swipe-del" data-id="{{item.id}}" catchtap="deleteConv">删除</view>
+    <block wx:for="{{conversations}}" wx:key="id">
+      <!-- 系统通知：内联展示，不单独占栏、不可左滑删除 -->
       <view
-        class="conversation card swipe-content {{swipeId === item.id ? 'open' : ''}}"
+        wx:if="{{item.isSys}}"
+        class="conversation card section sys-entry"
         data-id="{{item.id}}"
         bindtap="openRoom"
-        bindtouchstart="onConvTouchStart"
-        bindtouchend="onConvTouchEnd"
         hover-class="card-hover"
       >
-        <ua-avatar avatar="{{item.partnerAvatar}}" name="{{item.partnerName}}" uid="{{item.partnerId}}" size="{{86}}" />
+        <view class="avatar sys-avatar">🔔</view>
         <view class="main">
           <view class="space-between">
-            <text class="name">{{item.partnerName}}</text>
+            <text class="name">系统通知</text>
             <text class="muted time">{{item.lastTimeText}}</text>
           </view>
-          <view class="task">{{item.taskTitle || '普通会话'}}</view>
-          <view class="last">{{item.lastMessage || '还没有消息'}}</view>
+          <view class="last">{{item.lastMessage || '订单动态和平台通知会显示在这里'}}</view>
         </view>
         <view wx:if="{{item.unreadCount > 0}}" class="badge">{{item.unreadCount}}</view>
       </view>
-    </view>
+
+      <!-- 普通会话：保留左滑删除 -->
+      <view wx:else class="swipe-item section">
+        <view class="swipe-del" data-id="{{item.id}}" catchtap="deleteConv">删除</view>
+        <view
+          class="conversation card swipe-content {{swipeId === item.id ? 'open' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="openRoom"
+          bindtouchstart="onConvTouchStart"
+          bindtouchend="onConvTouchEnd"
+          hover-class="card-hover"
+        >
+          <ua-avatar avatar="{{item.partnerAvatar}}" name="{{item.partnerName}}" uid="{{item.partnerId}}" size="{{86}}" />
+          <view class="main">
+            <view class="space-between">
+              <text class="name">{{item.taskTitle || '普通会话'}}</text>
+              <text class="muted time">{{item.lastTimeText}}</text>
+            </view>
+            <view class="partner">{{item.partnerName}}<text wx:if="{{item.todoTag}}" class="todo-tag">{{item.todoTag}}</text></view>
+            <view class="last">{{item.lastMessage || '还没有消息'}}</view>
+          </view>
+          <view wx:if="{{item.unreadCount > 0}}" class="badge">{{item.unreadCount}}</view>
+        </view>
+      </view>
+    </block>
   </block>
 </view>

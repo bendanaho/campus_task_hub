@@ -29,6 +29,21 @@
       </view>
     </view>
 
+    <view wx:if="{{profile.photos.length}}" class="card section">
+      <view class="block-title">展示照片</view>
+      <view class="photo-grid">
+        <image
+          wx:for="{{profile.photos}}"
+          wx:key="index"
+          class="photo-img"
+          src="{{item}}"
+          mode="aspectFill"
+          bindtap="previewPhoto"
+          data-index="{{index}}"
+        />
+      </view>
+    </view>
+
     <view class="card section">
       <view class="block-title">收到的评价</view>
       <view wx:if="{{reviews.length == 0}}" class="review-empty">暂无评价</view>

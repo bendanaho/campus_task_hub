@@ -20,11 +20,36 @@
   font-weight: 650;
 }
 
-.picker-box {
-  min-height: 76rpx;
-  padding: 0 20rpx;
-  border-radius: 10rpx;
-  background: var(--field);
+.stars {
   display: flex;
   align-items: center;
+  min-height: 76rpx;
+}
+
+.star {
+  font-size: 56rpx;
+  line-height: 1;
+  color: var(--line);
+  padding: 4rpx 8rpx;
+}
+
+.star.on {
+  color: var(--amber);
+}
+
+.stars-off {
+  opacity: 0.5;
+}
+
+.star-hint {
+  margin-left: 16rpx;
+  font-size: 24rpx;
+  color: var(--faint);
+}
+
+.char-count {
+  margin-top: 8rpx;
+  text-align: right;
+  font-size: 22rpx;
+  color: var(--faint);
 }

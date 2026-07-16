@@ -4,6 +4,12 @@ function conversations() {
   return request({ url: '/api/conversations', method: 'GET' })
 }
 
+// 消息中心聚合接口：一次返回会话 + 未读数 + 订单快照 + 是否已评价，
+// 避免"会话列表 + 逐条未读"的多次请求，显著加快消息中心加载。
+function enrichedConversations() {
+  return request({ url: '/api/conversations/enriched', method: 'GET' })
+}
+
 function ensureConversation(data) {
   return request({
     url: '/api/conversations/ensure',
@@ -19,11 +25,17 @@ function messages(chatId) {
   })
 }
 
-function sendMessage(chatId, content) {
+// 第三参 type 支持图片等非文本消息（type==='image' 时 content 传图片 URL）；
+// 不传 type 时后端按 text 处理，保持既有文本发送调用兼容。
+function sendMessage(chatId, content, type) {
+  const data = { content: content }
+  if (type) {
+    data.type = type
+  }
   return request({
     url: '/api/conversations/' + encodeURIComponent(chatId) + '/messages',
     method: 'POST',
-    data: { content: content }
+    data: data
   })
 }
 
@@ -62,6 +74,7 @@ function withdraw(messageId) {
 
 module.exports = {
   conversations,
+  enrichedConversations,
   ensureConversation,
   messages,
   sendMessage,

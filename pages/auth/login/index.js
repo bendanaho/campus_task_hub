@@ -15,9 +15,19 @@ function goAfterLogin(redirect) {
   const path = target.split('?')[0]
   if (tabPages.indexOf(path) >= 0) {
     wx.switchTab({ url: path })
-  } else {
-    wx.redirectTo({ url: target })
+    return
   }
+  // 非 tab 页：若回跳目标恰为登录页下方的上一页，直接 navigateBack，
+  // 避免用 redirectTo 把同一页面再 push 一份、造成实例重复堆叠。
+  const pages = getCurrentPages()
+  if (pages && pages.length >= 2) {
+    const prev = pages[pages.length - 2]
+    if (prev && ('/' + prev.route) === path) {
+      wx.navigateBack()
+      return
+    }
+  }
+  wx.redirectTo({ url: target })
 }
 
 Page({
@@ -25,6 +35,7 @@ Page({
     account: '',
     password: '',
     redirect: '',
+    showPwd: false,
     submitting: false
   },
 
@@ -42,23 +53,33 @@ Page({
     this.setData({ password: e.detail.value })
   },
 
+  togglePwd() {
+    this.setData({ showPwd: !this.data.showPwd })
+  },
+
   submit() {
     if (this.data.submitting) {
       return
     }
-    if (!this.data.account || !this.data.password) {
+    const account = (this.data.account || '').trim()
+    if (!account || !this.data.password) {
       wx.showToast({ title: '请输入账号和密码', icon: 'none' })
       return
     }
-    this.setData({ submitting: true })
+    // 回写 trim 后的账号，保证界面与上送一致
+    this.setData({ account: account, submitting: true })
+    const redirect = this.data.redirect
     authService.login({
-      account: this.data.account,
+      account: account,
       password: this.data.password
     }).then((data) => {
       auth.setSession(data)
       socket.connect()
+      // 先让“登录成功”toast 展示完整，再跳转（switchTab 会连带把 toast 吞掉）
       wx.showToast({ title: '登录成功', icon: 'success' })
-      goAfterLogin(this.data.redirect)
+      setTimeout(function () {
+        goAfterLogin(redirect)
+      }, 700)
     }).catch(function () {
     }).finally(() => {
       this.setData({ submitting: false })

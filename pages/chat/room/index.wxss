@@ -37,6 +37,20 @@
   padding: 4rpx 14rpx;
 }
 
+/* 可点的"有新评价"胶囊：与纯状态标记(交易成功)视觉区分，并放大点击区 */
+.review-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48rpx;
+  padding: 10rpx 22rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--brand);
+  color: var(--brand);
+  font-size: 24rpx;
+  font-weight: 700;
+  border-radius: 999rpx;
+}
+
 .head-actions {
   display: flex;
   align-items: center;
@@ -163,18 +177,20 @@
   opacity: 0.65;
 }
 
-.failed-badge {
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 50%;
-  background: var(--reward);
-  color: var(--surface);
-  font-size: 26rpx;
-  font-weight: 800;
+/* 发送失败：气泡描边标红 + 下方可见文案；整条气泡与文案均可点重发 */
+.bubble.is-failed {
+  border: 1rpx solid var(--reward);
+}
+
+.failed-hint {
+  margin-top: 8rpx;
+  min-height: 44rpx;
+  padding: 6rpx 4rpx;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  color: var(--reward);
+  font-size: 22rpx;
+  font-weight: 600;
 }
 
 .mine .bubble {
@@ -188,14 +204,52 @@
   color: var(--ink);
 }
 
-.payment-title {
+/* 图片消息：去掉气泡底色/边框/内边距，直接展示图片本身 */
+.mine .bubble.is-image,
+.other .bubble.is-image {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.msg-image {
+  display: block;
+  width: 340rpx;
+  max-width: 60vw;
+  border-radius: 14rpx;
+  background: var(--field);
+}
+
+/* 金额内联在类型后面：转账 ¥50.00 */
+.pay-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
   font-weight: 800;
 }
 
-.payment-money {
-  margin: 12rpx 0;
-  font-size: 36rpx;
+.pay-kind {
+  font-size: 30rpx;
+}
+
+.pay-amount {
+  font-size: 34rpx;
   font-weight: 850;
+}
+
+/* 转账说明（后端返回 note 时显示，无则整行不渲染）；用继承色 + 透明度，
+   使其在“我方”粉底白字与“对方”白底深字两种气泡里都清晰 */
+.pay-note {
+  margin-top: 8rpx;
+  font-size: 25rpx;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
+.pay-status {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  opacity: 0.75;
 }
 
 .payment-actions {
@@ -239,33 +293,94 @@
   padding: 0;
 }
 
+/* 仿微信：输入框在左，右侧「表情」「+」；发送走键盘回车/表情面板内发送键 */
 .input-bar {
   flex: none;
   display: grid;
-  grid-template-columns: 68rpx minmax(0, 1fr) 112rpx;
+  grid-template-columns: minmax(0, 1fr) 68rpx 68rpx;
   gap: 12rpx;
   align-items: center;
 }
 
-.emoji-toggle {
+.io-btn {
   width: 68rpx;
   height: 68rpx;
   border-radius: 50%;
   background: var(--surface);
   border: 1rpx solid var(--line);
-  font-size: 38rpx;
+  font-size: 40rpx;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+/* 「+」按钮用主题强调色，随换肤一起变色 */
+.io-plus {
+  color: var(--brand);
+  border-color: var(--brand-soft);
+  background: var(--brand-soft);
+  font-weight: 700;
+}
+
+.io-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+}
+
+/* 「+」面板：转账 / 图片，仿微信九宫格入口 */
+.more-panel {
+  flex: none;
+  margin-bottom: 14rpx;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 24rpx 16rpx;
+  display: flex;
+  gap: 32rpx;
+}
+
+.more-item {
+  width: 128rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.more-icon {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 24rpx;
+  background: var(--field);
+  font-size: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.more-label {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
 .emoji-panel {
   flex: none;
-  margin-top: 14rpx;
+  position: relative;
+  /* 面板已上移到输入栏上方，与输入栏之间留出间距 */
+  margin-bottom: 14rpx;
   background: var(--surface);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 16rpx;
+}
+
+/* 表情多了以后面板限高滚动，不挤没消息区 */
+.emoji-scroll {
+  max-height: 420rpx;
+}
+
+.emoji-grid {
   display: flex;
   flex-wrap: wrap;
 }
@@ -276,6 +391,20 @@
   font-size: 44rpx;
   line-height: 1;
   padding: 14rpx 0;
+}
+
+/* 面板内发送键：输入非空时出现（键盘收起也能发出纯表情消息） */
+.emoji-send {
+  position: absolute;
+  right: 20rpx;
+  bottom: 20rpx;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  padding: 12rpx 34rpx;
+  box-shadow: var(--shadow-card);
 }
 
 .message-input {
@@ -315,4 +444,16 @@
   border: 1rpx solid var(--line);
   border-radius: 999rpx;
   padding: 10rpx 24rpx;
+}
+
+/* 图片消息加载失败提示（点击仍可预览强制拉取） */
+.img-fail-hint {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--faint);
+}
+
+/* 灰底占位给个最小高度，加载中不至于塌成细条 */
+.msg-image {
+  min-height: 200rpx;
 }

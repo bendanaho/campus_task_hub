@@ -1,6 +1,17 @@
 const config = require('../config/index')
 const auth = require('./auth')
 
+// 面向用户的错误文案统一在此维护，保证全局口径一致（修复8）。
+// 状态码 / errorCode 只写进日志（logWarn），不暴露给终端用户。
+const MSG = {
+  NETWORK: '网络开小差了，请稍后重试',
+  SERVER: '服务开小差了，请稍后重试',
+  LOGIN_REQUIRED: '请先登录',
+  FORBIDDEN: '没有权限进行此操作',
+  VERIFY_REQUIRED: '请先完成实名认证',
+  DEFAULT_FAIL: '请求失败'
+}
+
 let loadingCount = 0
 let realtimeLogger = null
 let realtimeLoggerInited = false
@@ -62,41 +73,76 @@ function hideRequestLoading() {
   }
 }
 
+// 错误提示与 loading 共用微信的提示通道：并发失败时若 loading 遮罩仍在，
+// showToast 会被遮罩顶掉、或随后 hideLoading 把这条 toast 一并关掉（修复4）。
+// 因此提示前先强制收起 loading，再弹 toast。
+function ensureLoadingHidden() {
+  if (loadingCount > 0) {
+    loadingCount = 0
+    wx.hideLoading()
+  }
+}
+
+function toast(title) {
+  ensureLoadingHidden()
+  wx.showToast({ title: title, icon: 'none' })
+}
+
+// 鉴权失败清 session 后标记登录态失效，让顶层页刷新 loggedIn / 显示温和横幅（修复7）。
+function markAuthExpired() {
+  try {
+    const app = getApp()
+    if (app && typeof app.markAuthExpired === 'function') {
+      app.markAuthExpired()
+    }
+  } catch (e) {
+    // 无 app 实例时忽略，不影响主流程
+  }
+}
+
 function handleHttpError(url, method, statusCode, reject, silentAuth) {
   logWarn(url, method, statusCode, 'HTTP ' + statusCode)
 
-  if (statusCode === 401 || statusCode === 403) {
+  if (statusCode === 401) {
+    // 401 = 未登录 / 登录失效：清 session，非静默时跳登录（修复1）
     auth.clearSession()
+    markAuthExpired()
     if (!silentAuth) {
-      wx.showToast({ title: '请先登录', icon: 'none' })
+      toast(MSG.LOGIN_REQUIRED)
       auth.goLogin()
     }
+  } else if (statusCode === 403) {
+    // 403 = 已登录但无权限：仅提示，不清 session、不跳登录（修复1）
+    if (!silentAuth) {
+      toast(MSG.FORBIDDEN)
+    }
   } else if (!silentAuth) {
-    wx.showToast({ title: '服务异常(' + statusCode + ')', icon: 'none' })
+    toast(MSG.SERVER)
   }
 
-  reject({ statusCode: statusCode, message: '服务异常(' + statusCode + ')' })
+  reject({ statusCode: statusCode, message: 'HTTP ' + statusCode })
 }
 
 function handleBusinessError(url, method, body, reject, silentAuth) {
-  const message = body && body.message ? body.message : '请求失败'
+  const message = body && body.message ? body.message : MSG.DEFAULT_FAIL
   const errorCode = body ? body.errorCode : 0
 
   logWarn(url, method, errorCode, message)
 
   if (errorCode === 1002 || errorCode === 2005) {
     auth.clearSession()
+    markAuthExpired()
     if (!silentAuth) {
-      wx.showToast({ title: '请先登录', icon: 'none' })
+      toast(MSG.LOGIN_REQUIRED)
       auth.goLogin()
     }
   } else if (silentAuth) {
     // 后台静默请求：不打扰用户，交给调用方兜底
   } else if (errorCode === 2006) {
-    wx.showToast({ title: '请先完成实名认证', icon: 'none' })
+    toast(MSG.VERIFY_REQUIRED)
     wx.navigateTo({ url: '/pages/user/verify/index' })
   } else {
-    wx.showToast({ title: message, icon: 'none' })
+    toast(message)
   }
 
   reject(body || { message: message, errorCode: errorCode })
@@ -112,8 +158,8 @@ function request(options) {
 
   return new Promise(function (resolve, reject) {
     if (isOffline()) {
-      wx.showToast({ title: '当前网络不可用', icon: 'none' })
-      reject({ message: '当前网络不可用', offline: true })
+      toast(MSG.NETWORK)
+      reject({ message: MSG.NETWORK, offline: true })
       return
     }
 
@@ -168,7 +214,7 @@ function request(options) {
           const errMsg = err && err.errMsg ? err.errMsg : 'request:fail'
           logWarn(options.url, method, 'NETWORK', errMsg)
           done()
-          wx.showToast({ title: '网络不给力，请稍后再试', icon: 'none' })
+          toast(MSG.NETWORK)
           reject(err)
         }
       })

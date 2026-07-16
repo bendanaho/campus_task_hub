@@ -2,6 +2,7 @@
   --surface: #ffffff;
   --line: #E7ECF4;
   --faint: #98A2B5;
+  --muted: #66718A;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -48,8 +49,9 @@
 }
 
 .tab-text {
-  font-size: 21rpx;
-  color: var(--faint);
+  font-size: 22rpx;
+  /* --faint(#98A2B5)≈2.56:1 不达 WCAG AA，未选中文字提到 --muted(#66718A)≈4.7:1（修复5-a11y） */
+  color: var(--muted);
   line-height: 1.2;
 }
 
@@ -109,6 +111,8 @@
   --surface: #1C2230;
   --line: #2A3346;
   --faint: #77839A;
+  /* 深色下未选中文字用更亮的 muted，保证与 #1C2230 底对比达标 */
+  --muted: #9AA5B8;
 }
 
 
@@ -142,4 +146,36 @@
 .tab-bar.accent-dark .publish-fab {
   background: linear-gradient(160deg, #5B8CFF, #2E4E9E);
   box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.5);
+}
+
+/* 新增背景色 b6~b10 的选中文字色与发布 + 按钮渐变，随换肤一起变色 */
+.tab-bar.accent-b6 .tab-item.on .tab-text { color: #7D5FD1; }
+.tab-bar.accent-b7 .tab-item.on .tab-text { color: #0FA189; }
+.tab-bar.accent-b8 .tab-item.on .tab-text { color: #E9752E; }
+.tab-bar.accent-b9 .tab-item.on .tab-text { color: #566378; }
+.tab-bar.accent-b10 .tab-item.on .tab-text { color: #C99A15; }
+
+.tab-bar.accent-b6 .publish-fab {
+  background: linear-gradient(160deg, #A78BE8, #5E43B0);
+  box-shadow: 0 10rpx 24rpx rgba(94, 67, 176, 0.4);
+}
+
+.tab-bar.accent-b7 .publish-fab {
+  background: linear-gradient(160deg, #43C7B0, #077E6B);
+  box-shadow: 0 10rpx 24rpx rgba(7, 126, 107, 0.4);
+}
+
+.tab-bar.accent-b8 .publish-fab {
+  background: linear-gradient(160deg, #F5A063, #C25A1B);
+  box-shadow: 0 10rpx 24rpx rgba(194, 90, 27, 0.4);
+}
+
+.tab-bar.accent-b9 .publish-fab {
+  background: linear-gradient(160deg, #7C8AA0, #3D485A);
+  box-shadow: 0 10rpx 24rpx rgba(61, 72, 90, 0.4);
+}
+
+.tab-bar.accent-b10 .publish-fab {
+  background: linear-gradient(160deg, #E4BC4A, #A17A0C);
+  box-shadow: 0 10rpx 24rpx rgba(161, 122, 12, 0.4);
 }

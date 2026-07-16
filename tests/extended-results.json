@@ -1,0 +1,131 @@
+{
+  "passed": 25,
+  "failed": 0,
+  "records": [
+    {
+      "name": "接受订单后：付款方(张三)余额精确 −报酬（冻结）",
+      "ok": true,
+      "detail": "¥74→¥67（冻结7）"
+    },
+    {
+      "name": "冻结阶段：收款方(李四)余额不变",
+      "ok": true,
+      "detail": "保持 ¥96"
+    },
+    {
+      "name": "双方确认完成后：收款方(李四)余额精确 +报酬（结算）",
+      "ok": true,
+      "detail": "¥96→¥103（结算7）"
+    },
+    {
+      "name": "结算后：付款方(张三)不再退款，净支出=报酬",
+      "ok": true,
+      "detail": "净支出 ¥7"
+    },
+    {
+      "name": "账单流水：收款方生成一笔 in/order 金额=报酬",
+      "ok": true,
+      "detail": "direction=in, amount=¥7, category=order"
+    },
+    {
+      "name": "订单在双方“我的订单”均可见",
+      "ok": true,
+      "detail": "发布方/接单方各自可见"
+    },
+    {
+      "name": "跨端一致性：帖子详情可被任意端读到同一条数据",
+      "ok": true,
+      "detail": "postId=29 详情可读"
+    },
+    {
+      "name": "重复评价同一订单被拒",
+      "ok": true,
+      "detail": "第二次评价被拦截"
+    },
+    {
+      "name": "余额不足时接受订单失败（BALANCE_NOT_ENOUGH）",
+      "ok": true,
+      "detail": "余额不足"
+    },
+    {
+      "name": "接受失败后：付款方余额未被扣减",
+      "ok": true,
+      "detail": "保持 ¥103"
+    },
+    {
+      "name": "接受→双方确认全程，双方余额均不变",
+      "ok": true,
+      "detail": "双方均保持（A ¥67 / B ¥103）"
+    },
+    {
+      "name": "非发布者(王五)不能接受订单（FORBIDDEN）",
+      "ok": true,
+      "detail": "无权访问该资源"
+    },
+    {
+      "name": "非参与者(王五)不能取消订单",
+      "ok": true,
+      "detail": "无权访问该资源"
+    },
+    {
+      "name": "发布者正常接受订单（→ in_progress）",
+      "ok": true,
+      "detail": "in_progress"
+    },
+    {
+      "name": "重复接受同一订单被拒（非法状态流转）",
+      "ok": true,
+      "detail": "订单当前状态不可操作"
+    },
+    {
+      "name": "进行中订单不能被取消（cancel 仅限 pending）",
+      "ok": true,
+      "detail": "订单当前状态不可操作"
+    },
+    {
+      "name": "完成后重复确认被拒（不会重复打款）",
+      "ok": true,
+      "detail": "订单当前状态不可操作"
+    },
+    {
+      "name": "接单者可取消待接受订单（→ cancelled）",
+      "ok": true,
+      "detail": "cancelled"
+    },
+    {
+      "name": "取消后双方余额不变（冻结发生在接受，取消早于冻结）",
+      "ok": true,
+      "detail": "A ¥64 / B ¥106"
+    },
+    {
+      "name": "已取消订单不能再被接受",
+      "ok": true,
+      "detail": "订单当前状态不可操作"
+    },
+    {
+      "name": "新注册用户默认 authStatus=unverified",
+      "ok": true,
+      "detail": "unverified"
+    },
+    {
+      "name": "未实名用户不能创建订单（VERIFICATION_REQUIRED）",
+      "ok": true,
+      "detail": "请先完成实名认证后再操作"
+    },
+    {
+      "name": "无 token 访问受保护接口被拒",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "错误密码登录被拒",
+      "ok": true,
+      "detail": "被拒"
+    },
+    {
+      "name": "普通用户访问管理员接口被拒（越权拦截）",
+      "ok": true,
+      "detail": "status=403"
+    }
+  ]
+}

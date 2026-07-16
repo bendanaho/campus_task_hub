@@ -31,17 +31,21 @@ function emit(type, msg) {
 }
 
 function openSocket() {
+  // 用局部 s 持有本次连接实例：resetAndReconnect 主动重建时，旧 socket 的
+  // 异步 onClose 才不会把新建立的连接 socket 误置为 null（避免竞态）。
+  let s
   try {
-    socket = wx.connectSocket({ url: wsUrl(connectedUserId) })
+    s = wx.connectSocket({ url: wsUrl(connectedUserId) })
   } catch (e) {
     socket = null
     scheduleReconnect()
     return
   }
-  socket.onOpen(function () {
+  socket = s
+  s.onOpen(function () {
     reconnectAttempts = 0
   })
-  socket.onMessage(function (res) {
+  s.onMessage(function (res) {
     try {
       const msg = JSON.parse(res.data)
       if (msg && msg.type) {
@@ -51,13 +55,15 @@ function openSocket() {
       // 非 JSON 消息忽略
     }
   })
-  socket.onClose(function () {
-    socket = null
-    scheduleReconnect()
+  s.onClose(function () {
+    if (socket === s) {
+      socket = null
+      scheduleReconnect()
+    }
   })
-  socket.onError(function () {
+  s.onError(function () {
     try {
-      if (socket) socket.close({})
+      if (s) s.close({})
     } catch (e) {
     }
   })
@@ -109,6 +115,26 @@ function close() {
   connectedUserId = null
 }
 
+// 网络由断→通时调用（见 app.js onNetworkStatusChange）：重置退避、清待重连 timer、
+// 立即重连，避免命中指数退避最长等 30s 才恢复实时通知（修复3）。
+function resetAndReconnect() {
+  reconnectAttempts = 0
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  const user = auth.getUser()
+  if (!user || !user.id) {
+    return
+  }
+  // 强制重建：close() 会断开可能已失效的旧连接，随后立即重新建立
+  close()
+  manualClose = false
+  connectedUserId = user.id
+  reconnectAttempts = 0
+  openSocket()
+}
+
 // 订阅某类消息，返回取消订阅函数
 function on(type, fn) {
   ;(handlers[type] = handlers[type] || []).push(fn)
@@ -124,5 +150,6 @@ function on(type, fn) {
 module.exports = {
   connect,
   close,
+  resetAndReconnect,
   on
 }

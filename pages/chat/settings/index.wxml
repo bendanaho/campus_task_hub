@@ -19,7 +19,7 @@
         <view class="setting-title">未读消息角标</view>
         <view class="setting-sub">在底部「消息」上显示未读数量红点</view>
       </view>
-      <switch checked="{{badgeEnabled}}" color="#2E6BFF" bindchange="onBadgeChange" />
+      <switch checked="{{badgeEnabled}}" color="{{brandColor}}" bindchange="onBadgeChange" />
     </view>
   </view>
 
@@ -29,7 +29,17 @@
         <view class="setting-title">进入会话自动已读</view>
         <view class="setting-sub">关闭后需手动使用消息页的清除未读</view>
       </view>
-      <switch checked="{{autoRead}}" color="#2E6BFF" bindchange="onAutoReadChange" />
+      <switch checked="{{autoRead}}" color="{{brandColor}}" bindchange="onAutoReadChange" />
+    </view>
+  </view>
+
+  <view class="card section">
+    <view class="setting-row">
+      <view>
+        <view class="setting-title">互动消息</view>
+        <view class="setting-sub">接收订单、评价等互动通知</view>
+      </view>
+      <switch checked="{{interactionEnabled}}" color="{{brandColor}}" bindchange="onInteractionChange" />
     </view>
   </view>
 

@@ -36,6 +36,13 @@
   font-weight: 800;
 }
 
+/* 面议/纯互助：与列表页 price-alt 一致，绿色文字而非 ¥0.00（spec 修复2） */
+.reward-alt {
+  color: #0A9463;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
 .info-grid {
   margin-top: 26rpx;
   display: grid;
@@ -128,9 +135,28 @@
   font-weight: 600;
 }
 
+/* 举报入口：提升对比度并放大点击区，让安全动作更易发现（spec 修复12） */
 .report-link {
   text-align: center;
+  color: var(--muted);
+  font-size: 25rpx;
+  text-decoration: underline;
+  padding: 30rpx 0;
+}
+
+/* 金额方向标 + 双按钮区别说明 */
+.reward-hint {
+  margin-left: 8rpx;
+  font-size: 20rpx;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.action-hint {
+  margin-top: -6rpx;
+  padding: 0 8rpx 4rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
   color: var(--faint);
-  font-size: 23rpx;
-  padding: 4rpx 0 20rpx;
+  text-align: center;
 }

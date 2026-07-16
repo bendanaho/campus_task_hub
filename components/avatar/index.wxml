@@ -4,6 +4,7 @@
   style="width: {{size}}rpx; height: {{size}}rpx;"
   src="{{d.src}}"
   mode="aspectFill"
+  binderror="onImgError"
 />
 <view
   wx:else

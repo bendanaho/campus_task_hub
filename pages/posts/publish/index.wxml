@@ -7,7 +7,7 @@
 
   <view wx:elif="{{!verified}}" class="card gate">
     <view class="gate-title">完成实名认证后才能发布</view>
-    <view class="muted">后端要求发布、下单、支付等交易操作必须实名。</view>
+    <view class="muted">为保障同学间交易安全，发布、接单、支付前需先完成实名认证（仅需姓名和学号）。</view>
     <button class="btn gate-btn" bindtap="goVerify">去认证</button>
   </view>
 
@@ -27,15 +27,18 @@
       </view>
       <view class="field">
         <text class="label">标题</text>
-        <input class="input" placeholder="一句话说清楚需求或服务" value="{{title}}" data-key="title" bindinput="onInput" />
+        <input class="input" placeholder="一句话说清楚需求或服务" value="{{title}}" data-key="title" bindinput="onInput" maxlength="30" />
+        <view class="counter {{title.length >= 27 ? 'counter-warn' : ''}}">{{title.length}}/30</view>
       </view>
       <view class="field">
         <text class="label">描述</text>
-        <textarea class="textarea" placeholder="补充地点、时间、要求等信息" value="{{description}}" data-key="description" bindinput="onInput" />
+        <textarea class="textarea" placeholder="补充地点、时间、要求等信息" value="{{description}}" data-key="description" bindinput="onInput" maxlength="500" />
+        <view class="counter {{description.length >= 480 ? 'counter-warn' : ''}}">{{description.length}}/500</view>
       </view>
-      <view class="field">
+      <view class="field" wx:if="{{sides[sideIndex].value != 'none'}}">
         <text class="label">金额</text>
-        <input class="input" type="digit" placeholder="纯互助可不填，服务可填 0 表示面议" value="{{rewardValue}}" data-key="rewardValue" bindinput="onInput" />
+        <input class="input" type="digit" placeholder="服务可填 0 表示面议" value="{{rewardValue}}" data-key="rewardValue" bindinput="onInput" />
+        <view wx:if="{{freezeHint && !balanceWarn}}" class="freeze-tip">{{freezeHint}}</view>
         <view wx:if="{{balanceWarn}}" class="warn-tip">{{balanceWarn}}<text class="warn-link" catchtap="goWallet"> 去充值 ›</text></view>
       </view>
       <view class="field" wx:if="{{sides[sideIndex].value == 'payer'}}">

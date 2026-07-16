@@ -7,7 +7,9 @@ Page({
     list: [],
     totalIn: '0.00',
     totalOut: '0.00',
-    loading: true
+    loading: true,
+    loaded: false,
+    error: false
   },
 
   onShow() {
@@ -24,7 +26,7 @@ Page({
   },
 
   loadBills() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: false })
     return userService.getBills().then((data) => {
       const list = (data.list || []).map(function (item) {
         return Object.assign({}, item, {
@@ -36,9 +38,13 @@ Page({
       this.setData({
         list: list,
         totalIn: format.formatMoney(data.totalIn),
-        totalOut: format.formatMoney(data.totalOut)
+        totalOut: format.formatMoney(data.totalOut),
+        loaded: true,
+        error: false
       })
-    }).catch(function () {
+    }).catch(() => {
+      // 加载失败：标记错误态，让页面渲染「点击重试」而非误显示空态/¥0.00
+      this.setData({ error: true })
     }).finally(() => {
       this.setData({ loading: false })
     })

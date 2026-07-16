@@ -62,3 +62,24 @@
   color: var(--brand);
   font-weight: 600;
 }
+
+/* 标题/描述实时字数提示（spec 修复4） */
+.counter {
+  margin-top: 8rpx;
+  text-align: right;
+  font-size: 22rpx;
+  color: var(--faint);
+}
+
+.counter.counter-warn {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+/* 悬赏冻结担保的常驻预览（余额充足时显示） */
+.freeze-tip {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--muted);
+}

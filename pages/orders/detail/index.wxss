@@ -95,11 +95,13 @@
 .actions {
   margin-top: 28rpx;
   display: flex;
+  flex-wrap: wrap;
   gap: 16rpx;
 }
 
 .actions .btn {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 180rpx;
 }
 
 .section-title {

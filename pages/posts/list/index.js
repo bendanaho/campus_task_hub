@@ -5,6 +5,7 @@ const constants = require('../../../utils/constants')
 const format = require('../../../utils/format')
 const socket = require('../../../utils/socket')
 const history = require('../../../utils/history')
+const upload = require('../../../utils/upload')
 
 const HIST_KEY = 'posts'
 
@@ -19,6 +20,8 @@ const PAGE_SIZE = 10
 Page({
   data: {
     statusBarHeight: 20,
+    showOnboard: false,
+    obIndex: 0,
     keyword: '',
     sideIndex: 0,
     sortIndex: 0,
@@ -33,6 +36,7 @@ Page({
     posts: [],
     hasMore: false,
     loading: false,
+    loadingMore: false,
     loggedIn: false,
     collapsed: false,
     hasNewPosts: false,
@@ -51,6 +55,13 @@ Page({
   },
 
   onLoad() {
+    // 首次启动的 3 页新手引导（看过一次不再出现）
+    try {
+      if (!wx.getStorageSync('campus_onboard_v1')) {
+        this.setData({ showOnboard: true })
+      }
+    } catch (e) {
+    }
     let statusBarHeight = 20
     try {
       const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
@@ -92,13 +103,28 @@ Page({
     this.setData({ keyword: e.detail.value })
   },
 
+  // 一键清除搜索词并回到全部列表（spec 修复13）
+  onClearKeyword() {
+    if (!this.data.keyword) {
+      return
+    }
+    this.setData({ keyword: '' })
+    this.reloadTop()
+  },
+
+  // 筛选/排序/搜索切换统一走这里：先回顶再加载，配合列表遮罩给出即时反馈（spec 修复7）
+  reloadTop() {
+    wx.pageScrollTo({ scrollTop: 0, duration: 150 })
+    return this.loadPosts()
+  },
+
   onSideTap(e) {
     const index = Number(e.currentTarget.dataset.index)
     if (index === this.data.sideIndex) {
       return
     }
     this.setData({ sideIndex: index })
-    this.loadPosts()
+    this.reloadTop()
   },
 
   // chips 行是单选：点中即只筛该分类，再点一次取消回到全部；多选走「﹀」面板
@@ -124,7 +150,7 @@ Page({
     const selMap = {}
     cats.forEach(function (v) { selMap[v] = true })
     this.setData({ selMap: selMap, selectedCount: cats.length })
-    this.loadPosts()
+    this.reloadTop()
   },
 
   openFilter() {
@@ -165,20 +191,20 @@ Page({
 
   onSortChange(e) {
     this.setData({ sortIndex: Number(e.detail.value) })
-    this.loadPosts()
+    this.reloadTop()
   },
 
   onSearch() {
     if (this.data.keyword.trim()) {
       this.setData({ searchHistory: history.push(HIST_KEY, this.data.keyword) })
     }
-    this.loadPosts()
+    this.reloadTop()
   },
 
   onHistTap(e) {
     const term = e.currentTarget.dataset.term
     this.setData({ keyword: term, searchFocus: false })
-    this.loadPosts()
+    this.reloadTop()
   },
 
   onHistClear() {
@@ -233,8 +259,15 @@ Page({
         moneyText: format.formatMoney(item.rewardValue),
         hasPrice: hasPrice,
         priceAlt: item.publisherSide === 'none' ? '免费互助' : (item.reward || '面议'),
+        // 金额方向标：悬赏=接单方完成可得；服务=下单方需支付，消除"¥50 是我付还是我拿"歧义
+        priceHint: hasPrice ? (item.publisherSide === 'payer' ? '完成可得' : (item.publisherSide === 'earner' ? '需支付' : '')) : '',
         avatarChar: item.publisherName ? item.publisherName.slice(0, 1) : '同',
         avatarColor: AVATAR_COLORS[(Number(item.publisherId) || 0) % AVATAR_COLORS.length],
+        // 有上传头像(/uploads/xxx 相对路径或完整 URL)则显示真实头像，否则回退首字色块
+        // 已预取过本地文件的头像直接用本地路径（真机 <image> 直载 http/IP 受限）
+        avatarUrl: (item.publisherAvatar && String(item.publisherAvatar).indexOf('color:') !== 0)
+          ? (upload.getCachedLocal(upload.fullUrl(item.publisherAvatar)) || upload.fullUrl(item.publisherAvatar))
+          : '',
         creditText: Number(item.publisherCredit || 0).toFixed(1),
         thumb: thumb
       })
@@ -252,17 +285,40 @@ Page({
         posts: posts,
         hasMore: isPaged ? !!res.hasMore : false
       })
+      this.prefetchAvatars(0)
     }).catch(function () {
     }).finally(() => {
       this.setData({ loading: false })
     })
   },
 
+  // 把仍指向 http 远程地址的发布者头像转成本地文件后原位替换（真机可显示）。
+  // toLocalFile 有完成缓存 + 去重，翻页/刷新反复调用无害。
+  prefetchAvatars(startIndex) {
+    const self = this
+    const list = this.data.posts || []
+    for (let i = startIndex; i < list.length; i++) {
+      ;(function (idx, item) {
+        const url = item && item.avatarUrl
+        if (!url || String(url).indexOf('http') !== 0) {
+          return
+        }
+        upload.toLocalFile(url).then(function (path) {
+          const cur = (self.data.posts || [])[idx]
+          if (cur && cur.id === item.id) {
+            self.setData({ ['posts[' + idx + '].avatarUrl']: path })
+          }
+        }).catch(function () {})
+      })(i, list[i])
+    }
+  },
+
   onReachBottom() {
-    if (this.loadingMore || !this.data.hasMore) {
+    if (this.data.loadingMore || !this.data.hasMore) {
       return
     }
-    this.loadingMore = true
+    // loadingMore 进 data 驱动 UI：仅真正上拉加载时底部才显示「加载中…」（spec 修复6）
+    this.setData({ loadingMore: true })
     const next = (this.pageNum || 0) + 1
     postService.list(this.buildQuery(next)).then((res) => {
       const data = (res && !Array.isArray(res)) ? res : { list: [], hasMore: false }
@@ -274,9 +330,10 @@ Page({
         patch['posts[' + (start + i) + ']'] = item
       })
       this.setData(patch)
+      this.prefetchAvatars(start)
     }).catch(function () {
     }).finally(() => {
-      this.loadingMore = false
+      this.setData({ loadingMore: false })
     })
   },
 
@@ -285,6 +342,30 @@ Page({
     wx.navigateTo({
       url: '/pages/posts/detail/index?id=' + id
     })
+  },
+
+  // 头像图加载失败(404/域名未配置等)：回退到该项的首字色块头像
+  onAvatarError(e) {
+    const idx = e.currentTarget.dataset.index
+    if (idx === undefined || idx === null || idx === '') {
+      return
+    }
+    const patch = {}
+    patch['posts[' + idx + '].avatarUrl'] = ''
+    this.setData(patch)
+  },
+
+  // ---- 新手引导 ----
+  onObSwipe(e) {
+    this.setData({ obIndex: (e.detail && e.detail.current) || 0 })
+  },
+
+  closeOnboard() {
+    try {
+      wx.setStorageSync('campus_onboard_v1', 1)
+    } catch (e) {
+    }
+    this.setData({ showOnboard: false })
   },
 
   goPublish() {

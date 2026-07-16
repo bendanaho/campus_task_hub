@@ -233,6 +233,32 @@ button::after {
 }
 
 
+/* ===== 全局横幅：断网 / 登录过期（修复2/修复7）=====
+   小程序无全局 DOM，横幅由各页在根节点渲染，状态经 app.onBannerChange 订阅注入。
+   接入方式见 app.js 顶部注释。 */
+.offline-banner,
+.auth-expired-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  padding: 12rpx 24rpx;
+  padding-top: calc(12rpx + env(safe-area-inset-top));
+  color: #ffffff;
+  font-size: 24rpx;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.offline-banner {
+  background: #FA5151;
+}
+
+.auth-expired-banner {
+  background: var(--amber);
+}
+
 /* ===== 外观主题（我的页可切换） ===== */
 .theme-light {
   background: var(--paper);
@@ -267,6 +293,41 @@ button::after {
   --brand: #E2699A;
   --brand-deep: #C24677;
   --brand-soft: #FCE9F1;
+}
+
+.theme-light.bg-b6 {
+  --paper: #F4F0FC;
+  --brand: #7D5FD1;
+  --brand-deep: #5F42B5;
+  --brand-soft: #ECE5FA;
+}
+
+.theme-light.bg-b7 {
+  --paper: #EAF7F3;
+  --brand: #0FA189;
+  --brand-deep: #0A7A67;
+  --brand-soft: #DBF2ED;
+}
+
+.theme-light.bg-b8 {
+  --paper: #FEF2E9;
+  --brand: #E9752E;
+  --brand-deep: #C55A1C;
+  --brand-soft: #FBE5D5;
+}
+
+.theme-light.bg-b9 {
+  --paper: #ECEEF2;
+  --brand: #566378;
+  --brand-deep: #3E4A5E;
+  --brand-soft: #E3E7ED;
+}
+
+.theme-light.bg-b10 {
+  --paper: #FCF7E4;
+  --brand: #C99A15;
+  --brand-deep: #A37D0A;
+  --brand-soft: #F5EDC9;
 }
 
 .theme-dark {

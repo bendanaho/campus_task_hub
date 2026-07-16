@@ -12,6 +12,20 @@ function pad2(n) {
   return n < 10 ? '0' + n : '' + n
 }
 
+// 计算截止时间默认值：18:00 若已早于当前时刻则顺延到「当前+2小时」的整点，
+// 跨天时退到今天 23:59，避免当天发布时默认值直接被「需晚于当前时间」拦下
+function computeDefaultTime(now) {
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  if (18 * 60 > nowMin) {
+    return '18:00'
+  }
+  const target = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+  if (target.getDate() !== now.getDate()) {
+    return '23:59'
+  }
+  return pad2(target.getHours()) + ':00'
+}
+
 const MAX_IMAGES = 3
 const MAX_TITLE_LEN = 30
 const MAX_DESC_LEN = 500
@@ -39,7 +53,8 @@ Page({
     todayDate: '',
     nowTime: '',
     balanceNum: null,
-    balanceWarn: ''
+    balanceWarn: '',
+    freezeHint: ''
   },
 
   onLoad() {
@@ -58,8 +73,20 @@ Page({
       todayDate: format.todayDate(),
       nowTime: pad2(now.getHours()) + ':' + pad2(now.getMinutes())
     })
+    this.refreshDefaultTime()
     this.restoreDraft()
     this.loadBalanceForWarn()
+  },
+
+  // 用户未手动改动前，让截止时间默认值随当前时刻校正
+  refreshDefaultTime() {
+    if (this.userSetTime) {
+      return
+    }
+    const t = computeDefaultTime(new Date())
+    if (t !== this.data.time) {
+      this.setData({ time: t })
+    }
   },
 
   // ---- 草稿：填写内容防抖暂存，回来自动恢复；"再发一单"也走这里 ----
@@ -127,11 +154,16 @@ Page({
     const side = this.data.sides[this.data.sideIndex].value
     const value = Number(this.data.rewardValue || 0)
     const balance = this.data.balanceNum
-    const warn = side === 'payer' && value > 0 && balance !== null && value > balance
-      ? '当前余额 ¥' + balance.toFixed(2) + '，低于悬赏金额；接受订单时需冻结全额'
+    // 悬赏发布即冻结担保：常驻预览让新用户明白"为什么发求助要有余额"
+    const isReward = side === 'payer' && value > 0
+    const freezeHint = isReward
+      ? '发布后将从余额冻结 ¥' + value.toFixed(2) + ' 作为担保，完成后支付给接单同学'
       : ''
-    if (warn !== this.data.balanceWarn) {
-      this.setData({ balanceWarn: warn })
+    const warn = isReward && balance !== null && value > balance
+      ? '可用余额 ¥' + balance.toFixed(2) + ' 不足，无法发布；余额为虚拟货币，充值不花真钱'
+      : ''
+    if (warn !== this.data.balanceWarn || freezeHint !== this.data.freezeHint) {
+      this.setData({ balanceWarn: warn, freezeHint: freezeHint })
     }
   },
 
@@ -167,6 +199,7 @@ Page({
   },
 
   onTimeChange(e) {
+    this.userSetTime = true
     this.setData({ time: e.detail.value })
     this.scheduleDraftSave()
   },
@@ -186,6 +219,11 @@ Page({
     }
     imageUtil.chooseImages(remain).then((list) => {
       if (list.length) {
+        // 性能注意（spec 修复5）：list 为 base64 data URL（单张上限 800KB），
+        // 直接进 setData 时多张接近上限会逼近微信 setData 单次 1MB 硬限，
+        // 有「data too large」告警/渲染卡顿风险。理想做法是缩略图路径进 setData、
+        // base64 挂实例属性 submit 时再组装；此处受限于 utils/image 现有能力（无独立
+        // 缩略图/本地路径产物），暂维持原状不破坏，待 image.js 支持后再改。
         this.setData({ images: this.data.images.concat(list) })
       }
     }).catch(function () {

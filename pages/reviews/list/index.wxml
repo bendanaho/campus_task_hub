@@ -2,20 +2,27 @@
   <skeleton wx:if="{{loading && !hasAny}}" count="3" />
 
   <block wx:else>
-    <view wx:if="{{summary}}" class="card summary-card">
+    <view wx:if="{{summary || creditScore !== ''}}" class="card summary-card">
       <view class="summary-avg-box">
-        <view class="summary-avg">{{summary.avg}}</view>
-        <view class="summary-sub">平均分</view>
+        <view class="summary-avg">{{creditScore !== '' ? creditScore : summary.avg}}</view>
+        <view class="summary-sub">{{creditScore !== '' ? '信用分' : '平均分'}}</view>
       </view>
-      <view class="summary-divider"></view>
-      <view class="summary-item">
-        <view class="summary-num">{{summary.count}}</view>
-        <view class="summary-sub">共 {{summary.count}} 条</view>
-      </view>
-      <view class="summary-item">
-        <view class="summary-num">{{summary.goodRate}}%</view>
-        <view class="summary-sub">好评率</view>
-      </view>
+      <block wx:if="{{summary}}">
+        <view class="summary-divider"></view>
+        <!-- 信用分缺失时头部已用平均分占位，此处不再重复渲染平均分 -->
+        <view wx:if="{{creditScore !== ''}}" class="summary-item">
+          <view class="summary-num">{{summary.avg}}</view>
+          <view class="summary-sub">平均分</view>
+        </view>
+        <view class="summary-item">
+          <view class="summary-num">{{summary.count}}</view>
+          <view class="summary-sub">共 {{summary.count}} 条</view>
+        </view>
+        <view class="summary-item">
+          <view class="summary-num">{{summary.goodRate}}%</view>
+          <view class="summary-sub">好评率</view>
+        </view>
+      </block>
     </view>
 
     <view wx:if="{{hasAny}}" class="chips">
@@ -28,7 +35,15 @@
       >{{item.label}}</view>
     </view>
 
-    <empty-state wx:if="{{reviews.length === 0}}" emoji="⭐" title="暂无评价" />
+    <empty-state wx:if="{{reviews.length === 0 && !hasAny}}" emoji="⭐" title="暂无评价" />
+    <empty-state
+      wx:if="{{reviews.length === 0 && hasAny}}"
+      emoji="🔍"
+      title="该筛选下暂无评价"
+      sub="换个条件，或查看全部评价"
+      btn-text="查看全部"
+      bind:action="onShowAll"
+    />
 
     <view wx:for="{{reviews}}" wx:key="id" class="card review-card">
       <view class="review-top">

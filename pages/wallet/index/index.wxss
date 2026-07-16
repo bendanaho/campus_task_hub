@@ -8,6 +8,35 @@
   font-weight: 850;
 }
 
+.balance-retry {
+  margin-top: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  min-height: 56rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.frozen-line {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: var(--amber);
+}
+
+.balance-note {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.recharge-note {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .label {
   margin-bottom: 12rpx;
   color: var(--muted);
@@ -26,10 +55,13 @@
 
 .quick-amount {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
   text-align: center;
   font-size: 26rpx;
   font-weight: 600;
-  padding: 16rpx 0;
   border-radius: 12rpx;
   background: var(--field);
   color: var(--muted);

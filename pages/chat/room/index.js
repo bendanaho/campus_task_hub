@@ -6,18 +6,35 @@ const format = require('../../../utils/format')
 const confirm = require('../../../utils/confirm').confirm
 const settings = require('../../../utils/settings')
 const socket = require('../../../utils/socket')
+const upload = require('../../../utils/upload')
 
 const SYS_PREFIX = 'sys-notify-'
 
 const WITHDRAW_WINDOW = 120 * 1000
 
+// 时间分组：与上一条间隔超过 5 分钟才在气泡上方渲染一次分隔时间
+const TIME_GROUP_GAP = 5 * 60 * 1000
+
+// 会话草稿（含未发送输入 / 发送失败文案）本地存储键前缀
+const DRAFT_PREFIX = 'chat-draft-'
+
 const QUICK_PHRASES = ['在吗？', '多少钱？', '好的', '已到楼下', '麻烦快一点', '谢谢！']
 
 const EMOJIS = [
-  '😀', '😄', '😂', '🤣', '😊', '😍', '😉', '🤔',
-  '😅', '😭', '😳', '😴', '🙏', '👍', '👎', '👌',
-  '🤝', '💪', '🎉', '❤️', '🔥', '⭐', '🌹', '🍀',
-  '🍜', '☕', '📚', '🏃', '⚽', '🎮', '🚴', '📦'
+  '😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆',
+  '😉', '😊', '😋', '😎', '😍', '😘', '🙂', '🤗',
+  '🤔', '😐', '😑', '🙄', '😏', '😮', '😪', '😴',
+  '😌', '😜', '😝', '🤤', '😒', '😔', '🙃', '🤑',
+  '😲', '🙁', '😖', '😞', '😟', '😤', '😢', '😭',
+  '😨', '😩', '🤯', '😬', '😰', '😱', '🥵', '😳',
+  '🤪', '😵', '😡', '😠', '🤬', '😷', '🤒', '🤕',
+  '🤢', '🥳', '🥰', '😇', '🤠', '🤡', '👻', '💀',
+  '👍', '👎', '👌', '🙏', '🤝', '💪', '👏', '🙌',
+  '👋', '✌️', '🤞', '🤙', '☝️', '✍️', '💅', '👀',
+  '❤️', '💔', '💕', '💯', '🔥', '⭐', '✨', '🎉',
+  '🎊', '🌹', '🍀', '🌈', '☀️', '⚡', '💧', '❄️',
+  '🍜', '☕', '🍔', '🍎', '🎂', '🍺', '📚', '💰',
+  '🧧', '🎁', '⏰', '📍', '✅', '❌', '❓', '❗'
 ]
 
 function parsePayment(raw) {
@@ -64,7 +81,11 @@ Page({
     canReview: false,
     hasNewReview: false,
     isSystemChat: false,
-    fontClass: ''
+    fontClass: '',
+    atBottom: true,
+    showPay: false,
+    showMore: false,
+    inputFocused: false
   },
 
   onLoad(options) {
@@ -96,7 +117,10 @@ Page({
       this.loadContext()
     }
     this.stopPolling()
-    this.pollTimer = setInterval(() => this.loadMessages(true), 4000)
+    // WS 已负责实时刷新，此处仅作兜底轮询，故间隔从 4s 拉长到 15s，降低长会话下
+    // 每次全量 GET + 全量 setData 的开销。真正的增量拉取（since/afterId 游标、
+    // 只 append 新消息）需后端消息接口支持游标参数，前端暂无法实现。
+    this.pollTimer = setInterval(() => this.loadMessages(true), 15000)
     // WS 即时刷新（轮询保留作兜底）
     this.stopRealtime()
     this.unsubChat = socket.on('CHAT_UPDATE', (msg) => {
@@ -104,6 +128,36 @@ Page({
         this.loadMessages(true)
       }
     })
+    // 返回会话时恢复上次离开留下的未发送/发送失败草稿（每个页面实例只恢复一次）
+    if (!this.draftRestored) {
+      this.draftRestored = true
+      this.restoreDraft()
+    }
+  },
+
+  onReady() {
+    // 量一次消息滚动区可视高度，用于 bindscroll 判断是否贴底
+    this.measureMessagesHeight()
+  },
+
+  measureMessagesHeight() {
+    const self = this
+    wx.createSelectorQuery().select('.messages').boundingClientRect(function (rect) {
+      if (rect && rect.height) {
+        self.msgViewHeight = rect.height
+      }
+    }).exec()
+  },
+
+  // 记录用户是否贴底：翻看历史（未贴底）时不因新消息被强制拉回底部
+  onMessagesScroll(e) {
+    const d = e.detail || {}
+    const vh = this.msgViewHeight || 0
+    // 量不到视口高度时保守认为贴底（回退到旧的"总是滚到最新"行为）
+    const atBottom = !vh || (d.scrollHeight - d.scrollTop - vh) < 80
+    if (atBottom !== this.data.atBottom) {
+      this.setData({ atBottom: atBottom })
+    }
   },
 
   onHide() {
@@ -112,8 +166,50 @@ Page({
   },
 
   onUnload() {
+    this.saveDraft()
+    if (this.blurTimer) {
+      clearTimeout(this.blurTimer)
+      this.blurTimer = null
+    }
     this.stopPolling()
     this.stopRealtime()
+  },
+
+  // 离开会话前把未发送输入与发送失败的文案暂存本地，返回时恢复，避免用户白打一段字
+  saveDraft() {
+    // 仅暂存失败的文本消息；图片消息 content 是本地临时路径，重进页面已失效，不入草稿
+    const failedTexts = (this.data.messages || []).filter(function (m) {
+      return m.failed && m.content && m.type !== 'image'
+    }).map(function (m) {
+      return m.content
+    })
+    const draft = (this.data.input || '').trim()
+    const parts = failedTexts.concat(draft ? [draft] : [])
+    const key = DRAFT_PREFIX + this.data.chatId
+    try {
+      if (parts.length) {
+        wx.setStorageSync(key, parts.join('\n'))
+      } else {
+        wx.removeStorageSync(key)
+      }
+    } catch (e) {}
+  },
+
+  restoreDraft() {
+    const key = DRAFT_PREFIX + this.data.chatId
+    let draft = ''
+    try {
+      draft = wx.getStorageSync(key) || ''
+    } catch (e) {
+      draft = ''
+    }
+    if (draft) {
+      try { wx.removeStorageSync(key) } catch (e) {}
+      if (!this.data.input) {
+        this.setData({ input: draft })
+        wx.showToast({ title: '已恢复未发送内容', icon: 'none' })
+      }
+    }
   },
 
   stopRealtime() {
@@ -199,8 +295,60 @@ Page({
     })
   },
 
+  // 支付卡片 / 表情 / 快捷短语面板会改变消息滚动区高度，
+  // 展开收起后重新量一次，避免 atBottom 用陈旧高度误判（回归修复）
+  remeasureLater() {
+    const self = this
+    return function () {
+      self.measureMessagesHeight()
+    }
+  },
+
   toggleEmoji() {
-    this.setData({ showEmoji: !this.data.showEmoji })
+    const next = !this.data.showEmoji
+    // 展开表情面板前收起键盘，避免面板与键盘互相遮挡；同时收起「+」面板
+    if (next && wx.hideKeyboard) {
+      wx.hideKeyboard({})
+    }
+    this.setData({ showEmoji: next, showMore: false }, this.remeasureLater())
+  },
+
+  // 「+」面板：内含 转账 / 图片（仿微信）
+  toggleMore() {
+    const next = !this.data.showMore
+    if (next && wx.hideKeyboard) {
+      wx.hideKeyboard({})
+    }
+    this.setData({ showMore: next, showEmoji: false }, this.remeasureLater())
+  },
+
+  // + 面板里点「转账」：收起面板，展开支付卡片输入
+  onMoreTransfer() {
+    this.setData({ showMore: false, showPay: !this.data.showPay }, this.remeasureLater())
+  },
+
+  // + 面板里点「图片」：收起面板，选图发送
+  onMoreImage() {
+    this.setData({ showMore: false }, this.remeasureLater())
+    this.chooseImage()
+  },
+
+  onInputFocus() {
+    if (this.blurTimer) {
+      clearTimeout(this.blurTimer)
+      this.blurTimer = null
+    }
+    // 聚焦输入框时收起表情/「+」面板，行为与微信一致
+    this.setData({ inputFocused: true, showEmoji: false, showMore: false }, this.remeasureLater())
+  },
+
+  onInputBlur() {
+    // 延迟收起，保证点击快捷短语能先于失焦触发
+    const self = this
+    this.blurTimer = setTimeout(function () {
+      self.setData({ inputFocused: false }, self.remeasureLater())
+      self.blurTimer = null
+    }, 200)
   },
 
   onEmojiTap(e) {
@@ -215,15 +363,25 @@ Page({
       const mapped = (list || []).map(function (item) {
         const payment = parsePayment(item.payment)
         const isMine = item.senderId != null && String(item.senderId) === uid
+        const isImage = item.type === 'image'
         return Object.assign({}, item, {
           isSystem: item.type === 'system',
+          isImage: isImage,
+          // 图片消息 content 为后端图片相对地址(/uploads/xxx)，补全为完整 URL 供 <image> 使用
+          // 已经转过本地文件的图优先用本地路径（真机 <image> 直载 http/IP 会失败）
+          imageUrl: isImage ? (upload.getCachedLocal(upload.fullUrl(item.content)) || upload.fullUrl(item.content)) : '',
           isMine: isMine,
           bubbleClass: isMine ? 'mine' : 'other',
-          timeText: format.formatTime(item.time),
           paymentInfo: payment,
           paymentTitle: payment && payment.kind === 'request' ? '收款请求' : '转账',
-          paymentStatusText: payment ? (payment.status === 'pending' ? '待处理' : (payment.status === 'paid' ? '已支付' : '已取消')) : '',
+          paymentStatusText: payment ? (
+            payment.status === 'pending' ? '待处理'
+              : payment.status === 'paid' ? '已支付'
+                : payment.status === 'escrowed' ? '托管中 · 订单完成后到账'
+                  : '已取消'
+          ) : '',
           paymentAmountText: payment ? format.formatMoney(payment.amount) : '',
+          paymentNote: payment && payment.note ? String(payment.note) : '',
           canPay: payment && payment.status === 'pending' && String(payment.payerId) === uid,
           canCancelPayment: payment && payment.status === 'pending' && isMine
         })
@@ -232,7 +390,7 @@ Page({
       const locals = (this.data.messages || []).filter(function (item) {
         return isLocalId(item.id) && (item.pending || item.failed)
       })
-      const messages = mapped.concat(locals)
+      const merged = mapped.concat(locals)
 
       const current = this.data.messages || []
       // 内容级签名：撤回、支付卡状态变化即使条数不变也要刷新
@@ -241,19 +399,39 @@ Page({
           return String(m.id) + ':' + (m.withdrawn ? 1 : 0) + ':' + (m.paymentInfo ? m.paymentInfo.status : '')
         }).join(',')
       }
-      if (silent && !this.data.loading && signature(messages) === signature(current)) {
+      if (silent && !this.data.loading && signature(merged) === signature(current)) {
         // 无任何变化，跳过 setData，避免打断输入
         return
       }
 
+      // 时间分组：仅当与上一条已展示时间间隔超过阈值时才渲染一次分隔时间，
+      // 避免每条气泡都挂一行完整日期。文案复用 format.shortTime（当天 HH:mm、跨天带日期）
+      let prevShownTime = 0
+      const messages = merged.map(function (m) {
+        const t = parseMessageTime(m.time)
+        let showTime = ''
+        if (t && (!prevShownTime || t - prevShownTime > TIME_GROUP_GAP)) {
+          showTime = format.shortTime(m.time)
+          prevShownTime = t
+        }
+        return Object.assign({}, m, { showTime: showTime })
+      })
+
       const lastNew = messages.length ? messages[messages.length - 1] : null
       const lastCur = current.length ? current[current.length - 1] : null
       const patch = { messages: messages, loading: false }
-      // 只有出现新的末条消息才移动滚动位置，状态变化不把用户从历史消息拉回底部
+      // 只有出现新的末条消息才移动滚动位置，状态变化不把用户从历史消息拉回底部；
+      // 且仅当用户本来就贴底、或最新一条是自己发送时才滚到底，翻看历史时不被强制拉回。
+      // （更完善的做法是显示"N 条新消息↓"浮标，这里按需求用 atBottom 启发式实现）
       if (lastNew && (!lastCur || String(lastNew.id) !== String(lastCur.id) || messages.length !== current.length)) {
-        patch.intoView = 'msg-' + lastNew.id
+        if (this.data.atBottom || lastNew.isMine) {
+          patch.intoView = 'msg-' + lastNew.id
+        }
       }
       this.setData(patch)
+      // 真机上 <image> 直载 http/IP 常被限制：对 http 图片主动走 wx.request
+      // 通道预取为本地文件（与业务 API 同通道），不等 binderror 再补救
+      this.prefetchImages(messages)
       if (this.autoRead !== false) {
         chatService.markRead(this.data.chatId).catch(function () {})
       }
@@ -270,9 +448,18 @@ Page({
 
   sendQuick(e) {
     const text = e.currentTarget.dataset.text
-    if (text) {
-      this.pushLocalAndSend(text)
+    if (!text) {
+      return
     }
+    // 防连点刷屏：短时间内忽略重复点击
+    const now = Date.now()
+    if (this.lastQuickAt && now - this.lastQuickAt < 600) {
+      return
+    }
+    this.lastQuickAt = now
+    // 与 sendText 收尾保持一致：收起表情面板
+    this.setData({ showEmoji: false })
+    this.pushLocalAndSend(text)
   },
 
   sendText() {
@@ -293,7 +480,7 @@ Page({
       isMine: true,
       pending: true,
       bubbleClass: 'mine',
-      timeText: ''
+      showTime: ''
     }
     this.setData({
       messages: (this.data.messages || []).concat([localMsg]),
@@ -317,6 +504,147 @@ Page({
     })
   },
 
+  // 选图 → 上传临时文件 → 以 type='image' 发送（复用本地乐观消息 + loadMessages 刷新）
+  chooseImage() {
+    const self = this
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      // 压缩后再传：原图动辄数 MB，服务器带宽有限，会话里会长时间灰块加载不出
+      sizeType: ['compressed'],
+      success: function (res) {
+        const files = res.tempFiles || []
+        const path = files.length ? files[0].tempFilePath : ''
+        if (path) {
+          self.sendImage(path)
+        }
+      }
+    })
+  },
+
+  sendImage(tempFilePath) {
+    const localId = 'local-' + Date.now()
+    // 乐观上屏：先用本地临时路径展示，上传成功后由 loadMessages 换成后端图片消息
+    const localMsg = {
+      id: localId,
+      type: 'image',
+      isImage: true,
+      content: tempFilePath,
+      imageUrl: tempFilePath,
+      isMine: true,
+      pending: true,
+      bubbleClass: 'mine',
+      showTime: ''
+    }
+    this.setData({
+      messages: (this.data.messages || []).concat([localMsg]),
+      intoView: 'msg-' + localId,
+      showEmoji: false
+    })
+    const self = this
+    upload.uploadImage(tempFilePath).then(function (url) {
+      return chatService.sendMessage(self.data.chatId, url, 'image')
+    }).then(function () {
+      self.setData({
+        messages: self.data.messages.filter(function (item) {
+          return item.id !== localId
+        })
+      })
+      self.loadMessages(true)
+    }).catch(function () {
+      // 上传或发送失败：转为失败态，点击气泡或下方提示可重发（uploadImage 已自带 toast）
+      self.setData({
+        messages: self.data.messages.map(function (item) {
+          return item.id === localId
+            ? Object.assign({}, item, { pending: false, failed: true })
+            : item
+        })
+      })
+    })
+  },
+
+  // 点击图片气泡：失败态→重发；发送中→忽略；正常→全屏预览（可左右滑看会话内全部图片）
+  // 对列表里仍指向 http 远程地址的图片消息，逐条转本地文件后原位替换。
+  // upload.toLocalFile 内部有完成缓存 + 进行中去重，轮询反复调用无害。
+  prefetchImages(messages) {
+    const self = this
+    ;(messages || []).forEach(function (m, index) {
+      if (!m.isImage || !m.imageUrl || String(m.imageUrl).indexOf('http') !== 0) {
+        return
+      }
+      upload.toLocalFile(m.imageUrl).then(function (path) {
+        const cur = (self.data.messages || [])[index]
+        // 轮询可能重排消息：确认还是同一条再替换
+        if (cur && String(cur.id) === String(m.id)) {
+          self.setData({
+            ['messages[' + index + '].imageUrl']: path,
+            ['messages[' + index + '].imageFailed']: false
+          })
+        }
+      }).catch(function () {
+        // 静默：直载可能本来就能成功；彻底失败由 binderror 路径提示
+      })
+    })
+  },
+
+  // 内联图片加载失败（真机 http/IP 限制、大图弱网）：先走 wx.request 拉字节转本地
+  // 文件重试一次（与业务 API 同通道，真机可用）；再失败才显示"点击查看"提示
+  onImageLoadError(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const msg = (this.data.messages || [])[index]
+    if (!msg) {
+      return
+    }
+    if (msg.imageFixTried) {
+      if (!msg.imageFailed) {
+        this.setData({ ['messages[' + index + '].imageFailed']: true })
+      }
+      return
+    }
+    this.setData({ ['messages[' + index + '].imageFixTried']: true })
+    const self = this
+    const remote = msg.content && String(msg.content).indexOf('/') === 0
+      ? upload.fullUrl(msg.content)
+      : msg.imageUrl
+    upload.toLocalFile(remote).then(function (path) {
+      self.setData({
+        ['messages[' + index + '].imageUrl']: path,
+        ['messages[' + index + '].imageFailed']: false
+      })
+    }).catch(function (err) {
+      // 把真实失败原因带到提示里，便于定位（域名受限/超时/写文件失败等）
+      const raw = (err && (err.errMsg || err.message)) || ''
+      self.setData({
+        ['messages[' + index + '].imageFailed']: true,
+        ['messages[' + index + '].imageFailMsg']: String(raw).slice(0, 40)
+      })
+    })
+  },
+
+  onImageTap(e) {
+    const id = e.currentTarget.dataset.id
+    const msg = this.findMessage(id)
+    if (!msg) {
+      return
+    }
+    if (msg.failed) {
+      this.resendLocal(e)
+      return
+    }
+    if (msg.pending || !msg.imageUrl) {
+      return
+    }
+    const urls = (this.data.messages || []).filter(function (m) {
+      return m.type === 'image' && m.imageUrl && !m.pending && !m.failed
+    }).map(function (m) {
+      return m.imageUrl
+    })
+    wx.previewImage({
+      current: msg.imageUrl,
+      urls: urls.length ? urls : [msg.imageUrl]
+    })
+  },
+
   resendLocal(e) {
     const localId = e.currentTarget.dataset.id
     const found = (this.data.messages || []).find(function (item) {
@@ -330,7 +658,11 @@ Page({
         return String(item.id) !== String(localId)
       })
     })
-    this.pushLocalAndSend(found.content)
+    if (found.type === 'image') {
+      this.sendImage(found.content)
+    } else {
+      this.pushLocalAndSend(found.content)
+    }
   },
 
   onAmountInput(e) {
@@ -345,13 +677,23 @@ Page({
     if (!auth.requireVerified()) {
       return
     }
-    const amount = Number(this.data.payAmount)
     if (!this.data.partnerId) {
       wx.showToast({ title: '缺少对方信息', icon: 'none' })
       return
     }
-    if (!amount || amount <= 0) {
+    const raw = Number(this.data.payAmount)
+    if (!raw || raw <= 0) {
       wx.showToast({ title: '请输入金额', icon: 'none' })
+      return
+    }
+    // 规整为两位小数，确认弹窗展示与提交后端用同一个值，避免"显示 ¥2.00 实发 1.999"的不一致
+    const amount = Math.round(raw * 100) / 100
+    if (amount < 0.01) {
+      wx.showToast({ title: '金额不能低于 0.01 元', icon: 'none' })
+      return
+    }
+    if (amount > 5000) {
+      wx.showToast({ title: '单笔金额不能超过 5000 元', icon: 'none' })
       return
     }
     const kind = this.data.paymentKinds[this.data.paymentKindIndex]
@@ -369,7 +711,7 @@ Page({
         kind: kind.value,
         amount: amount
       }).then(() => {
-        this.setData({ payAmount: '' })
+        this.setData({ payAmount: '', showPay: false })
         this.loadMessages()
       }).catch(function () {
       })
@@ -427,11 +769,19 @@ Page({
   onBubbleLongpress(e) {
     const id = e.currentTarget.dataset.id
     const msg = this.findMessage(id)
-    if (!msg || !msg.isMine || msg.withdrawn || msg.type === 'system' || isLocalId(msg.id)) {
+    // 已撤回 / 系统消息 / 支付卡片 / 本地未成功消息不走撤回：
+    // 支付卡片的作废只走卡片上的"取消"按钮，避免 withdraw 与 cancel-payment 两套作废入口状态不一致
+    if (!msg || msg.withdrawn || msg.type === 'system' || msg.type === 'payment' || isLocalId(msg.id)) {
+      return
+    }
+    // 不可撤回时给出可见反馈，而不是静默无反应（输入框占位符宣称"长按气泡可撤回"）
+    if (!msg.isMine) {
+      wx.showToast({ title: '只能撤回自己的消息', icon: 'none' })
       return
     }
     const sentAt = parseMessageTime(msg.time)
     if (!sentAt || Date.now() - sentAt > WITHDRAW_WINDOW) {
+      wx.showToast({ title: '超过2分钟不能撤回', icon: 'none' })
       return
     }
     wx.showActionSheet({
@@ -442,6 +792,15 @@ Page({
         }
       }
     })
+  },
+
+  onBubbleTap(e) {
+    // 整条气泡可点重发（配合发送失败态）
+    const id = e.currentTarget.dataset.id
+    const msg = this.findMessage(id)
+    if (msg && msg.failed) {
+      this.resendLocal(e)
+    }
   },
 
   doWithdraw(id) {

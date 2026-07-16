@@ -64,6 +64,19 @@
   line-height: 1.6;
 }
 
+.photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.photo-img {
+  width: 210rpx;
+  height: 210rpx;
+  border-radius: 14rpx;
+  background: var(--field);
+}
+
 .review {
   padding: 22rpx 0;
   border-top: 1rpx solid var(--line);

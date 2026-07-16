@@ -1,5 +1,7 @@
 const auth = require('../../../utils/auth')
 const orderService = require('../../../services/orders')
+const chatService = require('../../../services/chat')
+const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
 const confirmUtil = require('../../../utils/confirm')
 
@@ -26,6 +28,7 @@ Page({
   data: {
     chatId: '',
     loading: true,
+    loadedOnce: false,
     active: null,
     history: []
   },
@@ -40,6 +43,19 @@ Page({
     this.loadData()
   },
 
+  onShow() {
+    if (!auth.isLoggedIn()) {
+      return
+    }
+    // 若 onLoad 首次加载因未登录被跳过（登录后 navigateBack 回到本页），此处补首屏加载；
+    // 已加载过则仅在从会话等页面返回时静默刷新，避免与首次重复。
+    if (!this.data.loadedOnce) {
+      this.loadData()
+    } else {
+      this.loadData(true)
+    }
+  },
+
   onPullDownRefresh() {
     if (!auth.isLoggedIn()) {
       wx.stopPullDownRefresh()
@@ -50,20 +66,26 @@ Page({
     })
   },
 
-  loadData() {
+  loadData(silent) {
     const chatId = this.data.chatId
     if (!chatId) {
-      this.setData({ loading: false, active: null, history: [] })
+      this.setData({ loading: false, loadedOnce: true, active: null, history: [] })
       return Promise.resolve()
     }
-    this.setData({ loading: true })
+    if (!silent) {
+      this.setData({ loading: true })
+    }
     return Promise.all([
       orderService.byChat(chatId).catch(function () { return null }),
-      orderService.history(chatId).catch(function () { return [] })
+      orderService.history(chatId).catch(function () { return [] }),
+      // 对方昵称订单接口未返回，沿用聊天室做法：从会话列表按 chatId 取
+      chatService.conversations().catch(function () { return [] })
     ]).then((results) => {
       const user = auth.getUser()
       const uid = user ? String(user.id) : ''
-      const active = this.decorateActive(results[0], uid)
+      const conv = (results[2] || []).find(function (c) { return c.id === chatId })
+      const partnerName = conv && conv.partnerName ? conv.partnerName : '对方'
+      const active = this.decorateActive(results[0], uid, partnerName)
       const history = (results[1] || []).slice().reverse().map(function (order) {
         return {
           id: order.id,
@@ -75,18 +97,36 @@ Page({
         }
       })
       this.setData({ active: active, history: history })
+      return this.refreshReviewFlag(active)
     }).catch(function () {
     }).finally(() => {
-      this.setData({ loading: false })
+      this.setData({ loading: false, loadedOnce: true })
     })
   },
 
-  decorateActive(order, uid) {
+  // 已完成订单默认显示评价入口，若后端确认已评价则收起（查询失败按未评价处理，保留入口）
+  refreshReviewFlag(active) {
+    if (!active || active.status !== 'completed' || !active.partnerId) {
+      return Promise.resolve()
+    }
+    return reviewService.hasReviewed(active.id).then((data) => {
+      const cur = this.data.active
+      if (cur && cur.id === active.id && data && data.hasReviewed) {
+        this.setData({ 'active.canReview': false })
+      }
+    }).catch(function () {
+    })
+  },
+
+  decorateActive(order, uid, partnerName) {
     if (!order || !order.id) {
       return null
     }
     const isPayer = order.payerId != null && String(order.payerId) === uid
     const isEarner = order.earnerId != null && String(order.earnerId) === uid
+    const partnerId = isPayer
+      ? (order.earnerId != null ? String(order.earnerId) : '')
+      : (isEarner ? (order.payerId != null ? String(order.payerId) : '') : '')
     const timeline = []
     if (order.createdAt) {
       timeline.push({ label: '创建订单', time: format.formatTime(order.createdAt) })
@@ -114,6 +154,10 @@ Page({
       canCancel: order.status === 'pending' && (isPayer || isEarner),
       canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
       canDispute: order.status === 'in_progress' && (isPayer || isEarner),
+      // 先按状态乐观显示评价入口，refreshReviewFlag 查到已评价再收起
+      canReview: order.status === 'completed' && (isPayer || isEarner) && !!partnerId,
+      partnerId: partnerId,
+      partnerName: partnerName || '对方',
       disputeText: order.status === 'disputed' && order.disputeReason
         ? '申诉理由：' + order.disputeReason
         : (order.status === 'closed' ? resolutionLabel(order) : '')
@@ -144,11 +188,52 @@ Page({
       content: '确认对方已完成？双方均确认后订单将结算'
     }).then((ok) => {
       if (!ok) return
-      orderService.confirm(active.id).then(() => {
-        wx.showToast({ title: '已确认', icon: 'success' })
-        this.loadData()
+      orderService.confirm(active.id).then((order) => {
+        const completed = order && order.status === 'completed'
+        if (completed) {
+          wx.showToast({ title: '订单已完成', icon: 'success' })
+        } else {
+          wx.showToast({ title: '已确认，等待对方确认', icon: 'none' })
+        }
+        this.loadData().then(() => {
+          if (completed) {
+            this.promptReview()
+          }
+        })
       }).catch(function () {
       })
+    })
+  },
+
+  // 订单完成后引导评价，与列表页 confirmOrder 的「去评价」一致
+  promptReview() {
+    const active = this.data.active
+    if (!active || active.status !== 'completed' || !active.canReview || !active.partnerId) {
+      return
+    }
+    wx.showModal({
+      title: '订单已完成',
+      content: '去评价对方吧',
+      confirmText: '去评价',
+      success: (res) => {
+        if (res.confirm) {
+          this.goReview()
+        }
+      }
+    })
+  },
+
+  goReview() {
+    const active = this.data.active
+    if (!active) return
+    if (!active.partnerId) {
+      wx.showToast({ title: '无法识别评价对象', icon: 'none' })
+      return
+    }
+    wx.navigateTo({
+      url: '/pages/reviews/create/index?orderId=' + active.id +
+        '&toUserId=' + active.partnerId +
+        '&toUserName=' + encodeURIComponent(active.partnerName || '对方')
     })
   },
 

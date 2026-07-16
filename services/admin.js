@@ -19,6 +19,11 @@ function listReports() {
   return request({ url: '/api/admin/reports', method: 'GET' })
 }
 
+// 帖子管理：拉取全部帖子 List<PostDTO>（含 id/title/category/publisherSide/publisherName/status/reward 等）
+function listAllPosts() {
+  return request({ url: '/api/admin/posts', method: 'GET' })
+}
+
 function closePost(id, reason) {
   return request({
     url: '/api/admin/posts/' + id + '/close',
@@ -41,6 +46,7 @@ module.exports = {
   listDisputes,
   resolveDispute,
   listReports,
+  listAllPosts,
   closePost,
   deletePost
 }

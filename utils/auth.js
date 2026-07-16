@@ -102,8 +102,17 @@ function requireVerified() {
   if (isVerified()) {
     return true
   }
-  wx.navigateTo({
-    url: '/pages/user/verify/index'
+  // 先说明为什么再跳转，避免"突然被弹去填学号"的困惑；单按钮不提供取消
+  wx.showModal({
+    title: '需要实名认证',
+    content: '为保障同学间交易安全，发布、接单、支付前需先完成实名认证（仅需姓名和学号）',
+    confirmText: '去实名',
+    showCancel: false,
+    success: function (res) {
+      if (res.confirm) {
+        wx.navigateTo({ url: '/pages/user/verify/index' })
+      }
+    }
   })
   return false
 }
