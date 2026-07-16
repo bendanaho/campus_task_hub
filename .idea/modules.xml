@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/Keshe_backend/Keshe_backend.iml" filepath="$PROJECT_DIR$/Keshe_backend/Keshe_backend.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/campus_task_hub-back-end.iml" filepath="$PROJECT_DIR$/.idea/campus_task_hub-back-end.iml" />
+    </modules>
+  </component>
+</project>

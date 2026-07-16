@@ -1,0 +1,225 @@
+package com.example.keshe_backend.user.service;
+
+import com.example.keshe_backend.common.api.ErrorCode;
+import com.example.keshe_backend.common.exception.BusinessException;
+import com.example.keshe_backend.common.security.SecurityUtils;
+import com.example.keshe_backend.transaction.entity.Transaction;
+import com.example.keshe_backend.transaction.repository.TransactionRepository;
+import com.example.keshe_backend.user.dto.*;
+import com.example.keshe_backend.user.entity.User;
+import com.example.keshe_backend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
+
+    /**
+     * 获取本人完整资料(含 phone / email / realName / studentId 等敏感字段)。
+     * 仅允许查询当前登录用户本人,查他人抛 FORBIDDEN —— 防止越权拖取他人隐私。
+     * 查他人公开资料请用 {@link #getPublicProfile(Long)}。
+     */
+    public UserProfileResponse getUserProfile(Long userId) {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        if (!userId.equals(currentUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看他人完整资料");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        return UserProfileResponse.from(user);
+    }
+
+    /**
+     * 获取用户公开资料(他人主页用):仅返回可对外展示的字段,
+     * 屏蔽 phone / email / realName / studentId / balance 等敏感信息。
+     */
+    public UserPublicProfileDTO getPublicProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        return UserPublicProfileDTO.from(user);
+    }
+
+    /**
+     * 修改手机号
+     */
+    @Transactional
+    public UserProfileResponse updatePhone(String phone) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+
+        if (userRepository.existsByPhone(phone)) {
+            throw new BusinessException(ErrorCode.PHONE_EXISTS);
+        }
+
+        user.setPhone(phone);
+        userRepository.save(user);
+        return UserProfileResponse.from(user);
+    }
+
+    /**
+     * 修改邮箱
+     */
+    @Transactional
+    public UserProfileResponse updateEmail(String email) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+
+        // 空邮箱统一存 null 而非 ""，避免撞 email 唯一约束（同 register）
+        String normalized = (email != null && !email.isBlank()) ? email : null;
+        if (normalized != null && userRepository.existsByEmail(normalized)) {
+            throw new BusinessException(ErrorCode.EMAIL_EXISTS);
+        }
+
+        user.setEmail(normalized);
+        userRepository.save(user);
+        return UserProfileResponse.from(user);
+    }
+
+    /**
+     * 提交实名认证
+     */
+    @Transactional
+    public UserProfileResponse submitAuth(String realName, String studentId, String college, String className) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+
+        // 核心修复点：前置拦截学号超长畸形数据 (对应测试用例: TC_AUTH_003)
+        if (studentId != null && studentId.length() > 30) {
+            throw new BusinessException(ErrorCode.AUTH_REQUIRED, "学号格式不合法");
+        }
+
+        user.setRealName(realName);
+        user.setStudentId(studentId);
+        user.setCollege(college);
+        if (className != null && !className.isEmpty()) {
+            user.setClassName(className);
+        }
+        user.setAuthStatus(1); // 标记为已认证
+
+        userRepository.save(user);
+        return UserProfileResponse.from(user);
+    }
+
+    /**
+     * 查询余额
+     */
+    public BalanceResponse getBalance() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+        return new BalanceResponse(user.getBalance(), user.getFrozenBalance());
+    }
+
+    /**
+     * 更新个人资料：头像 / 个人简介 / 展示照片(最多5张)。字段为 null 表示不改。
+     */
+    @Transactional
+    public com.example.keshe_backend.user.dto.UserProfileResponse updateProfile(
+            com.example.keshe_backend.user.dto.UpdateProfileRequest req) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+        if (req.getAvatar() != null) {
+            user.setAvatar(req.getAvatar());
+        }
+        if (req.getBio() != null) {
+            String bio = req.getBio();
+            user.setBio(bio.length() > 500 ? bio.substring(0, 500) : bio);
+        }
+        if (req.getProfilePhotos() != null) {
+            java.util.List<String> ps = req.getProfilePhotos();
+            if (ps.size() > 5) ps = ps.subList(0, 5);
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < ps.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append("\"").append(ps.get(i).replace("\\", "\\\\").replace("\"", "\\\"")).append("\"");
+            }
+            sb.append("]");
+            user.setProfilePhotos(sb.toString());
+        }
+        userRepository.save(user);
+        return com.example.keshe_backend.user.dto.UserProfileResponse.from(user);
+    }
+
+    /**
+     * 充值
+     */
+    @Transactional
+    public BalanceResponse recharge(BigDecimal amount) {
+        if (amount == null || amount.compareTo(new BigDecimal("0.01")) < 0
+                || amount.compareTo(new BigDecimal("100000")) > 0) {
+            throw new BusinessException(ErrorCode.RECHARGE_AMOUNT_INVALID);
+        }
+
+        // 核心修复点：前置拦截充值过多小数位漏洞 (对应测试用例: TC_WAL_006)
+        if (amount.scale() > 2) {
+            throw new BusinessException(ErrorCode.RECHARGE_AMOUNT_INVALID, "金额最多支持两位小数");
+        }
+
+        Long userId = SecurityUtils.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
+
+        user.setBalance(user.getBalance().add(amount));
+        userRepository.save(user);
+
+        // 创建充值流水
+        Transaction tx = new Transaction();
+        tx.setUserId(userId);
+        tx.setDirection("in");
+        tx.setAmount(amount);
+        tx.setCategory("recharge");
+        tx.setNote("账户充值");
+        transactionRepository.save(tx);
+
+        return new BalanceResponse(user.getBalance(), user.getFrozenBalance());
+    }
+
+    /**
+     * 获取账单流水
+     */
+    public BillsResponse getBills() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        List<Transaction> transactions = transactionRepository.findByUserIdOrderByCreatedAtDesc(userId);
+
+        BigDecimal totalIn = BigDecimal.ZERO;
+        BigDecimal totalOut = BigDecimal.ZERO;
+        List<BillItemResponse> list = new ArrayList<>();
+
+        for (Transaction tx : transactions) {
+            if ("in".equals(tx.getDirection())) {
+                totalIn = totalIn.add(tx.getAmount());
+            } else {
+                totalOut = totalOut.add(tx.getAmount());
+            }
+            list.add(BillItemResponse.builder()
+                    .id(tx.getId())
+                    .userId(tx.getUserId())
+                    .direction(tx.getDirection())
+                    .amount(tx.getAmount())
+                    .category(tx.getCategory())
+                    .relatedId(tx.getRelatedId())
+                    .note(tx.getNote())
+                    .time(tx.getCreatedAt())
+                    .build());
+        }
+
+        return BillsResponse.builder()
+                .list(list)
+                .totalIn(totalIn)
+                .totalOut(totalOut)
+                .build();
+    }
+}
