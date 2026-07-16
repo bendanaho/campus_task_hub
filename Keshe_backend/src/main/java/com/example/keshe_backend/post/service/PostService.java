@@ -43,6 +43,8 @@ public class PostService {
     private final ChatService chatService;
     private final OrderRepository orderRepository;
     private final WalletService walletService;
+    // 复用 OrderService 的订单退款规则(冻结归属帖子还是订单)，不在这里抄第二份
+    private final com.example.keshe_backend.order.service.OrderService orderService;
 
     /** 与上传接口同一个目录：用于判断某张图的缩略图文件是否已生成 */
     @org.springframework.beans.factory.annotation.Value("${app.upload-dir:./uploads}")
@@ -288,6 +290,8 @@ public class PostService {
         for (Order o : pendings) {
             o.setStatus("cancelled");
             orderRepository.save(o);
+            // 服务帖的下单者在【下单时】就冻了钱，帖子被下架、订单被取消，这笔钱必须退回
+            orderService.refundOrderEscrowIfAny(o, task);
             chatService.addSystemMessage(o.getChatId(),
                     "该互助「" + task.getTitle() + "」已被管理员下架，订单已取消",
                     String.valueOf(task.getId()), task.getTitle());
@@ -376,6 +380,8 @@ public class PostService {
         for (Order o : pendings) {
             o.setStatus("cancelled");
             orderRepository.save(o);
+            // 同上：服务帖下单时冻的钱，随订单取消退回付款方
+            orderService.refundOrderEscrowIfAny(o, task);
             Long applicantId = o.getPayerId().equals(userId) ? o.getEarnerId() : o.getPayerId();
             chatService.addSystemMessage(o.getChatId(),
                     "发布者撤回了互助「" + task.getTitle() + "」，订单已取消",

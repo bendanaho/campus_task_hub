@@ -135,9 +135,7 @@ public class OrderService {
             amount = BigDecimal.ZERO;
         }
 
-        // 付款方下单即校验可用余额充足：服务帖(earner)接单者是付款方，若余额不足则立即拦下，
-        // 避免"余额不足也能下单、拖到对方接单时才 hold 失败"的坏体验。
-        // 悬赏帖(payer)报酬已在发布时冻结、下单者是收款方，无需校验。
+        // 先给出友好提示（hold 自身只会抛通用的"余额不足"）
         if (payerId.equals(userId) && amount.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal bal = currentUser.getBalance() == null ? BigDecimal.ZERO : currentUser.getBalance();
             if (bal.compareTo(amount) < 0) {
@@ -153,6 +151,16 @@ public class OrderService {
         order.setAmount(amount);
         order.setStatus("pending");
         order = orderRepository.save(order);
+
+        // 【下单即冻结】服务帖(earner)/组队帖的下单者就是付款方，钱在这一刻预留住。
+        // 此前是等对方接受时才 hold：只"校验余额"挡不住——校验到真正扣款之间(等待对方接受的
+        // 整段时间)这笔钱仍可被花掉，等对方点接受时 hold 失败，错误还暴露在【对方】那侧。
+        // 悬赏帖(payer)的报酬已在【发布时】冻结、下单者是收款方，这里不冻。
+        // 整个方法在事务里，hold 失败会连订单一起回滚。
+        if (payerId.equals(userId) && amount.compareTo(BigDecimal.ZERO) > 0) {
+            walletService.hold(userId, amount, "escrow_freeze", relOrder(order.getId()),
+                    "下单冻结报酬：" + post.getTitle());
+        }
 
         // 系统消息：响应方发起订单
         String createText = "none".equals(side) ? (currentUser.getUsername() + " 申请参加，等待发起者接受")
@@ -196,12 +204,8 @@ public class OrderService {
         BigDecimal amount = order.getAmount();
         LocalDateTime now = LocalDateTime.now();
 
-        // 冻结付款方报酬（纯互助 amount=0 跳过）：
-        // 悬赏帖(payer)报酬在【发布时】已冻结，这里不重复冻；服务帖(earner)在【接单时】冻结付款方(接单者)。
-        if (amount.compareTo(BigDecimal.ZERO) > 0 && !"payer".equals(post.getPublisherSide())) {
-            walletService.hold(order.getPayerId(), amount, "escrow_freeze", relOrder(order.getId()),
-                    "订单冻结报酬：" + post.getTitle());
-        }
+        // 这里不再冻结：报酬要么在【发布时】冻(悬赏帖)、要么在【下单时】冻(服务帖/组队帖)，
+        // 到接单这一步钱已经预留好了。此前在这里 hold 会让"等待接受"期间的钱处于未预留状态。
 
         order.setStatus("in_progress");
         order.setAcceptedAt(now);
@@ -259,6 +263,10 @@ public class OrderService {
 
         order.setStatus("cancelled");
         orderRepository.save(order);
+
+        // 下单时冻结的钱要退回付款方（对方拒绝、或自己撤回，都走这里）。
+        Task cancelPost = taskRepository.findById(order.getPostId()).orElse(null);
+        refundOrderEscrowIfAny(order, cancelPost);
 
         try {
                     Long partnerId = order.getPayerId().equals(userId) ? order.getEarnerId() : order.getPayerId();
@@ -618,6 +626,23 @@ public class OrderService {
                     .build());
         }
         return result;
+    }
+
+    /**
+     * 取消一笔尚未完成的订单时，退回它冻结的钱。
+     *
+     * 冻结归属分两种，退款规则随之不同：
+     *  - 悬赏帖(payer)：报酬冻在【帖子】上（发布时冻结）。订单取消不退——帖子还挂着，
+     *    等下一个人来接；真正退回发生在发布者撤回/管理员下架该帖时。
+     *  - 服务帖(earner)/组队帖：冻在【订单】上（下单时冻结）。订单一取消就必须退给付款方，
+     *    否则钱会一直冻着、没有任何东西能把它释放出来。
+     */
+    public void refundOrderEscrowIfAny(Order order, Task post) {
+        if (post != null && "payer".equals(post.getPublisherSide())) return;
+        BigDecimal amount = order.getAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        walletService.refund(order.getPayerId(), amount, "escrow_refund", relOrder(order.getId()),
+                "订单取消，退回冻结报酬：" + (post != null ? post.getTitle() : ""));
     }
 
     private User requireVerified(Long userId) {
