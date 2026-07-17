@@ -1441,9 +1441,13 @@ function initMessageCenter() {
         enriched.sort(function(a, b) { return convScore(b) - convScore(a); });
 
         counts = {
+            // 待处理/进行中：以【会话数】计（它们是待办清单，一条会话就是一件事）
             action: enriched.filter(function(it) { return it.needsAction && !it.isSystem; }).length,
             progress: enriched.filter(function(it) { return it.inProgress; }).length,
-            unread: enriched.filter(function(it) { return it.unread > 0; }).length
+            // 未读：以【消息条数】计，与导航栏角标同口径。
+            // 此前这里是"有未读的会话数"，而角标是消息条数，两个数天然对不上，
+            // 用户会以为哪边出了 bug。
+            unread: enriched.reduce(function(sum, it) { return sum + (it.unread || 0); }, 0)
         };
 
         renderOverview();
