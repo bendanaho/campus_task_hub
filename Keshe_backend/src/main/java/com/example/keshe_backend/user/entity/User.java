@@ -95,6 +95,15 @@ public class User {
     @Column(nullable = false)
     private Integer role = 0;
 
+    /**
+     * 令牌代次：签发 JWT 时写入 tv 声明，鉴权时与此值比对，不等即拒。
+     * 改密码/找回密码/管理员重置时 +1，使该用户此前签发的所有 JWT 立即作废。
+     * 没有它的话，改完密码旧 token 仍然有效——对"账号已被入侵"这个最需要
+     * 找回密码的场景，改密码等于没用（攻击者的会话还在里面）。
+     */
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
     @Version
     private Integer version;
 
@@ -126,6 +135,9 @@ public class User {
         }
         if (this.role == null) {
             this.role = 0;
+        }
+        if (this.tokenVersion == null) {
+            this.tokenVersion = 0;
         }
     }
 

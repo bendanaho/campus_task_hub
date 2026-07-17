@@ -37,7 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = jwtUtil.getUserIdFromToken(token);
                 Optional<User> userOpt = userRepository.findById(userId);
 
-                if (userOpt.isPresent()) {
+                if (userOpt.isPresent() && tokenVersionMatches(token, userOpt.get())) {
                     User user = userOpt.get();
                     // role=1 的用户额外授予 ROLE_ADMIN，供 /api/admin/** 鉴权
                     List<SimpleGrantedAuthority> authorities =
@@ -60,6 +60,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 令牌代次比对：改密码/找回/管理员重置会把 user.tokenVersion +1，使旧 JWT 立即作废。
+     *
+     * 本次改动之前签发的 token 没有 tv 声明 → 按 0 处理。所有存量用户的 tokenVersion 初始也是 0，
+     * 于是老 token 继续有效，上线不会把在线用户全踢下线；而一旦谁重置了密码，其 tokenVersion 变 1，
+     * 老 token 的 0 就对不上了，照样被拒——安全性一分不少，只是不做无谓的强制登出。
+     *
+     * 这里不额外查库：外层为了取 role 本来就 findById 了一次。
+     */
+    private boolean tokenVersionMatches(String token, User user) {
+        Integer claimed = jwtUtil.getTokenVersionFromToken(token);
+        int fromToken = claimed == null ? 0 : claimed;
+        int current = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        return fromToken == current;
     }
 
     private String extractToken(HttpServletRequest request) {

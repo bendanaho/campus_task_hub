@@ -21,6 +21,13 @@ public enum ErrorCode {
     EMAIL_EXISTS(2004, "该邮箱已注册"),
     AUTH_REQUIRED(2005, "请先登录"),
     VERIFICATION_REQUIRED(2006, "请先完成实名认证后再操作"),
+    // 找回密码 2007~2012。对外话术刻意含糊，不区分"账号不存在"与"邮箱不匹配"，避免账号枚举。
+    RESET_INFO_MISMATCH(2007, "账号与邮箱不匹配，或该账号未绑定邮箱"),
+    RESET_CODE_INVALID(2008, "验证码错误或已过期"),
+    RESET_TOO_MANY(2009, "尝试过于频繁，请稍后再试"),
+    RESET_CODE_COOLDOWN(2010, "发送过于频繁，请稍后再试"),
+    MAIL_SEND_FAILED(2011, "验证码邮件发送失败，请稍后重试"),
+    PASSWORD_WRONG(2012, "当前密码不正确"),
 
     // 订单/任务相关 3xxx
     BALANCE_NOT_ENOUGH(3001, "余额不足"),

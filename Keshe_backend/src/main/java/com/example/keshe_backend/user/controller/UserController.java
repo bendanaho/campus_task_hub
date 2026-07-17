@@ -45,7 +45,7 @@ public class UserController {
      */
     @PutMapping("/user/email")
     public ApiResponse<UserProfileResponse> updateEmail(@Valid @RequestBody UpdateEmailRequest request) {
-        return ApiResponse.success(userService.updateEmail(request.getEmail()));
+        return ApiResponse.success(userService.updateEmail(request.getEmail(), request.getCurrentPassword()));
     }
 
     /**

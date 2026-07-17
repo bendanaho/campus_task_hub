@@ -35,6 +35,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 公开端点（无需登录）
                         .requestMatchers("/api/login", "/api/register", "/api/login/wechat").permitAll()
+                        // 找回密码：使用者恰恰是登不进来的人，必须免登录。
+                        // 限流与账号枚举防护在 PasswordResetService 里，不靠这一层。
+                        .requestMatchers("/api/password/reset", "/api/password/reset/send-code").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()

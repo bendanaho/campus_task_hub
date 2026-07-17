@@ -41,11 +41,11 @@ public class AuthService {
         user.setPhone(request.getPhone());
         
 
-        // 邮箱选填：空邮箱统一存 null 而非 ""。email 列有唯一约束，
-        // 多个 null 视为互不相同（允许），但多个 "" 会撞唯一约束——
-        // 否则第二个不填邮箱的用户注册就会失败（23505）。
+        // 邮箱现已是必填（RegisterRequest 上有 @NotBlank + @Email），正常走不到 null 分支；
+        // 这里的归一化留作兜底：email 列有唯一约束，多个 null 互不相同（允许），
+        // 但多个 "" 会撞唯一约束（23505）。
         String email = request.getEmail();
-        user.setEmail(email != null && !email.isBlank() ? email : null);
+        user.setEmail(email != null && !email.isBlank() ? email.trim() : null);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         userRepository.save(user);
@@ -61,7 +61,7 @@ public class AuthService {
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername());
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getTokenVersion());
 
         return new LoginResponse(SafeUserDTO.from(user), token);
     }

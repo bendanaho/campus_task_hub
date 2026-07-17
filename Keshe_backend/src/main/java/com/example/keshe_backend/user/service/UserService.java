@@ -22,6 +22,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     /**
      * 获取本人完整资料(含 phone / email / realName / studentId 等敏感字段)。
@@ -70,14 +71,22 @@ public class UserService {
      * 修改邮箱
      */
     @Transactional
-    public UserProfileResponse updateEmail(String email) {
+    public UserProfileResponse updateEmail(String email, String currentPassword) {
         Long userId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_REQUIRED));
 
+        // 邮箱是找回密码的唯一凭据，改它必须先证明"你是本人"，光有登录态不够。
+        // 详见 UpdateEmailRequest.currentPassword 的说明。
+        if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.PASSWORD_WRONG);
+        }
+
         // 空邮箱统一存 null 而非 ""，避免撞 email 唯一约束（同 register）
-        String normalized = (email != null && !email.isBlank()) ? email : null;
-        if (normalized != null && userRepository.existsByEmail(normalized)) {
+        String normalized = (email != null && !email.isBlank()) ? email.trim() : null;
+        if (normalized != null
+                && !normalized.equalsIgnoreCase(user.getEmail())
+                && userRepository.existsByEmail(normalized)) {
             throw new BusinessException(ErrorCode.EMAIL_EXISTS);
         }
 

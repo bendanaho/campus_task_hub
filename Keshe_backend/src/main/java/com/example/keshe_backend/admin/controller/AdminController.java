@@ -1,5 +1,8 @@
 package com.example.keshe_backend.admin.controller;
 
+import com.example.keshe_backend.admin.dto.AdminResetPasswordResponse;
+import com.example.keshe_backend.admin.dto.AdminUserItemResponse;
+import com.example.keshe_backend.admin.service.AdminUserService;
 import com.example.keshe_backend.common.api.ApiResponse;
 import com.example.keshe_backend.order.dto.AdminOrderItemResponse;
 import com.example.keshe_backend.order.dto.OrderDTO;
@@ -28,6 +31,7 @@ public class AdminController {
     private final OrderService orderService;
     private final PostService postService;
     private final ReportService reportService;
+    private final AdminUserService adminUserService;
 
     /**
      * 待处理争议订单列表
@@ -97,5 +101,22 @@ public class AdminController {
                                                @RequestBody(required = false) AdminReasonRequest request) {
         String reason = request == null ? null : request.getReason();
         return ApiResponse.success(reportService.dismissReports(postId, reason));
+    }
+
+    /**
+     * 用户列表（脱敏）。供人工重置密码时找人用。
+     */
+    @GetMapping("/users")
+    public ApiResponse<List<AdminUserItemResponse>> listUsers() {
+        return ApiResponse.success(adminUserService.listUsers());
+    }
+
+    /**
+     * 人工重置密码：给没绑邮箱、走不了自助找回的用户兜底。
+     * 返回的临时密码只出现这一次，管理员须线下核实身份后再转告本人。
+     */
+    @PostMapping("/users/{id}/reset-password")
+    public ApiResponse<AdminResetPasswordResponse> resetUserPassword(@PathVariable Long id) {
+        return ApiResponse.success(adminUserService.resetPassword(id));
     }
 }
