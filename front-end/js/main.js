@@ -1604,6 +1604,10 @@ function initChatDetail() {
             statusText = iAmPayer ? '任务完成，已付给对方' : '任务完成，已到账';
         } else if (p.status === 'refunded') {
             statusText = iAmPayer ? '任务未成，已退回给你' : '任务未成，已退回对方';
+        } else if (p.status === 'arbitrated') {
+            // 该笔转账已并入争议仲裁，与订单金额一起由管理员按总额分配，
+            // 具体分给谁多少见结案说明——这里不重复报金额去向，避免与裁决结果打架
+            statusText = '已并入仲裁处理 · 见结案说明';
         } else if (p.status === 'paid') {
             statusText = iAmPayer ? '已付款' : (iAmReceiver ? '已到账' : '已完成');
         } else if (p.status === 'cancelled') {
@@ -1626,13 +1630,15 @@ function initChatDetail() {
                 }
             }
         }
-        // 金额方向：出账标红、入账标绿，扫一眼就知道钱是进是出
+        // 金额方向：出账标红、入账标绿，扫一眼就知道钱是进是出。
+        // cancelled/refunded 钱没走或已回来、arbitrated 去向由裁决决定，一律不标方向。
+        var noDirection = (p.status === 'cancelled' || p.status === 'refunded' || p.status === 'arbitrated');
         var amountClass = 'pay-card-amount';
-        if (p.status !== 'cancelled') {
-            if (iAmPayer && p.status !== 'refunded') amountClass += ' pay-out';
-            else if (iAmReceiver && p.status !== 'refunded') amountClass += ' pay-in';
+        if (!noDirection) {
+            if (iAmPayer) amountClass += ' pay-out';
+            else if (iAmReceiver) amountClass += ' pay-in';
         }
-        var sign = (iAmPayer && p.status !== 'cancelled' && p.status !== 'refunded') ? '-' : '';
+        var sign = (iAmPayer && !noDirection) ? '-' : '';
 
         return '<div class="chat-message chat-payment ' + side + '">' +
             '<div class="pay-card pay-' + stateClass + '">' +
@@ -2885,6 +2891,21 @@ function initAdminPage() {
         }).join('');
     }
 
+    // 争议标的 = 订单金额 + 该会话仍托管中的转账。
+    // 只显示 order.amount 会让管理员以为标的就那么多——而部分结算时那笔转账
+    // 会被悄悄全额划给收款方，他根本不知道它存在。这里把构成列出来。
+    var __disputeTotals = {};
+    function disputeAmountText(item) {
+        var amt = Number(item.order.amount || 0);
+        var extra = Number(item.escrowedTransferTotal || 0);
+        var total = Number(item.disputeTotal != null ? item.disputeTotal : amt);
+        __disputeTotals[item.order.id] = { amount: amt, extra: extra, total: total };
+        if (extra > 0) {
+            return '争议总额：<b>' + total + ' 元</b>（订单 ' + amt + ' ＋ 托管转账 ' + extra + '）（冻结中）';
+        }
+        return '金额：' + amt + ' 元（冻结中）';
+    }
+
     function renderDisputes(list) {
         if (!list || list.length === 0) {
             content.innerHTML = '<div class="card empty-state"><p>暂无待处理申诉</p></div>';
@@ -2895,7 +2916,7 @@ function initAdminPage() {
             return '<div class="card dispute-card">' +
                 '<div class="msg-header"><h3>' + item.postTitle + '</h3>' +
                     '<span class="msg-time">' + formatDateTime(o.disputedAt) + '</span></div>' +
-                '<p class="meta">订单号：' + o.id + ' ｜ 金额：' + (o.amount || 0) + ' 元（冻结中） ｜ 付款方：' + item.payerName + ' ｜ 收款方：' + item.earnerName + '</p>' +
+                '<p class="meta">订单号：' + o.id + ' ｜ ' + disputeAmountText(item) + ' ｜ 付款方：' + item.payerName + ' ｜ 收款方：' + item.earnerName + '</p>' +
                 '<p class="meta">申诉人：' + item.disputedByName + ' ｜ 理由：' + (o.disputeReason || '') + '</p>' +
                 '<div class="form-group"><textarea id="note-' + o.id + '" class="form-control" rows="2" placeholder="处理说明（必填，将随结案系统消息展示给双方）"></textarea></div>' +
                 '<div class="actions">' +
@@ -2959,9 +2980,23 @@ function initAdminPage() {
         if (!note) { alert('请先填写处理说明。'); return; }
         var amountToEarner = null;
         if (decision === 'partial') {
-            var input = prompt('请输入结算给收款方的金额（元），其余将退回付款方：');
+            // 上限是【争议总额】(订单+托管转账)，不是订单金额——否则那笔托管转账
+            // 既退不掉、又会被默默算给收款方
+            var d = __disputeTotals[orderId];
+            var tip = d
+                ? ('本单争议总额 ' + d.total + ' 元'
+                    + (d.extra > 0 ? '（订单 ' + d.amount + ' ＋ 托管转账 ' + d.extra + '）' : '')
+                    + '\n请输入结算给收款方的金额（0 ~ ' + d.total + '），其余退回付款方：')
+                : '请输入结算给收款方的金额（元），其余将退回付款方：';
+            var input = prompt(tip);
             if (input === null) return;
-            amountToEarner = Number(input);
+            var parsedAmt = parseMoneyInput(input);
+            if (!parsedAmt.ok) { alert(parsedAmt.error); return; }
+            amountToEarner = parsedAmt.value;
+            if (d && amountToEarner >= d.total) {
+                alert('部分结算金额必须小于争议总额 ' + d.total + ' 元。要全部给收款方请用「全额结算」。');
+                return;
+            }
         }
         var confirmText = {
             refund: '确认全额退款给付款方并结案？',

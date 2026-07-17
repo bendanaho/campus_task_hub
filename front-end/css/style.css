@@ -1127,6 +1127,16 @@ textarea.form-control {
 }
 .pay-card.pay-refunded .pay-card-amount { color: #6b7280; }
 
+/* 已并入仲裁处理：钱由管理员按总额分配，去向见结案说明，故用中性紫、不标进出 */
+.pay-card.pay-arbitrated {
+    background: #faf5ff;
+    border-color: #d8b4fe;
+    box-shadow: none;
+}
+.pay-card.pay-arbitrated .pay-card-head { color: #6b21a8; }
+.pay-card.pay-arbitrated .pay-card-kind { background: rgba(107, 33, 168, 0.12); }
+.pay-card.pay-arbitrated .pay-card-amount { color: #7e22ce; }
+
 /* 金额进出方向：出账红、入账绿，扫一眼知道钱是进是出 */
 .pay-card .pay-card-amount.pay-out { color: #dc2626 !important; }
 .pay-card .pay-card-amount.pay-in { color: var(--success) !important; }
