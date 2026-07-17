@@ -1240,6 +1240,18 @@ function initPublishForm() {
         // 报酬金额最多两位小数（reward 为自由文本，拦"5.999"这类多于两位小数的数字）
         if (side !== 'none' && /\d+\.\d{3,}/.test(reward)) { alert('报酬金额最多保留两位小数。'); return; }
 
+        // 报酬是自由文本，"3000到6000"「面议」这类没有确定金额 → rewardValue 为 0，
+        // 即不冻结、订单也按 0 元结算。这事发布者必须知情：否则他以为发了个有担保的悬赏，
+        // 实际接单者干完活一分钱都拿不到（钱得另外在聊天里转）。不拦，只让他确认一次。
+        if (side !== 'none' && parseRewardValue(reward) === 0) {
+            var warn = side === 'payer'
+                ? '报酬「' + reward + '」不是确定金额，发布时不会冻结任何资金作担保。\n\n'
+                  + '接单者完成后订单按 0 元结算，你需要在聊天里用「转账」把钱付给对方。'
+                : '报酬「' + reward + '」不是确定金额，下单时不会冻结任何资金。\n\n'
+                  + '订单会按 0 元结算，你需要在聊天里用「收款」向对方要钱。';
+            if (!confirm(warn + '\n\n若要有资金担保，请填确定的数字（如 3000）。\n\n仍要这样发布吗？')) return;
+        }
+
         var data = {
             title: title,
             publisherSide: side,
