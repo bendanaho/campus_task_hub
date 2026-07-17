@@ -887,10 +887,12 @@ function initHomePage() {
             }).join('') + '</div>' : '';
             return '<div class="task-item task-side-' + (task.publisherSide || 'none') + '">' +
                 '<div class="task-item-main">' +
+                    // 首页卡没有大厅那样的发布者行，标题行右侧就是它的空白处
                     '<div class="task-item-top">' +
                         '<h3>' + task.title + '</h3>' +
+                        taskPriceHTML(task) +
                     '</div>' +
-                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>） ｜ 报酬：' + formatReward(task.reward) + '</p>' +
+                    '<p class="meta">分类：' + catName + ' ｜ 任务发起者：' + '<a href="profile.html?userId=' + task.publisherId + '" class="user-link">' + task.publisherName + '</a>' + '（<span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span>）</p>' +
                     '<div class="task-item-body">' +
                         '<p class="task-desc">' + task.description + '</p>' +
                         bodyImages +
@@ -905,6 +907,36 @@ function initHomePage() {
         // 原来只有一个 then、没有 catch，请求挂了首页就一直空着不给交代
         taskList.innerHTML = '<p>推荐任务加载失败，请刷新重试。</p>';
     });
+}
+
+// 报酬 / 价格：同一个 reward 字段，叫法取决于【看的人】站在哪一边——
+//   payer (悬赏求助/发布者出钱)  → 看的人是接单方，这笔钱他能【赚到】 → 报酬
+//   earner(提供服务/发布者收钱)  → 看的人是下单方，这笔钱他要【付出】 → 价格
+//   none  (组队互助)            → 不涉及金钱，不显示
+// 两个标签都以浏览者为视角，不是发布者视角，否则同一张卡在不同页面会自相矛盾。
+// 顶层函数：大厅/首页/详情/我的订单/管理后台都要用，各写一份迟早改漏。
+function rewardLabelFor(side) {
+    if (side === 'none') return '';
+    return side === 'payer' ? '报酬' : '价格';
+}
+
+// 金额展示块。值直接用 formatReward 的输出（"5元" / "面议"），刻意不加 ¥ 前缀——
+// reward 是自由文本，"面议"前面挂个 ¥ 就成了"¥面议"。
+//
+// 大字号只给【确定金额】：reward 允许填一整句话（后端列宽 50 字符），线上就有
+// "3.5-1000 具体金额面议"这种。把一句话用 20px 加粗喊出来既难看、又占地方
+// （实测那条 242px，手机上会把发布者行挤成两行）。非金额一律降到 14px 并截断。
+function taskPriceHTML(task) {
+    var label = rewardLabelFor(task.publisherSide);
+    if (!label) return '';
+    var text = formatReward(task.reward);
+    var isAmount = parseRewardValue(task.reward) > 0;
+    return '<span class="task-price task-price-' + task.publisherSide + (isAmount ? '' : ' task-price-text') + '">' +
+        '<span class="task-price-label">' + label + '</span>' +
+        '<span class="task-price-value"' + (isAmount ? '' : ' title="' + escapeHtml(text) + '"') + '>' +
+            escapeHtml(text) +
+        '</span>' +
+    '</span>';
 }
 
 // 用户「头像+名字」名片入口：点进 TA 的主页。头像缺省用名字首字兜底，加载失败也回退首字。
@@ -1021,8 +1053,10 @@ function initTaskHall() {
                     '<h3>' + task.title + '</h3>' +
                     '<span class="task-badge ' + typeClass + '">' + typeLabel + '</span>' +
                 '</div>' +
-                '<div class="task-publisher">' + userChip(task.publisherId, task.publisherName, task.publisherAvatar) + '<span class="task-publisher-credit">信用 <span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span></span></div>' +
-                '<p class="meta">分类：' + catName + (task.publisherSide === 'none' ? '' : ' ｜ 报酬：' + formatReward(task.reward)) + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
+                // 金额挂在发布者行的右侧空白处：既不多占一行、又能被一眼看到。
+                // 原先它混在下面那条 meta 流水行里，和分类、时间同字号同灰色，等于没有。
+                '<div class="task-publisher">' + userChip(task.publisherId, task.publisherName, task.publisherAvatar) + '<span class="task-publisher-credit">信用 <span class="credit-score ' + creditColor + '">' + task.publisherCredit + '</span></span>' + taskPriceHTML(task) + '</div>' +
+                '<p class="meta">分类：' + catName + (task.publisherSide === 'payer' && task.deadline ? ' ｜ 截止：' + formatDateTime(task.deadline) : '') + ' ｜ ' + timeStr + '</p>' +
                 '<div class="task-item-body">' +
                     '<p class="task-desc">' + task.description + '</p>' +
                     bodyImages +
@@ -1237,7 +1271,9 @@ function initPublishForm() {
         if (serviceTimeGroup) serviceTimeGroup.style.display = side === 'earner' ? '' : 'none';
         // 纯互助不涉及金钱，隐藏报酬字段，并默认把分类设为「组队协作」
         if (rewardGroup) rewardGroup.style.display = side === 'none' ? 'none' : '';
-        if (rewardText) rewardText.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '期望报酬（你的收费）';
+        // 与大厅/详情的叫法对齐：出钱的帖叫「报酬」，收钱的帖叫「价格」。
+        // 这里原本是「期望报酬（你的收费）」，发布时叫报酬、挂出去却显示价格，两头对不上。
+        if (rewardText) rewardText.textContent = side === 'payer' ? '报酬金额（你愿意支付）' : '价格（你的收费）';
         if (side === 'none') {
             var cat = document.getElementById('postCategory');
             if (cat) cat.value = 'teamwork';
@@ -1376,7 +1412,8 @@ function initTaskDetail() {
                 '<p><strong>描述：</strong>' + task.description + '</p>' +
                 '<div class="detail-publisher"><strong>发布者：</strong>' + userChip(task.publisherId, task.publisherName, publisher.avatar, 'user-chip--lg') + '<span class="task-publisher-credit">信用 <span class="credit-score ' + getCreditColorClass(task.publisherCredit) + '">' + task.publisherCredit + '</span></span></div>' +
                 '<p><strong>联系方式：</strong>' + (task.contact || '站内联系') + '</p>' +
-                (task.publisherSide === 'none' ? '' : '<p><strong>报酬金额：</strong>' + formatReward(task.reward) + '</p>') +
+                // 大厅说「价格」、点进详情却写「报酬」，会让人以为是两笔钱
+                (task.publisherSide === 'none' ? '' : '<p><strong>' + rewardLabelFor(task.publisherSide) + '：</strong>' + formatReward(task.reward) + '</p>') +
                 serviceTimeHtml +
                 '<p><strong>发布时间：</strong>' + formatDateTime(task.publishTime) + '</p>' +
                 (task.publisherSide === 'payer' && task.deadline ? '<p><strong>截止时间：</strong>' + formatDateTime(task.deadline) + '</p>' : '') +
@@ -2594,7 +2631,8 @@ function initOrderCenter() {
     // 我发布的·待响应 卡
     function openPostCard(p) {
         var typeLabel = p.publisherSide === 'payer' ? '悬赏求助' : (p.publisherSide === 'none' ? '组队互助' : '提供服务');
-        var rewardText = p.publisherSide === 'none' ? '不涉及金钱' : ('报酬 ' + formatReward(p.reward));
+        var rewardText = p.publisherSide === 'none' ? '不涉及金钱'
+            : (rewardLabelFor(p.publisherSide) + ' ' + formatReward(p.reward));
         return '<div class="record-item order-row">' +
             '<div class="order-row-main">' +
                 '<h3 class="order-row-title">' + p.title + '</h3>' +
@@ -2610,7 +2648,8 @@ function initOrderCenter() {
     // 我发布的·已下架/已结束 卡：只读，不给撤回（已经不在大厅了）
     function closedPostCard(p) {
         var typeLabel = p.publisherSide === 'payer' ? '悬赏求助' : (p.publisherSide === 'none' ? '组队互助' : '提供服务');
-        var rewardText = p.publisherSide === 'none' ? '不涉及金钱' : ('报酬 ' + formatReward(p.reward));
+        var rewardText = p.publisherSide === 'none' ? '不涉及金钱'
+            : (rewardLabelFor(p.publisherSide) + ' ' + formatReward(p.reward));
         return '<div class="record-item order-row">' +
             '<div class="order-row-main">' +
                 '<h3 class="order-row-title">' + p.title + '</h3>' +
@@ -3149,7 +3188,8 @@ function initAdminPage() {
             return '<div class="card dispute-card">' +
                 '<div class="msg-header"><h3>' + t.title +
                     ' <span class="status-badge status-action">被举报 ' + item.reportCount + ' 次</span></h3></div>' +
-                '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName + ' ｜ 报酬：' + formatReward(t.reward) + '</p>' +
+                '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName +
+                    (t.publisherSide === 'none' ? '' : ' ｜ ' + rewardLabelFor(t.publisherSide) + '：' + formatReward(t.reward)) + '</p>' +
                 '<ul class="report-reasons">' + reasons + '</ul>' +
                 '<div class="actions">' +
                     '<a href="task-detail.html?id=' + t.id + '" class="btn btn-small btn-secondary">查看详情</a>' +
@@ -3234,7 +3274,8 @@ function initAdminPage() {
             return '<div class="card">' +
                 '<div class="msg-header"><h3>' + t.title + ' ' + stBadge + '</h3>' +
                     '<span class="msg-time">' + formatDateTime(t.publishTime) + '</span></div>' +
-                '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName + ' ｜ 报酬：' + formatReward(t.reward) + '</p>' +
+                '<p class="meta">' + typeLabel + ' ｜ 发布者：' + t.publisherName +
+                    (t.publisherSide === 'none' ? '' : ' ｜ ' + rewardLabelFor(t.publisherSide) + '：' + formatReward(t.reward)) + '</p>' +
                 '<div class="actions">' +
                     '<a href="task-detail.html?id=' + t.id + '" class="btn btn-small btn-secondary">查看详情</a>' +
                     (t.status === 'open' ? '<button type="button" class="btn btn-small" onclick="handleAdminClosePost(\'' + t.id + '\')">下架</button>' : '') +

@@ -662,6 +662,48 @@ textarea.form-control {
     margin: 8px 0 6px;
 }
 .task-publisher-credit { color: var(--ink-soft, #6b7280); font-size: 13px; }
+
+/* 报酬 / 价格：卡片里最该被看见的一条信息，原先和分类、时间挤在同一条 meta 流水行里，
+   同字号同灰色，等于没有。margin-left:auto 把它顶到发布者行右侧那片空白——
+   既不多占一行、又跑不掉。窄屏时 .task-publisher 的 flex-wrap 会让它自己换行并靠右。 */
+.task-price {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.task-price-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-mute);
+}
+
+.task-price-value {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+/* 配色沿用卡片已有的方向语言，不另起一套：
+   悬赏(浅红底) → 珊瑚，与 badge-demand 同色；服务(浅黄底) → 琥珀，压得住米黄。
+   刻意不用「绿=进账/红=出账」那套 pay-in/pay-out：绿字压粉底、红字压黄底会打架，
+   而方向信息卡片底色和类型徽章已经给足了。 */
+.task-price-payer .task-price-value { color: var(--coral); }
+.task-price-earner .task-price-value { color: var(--warn); }
+
+/* 非确定金额（"面议"/"3.5-1000 具体金额面议"/"私信交流"）：它是一句话不是数字，
+   不配也不该占用金额的字号。reward 后端限长 50 字符，不截断的话手机上会撑破卡片，
+   故限宽 + 省略号，完整内容挂 title 供悬停查看。 */
+.task-price.task-price-text .task-price-value {
+    font-size: 14px;
+    font-weight: 700;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .detail-publisher {
     display: flex;
     align-items: center;

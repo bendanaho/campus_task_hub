@@ -129,8 +129,10 @@
                                  和「默认」是同一个排序，已删。 -->
                             <option value="" selected>默认（最新发布）</option>
                             <option value="time_asc">最早发布</option>
-                            <option value="reward_asc">报酬金额递增</option>
-                            <option value="reward_desc">报酬金额递减</option>
+                            <!-- 叫「金额」不叫「报酬」：这两项同时管两种帖子（后端按 rewardValue
+                                 排序、不分方向），而收钱的帖子现在显示的是「价格」。 -->
+                            <option value="reward_asc">金额递增</option>
+                            <option value="reward_desc">金额递减</option>
                             <option value="credit_desc">信用分数递减</option>
                         </select>
                     </div>
