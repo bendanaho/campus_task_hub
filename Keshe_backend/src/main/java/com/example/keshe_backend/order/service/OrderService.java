@@ -518,15 +518,27 @@ public class OrderService {
                 } catch (Exception e) {
                     log.error("WebSocket仲裁通知失败", e);
                 }
+        // 结案文案必须报【实际动了多少钱】，即按 total 分配后的 payerGets/earnerGets，
+        // 不能报 order.amount。上面早已改成按「订单 + 托管转账」的总额分配，这里却一直
+        // 沿用 amount：订单 20 + 托管转账 5 时，实际退了 25，消息却说"20 元已退还"。
+        // （partial 分支当初就是用 earnerGets/payerGets 写的，所以只有它是对的。）
+        // 金额构成也一并列出，否则用户看到 25 不知道这 5 元是哪来的。
+        String breakdown = escrowedTransfers.compareTo(BigDecimal.ZERO) > 0
+                ? "（订单 " + fmt(amount) + " ＋ 托管转账 " + fmt(escrowedTransfers) + "）"
+                : "";
         String text;
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            // 用 total 而非 amount 判空：面议单(amount=0)若有托管转账，钱是真的动了，
+            // 按 amount 判会走进这个分支，结果一个数字都不报。
             text = "管理员已结案（说明：" + noteText + "）";
         } else if ("refund".equals(decision)) {
-            text = "管理员已结案：全额退款，" + fmt(amount) + " 元已退还 " + nameOf(order.getPayerId()) + "（说明：" + noteText + "）";
+            text = "管理员已结案：全额退款，" + fmt(payerGets) + " 元" + breakdown
+                    + "已退还 " + nameOf(order.getPayerId()) + "（说明：" + noteText + "）";
         } else if ("settle".equals(decision)) {
-            text = "管理员已结案：全额结算，" + fmt(amount) + " 元已支付给 " + nameOf(order.getEarnerId()) + "（说明：" + noteText + "）";
+            text = "管理员已结案：全额结算，" + fmt(earnerGets) + " 元" + breakdown
+                    + "已支付给 " + nameOf(order.getEarnerId()) + "（说明：" + noteText + "）";
         } else {
-            text = "管理员已结案：部分结算，" + nameOf(order.getEarnerId()) + " 获得 " + fmt(earnerGets) + " 元，"
+            text = "管理员已结案：部分结算" + breakdown + "，" + nameOf(order.getEarnerId()) + " 获得 " + fmt(earnerGets) + " 元，"
                     + nameOf(order.getPayerId()) + " 获退 " + fmt(payerGets) + " 元（说明：" + noteText + "）";
         }
         chatService.addSystemMessage(order.getChatId(), text, String.valueOf(order.getPostId()), title);

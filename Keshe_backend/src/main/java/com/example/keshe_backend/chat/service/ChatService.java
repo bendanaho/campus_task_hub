@@ -559,31 +559,49 @@ public class ChatService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        currentUser.setBalance(currentUser.getBalance().subtract(amount));
-        receiver.setBalance(receiver.getBalance().add(amount));
-        userRepository.save(currentUser);
-        userRepository.save(receiver);
 
-        Transaction txOut = new Transaction();
-        txOut.setUserId(userId);
-        txOut.setDirection("out");
-        txOut.setAmount(amount);
-        txOut.setCategory("payment");
-        txOut.setRelatedId(messageId.toString());
-        txOut.setNote("支付给 " + receiver.getUsername());
-        transactionRepository.save(txOut);
+        // 支付收款卡片，与主动转账走同一套规则：会话里有进行中订单 → 托管冻结，否则即时到账。
+        // 此前这里无条件即时划账，于是同一笔钱因为"谁先开口"而命运不同：
+        //   我转给你   → 冻结，任务完成才到账、未成可退、有争议可仲裁
+        //   你找我收款 → 我一付就直接进你余额，任务黄了要不回来、申诉时也没有标的
+        // 收款卡片的 payment 里 payerId/receiverId 早已写好（payerId=对方、receiverId=我），
+        // 而 release/refund/sum/markArbitrated 全部是按 payment 里的这两个字段结算的，
+        // 所以只要在这里把状态置成 escrowed，那一整套托管机器原样就能接管，无需改动。
+        Order activeOrder = orderRepository.findTopByChatIdOrderByCreatedAtDesc(msg.getChatId()).orElse(null);
+        boolean escrow = activeOrder != null && "in_progress".equals(activeOrder.getStatus());
 
-        Transaction txIn = new Transaction();
-        txIn.setUserId(receiverId);
-        txIn.setDirection("in");
-        txIn.setAmount(amount);
-        txIn.setCategory("payment");
-        txIn.setRelatedId(messageId.toString());
-        txIn.setNote(currentUser.getUsername() + " 的支付");
-        transactionRepository.save(txIn);
+        if (escrow) {
+            walletService.hold(userId, amount, "escrow_transfer", relOrder(activeOrder.getId()),
+                    "支付托管给 " + receiver.getUsername());
+            payment.put("status", "escrowed");
+            payment.put("orderId", activeOrder.getId());
+        } else {
+            currentUser.setBalance(currentUser.getBalance().subtract(amount));
+            receiver.setBalance(receiver.getBalance().add(amount));
+            userRepository.save(currentUser);
+            userRepository.save(receiver);
 
-        payment.put("status", "paid");
-        payment.put("paidAt", now.toString());
+            Transaction txOut = new Transaction();
+            txOut.setUserId(userId);
+            txOut.setDirection("out");
+            txOut.setAmount(amount);
+            txOut.setCategory("payment");
+            txOut.setRelatedId(messageId.toString());
+            txOut.setNote("支付给 " + receiver.getUsername());
+            transactionRepository.save(txOut);
+
+            Transaction txIn = new Transaction();
+            txIn.setUserId(receiverId);
+            txIn.setDirection("in");
+            txIn.setAmount(amount);
+            txIn.setCategory("payment");
+            txIn.setRelatedId(messageId.toString());
+            txIn.setNote(currentUser.getUsername() + " 的支付");
+            transactionRepository.save(txIn);
+
+            payment.put("status", "paid");
+            payment.put("paidAt", now.toString());
+        }
         msg.setPayment(toJson(payment));
         msg = messageRepository.save(msg);
 
