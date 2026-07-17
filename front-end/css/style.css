@@ -1007,6 +1007,17 @@ textarea.form-control {
     font-weight: 500;
 }
 
+/* 发言人名字：只在管理员只读取证视图出现。管理员不是会话双方，所有气泡都靠左、
+   长得一模一样，不标名字就分不清谁说的——而仲裁要判的正是这个。
+   加粗但压小、降透明度：它是标签不是正文，别盖过消息本身。 */
+.chat-sender {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    opacity: 0.75;
+    letter-spacing: 0.02em;
+}
+
 .chat-message.withdrawn {
     background: none !important;
     border: none;

@@ -1784,7 +1784,13 @@ function initChatDetail() {
 
         // 方向标题：谁付给谁，一眼看明白（只靠气泡左右对齐分不清是谁发起的）
         var dirText;
-        if (p.kind === 'request') {
+        if (adminView) {
+            // 管理员不是会话双方任何一人，"我 / 对方"无从谈起：
+            // 收款卡片会显示成"对方向我收款"（这个"我"根本不存在，纯属误导），
+            // 转账卡片则因 iAmPayer/iAmReceiver 都为 false 掉进兜底、只剩"转账"二字，
+            // 方向信息全丢——而仲裁要判的正是"谁把钱给了谁"。这里直接报双方名字。
+            dirText = escapeHtml(p.payerName || '付款方') + ' → ' + escapeHtml(p.receiverName || '收款方');
+        } else if (p.kind === 'request') {
             // 收款卡片：发起者是收款方
             dirText = isSelf ? '我向对方收款' : (p.payerName ? '对方向我收款' : '收款');
         } else {
@@ -1793,7 +1799,16 @@ function initChatDetail() {
         }
 
         var statusText = '', actions = '', stateClass = p.status;
-        if (p.status === 'escrowed') {
+        if (adminView && (p.status === 'escrowed' || p.status === 'released'
+                || p.status === 'refunded' || p.status === 'paid')) {
+            // 下面那些文案都带"你/对方"，是站在会话双方视角写的；管理员两头都不是，
+            // 照搬会得到"已到账"这种没有主语的话。取证要的是事实，不是代入感。
+            var who = escapeHtml(p.payerName || '付款方') + ' → ' + escapeHtml(p.receiverName || '收款方');
+            if (p.status === 'escrowed') statusText = '已冻结托管中 · 订单完成后付给 ' + escapeHtml(p.receiverName || '收款方');
+            else if (p.status === 'released') statusText = '订单完成，已付给 ' + escapeHtml(p.receiverName || '收款方');
+            else if (p.status === 'refunded') statusText = '订单未成，已退回 ' + escapeHtml(p.payerName || '付款方');
+            else statusText = '已付款（' + who + '）';
+        } else if (p.status === 'escrowed') {
             // 钱已从付款方余额冻结，等订单完成才释放给收款方
             statusText = iAmPayer ? '已冻结托管中 · 任务完成后自动付给对方'
                 : '已冻结托管中 · 任务完成后自动到账';
@@ -1863,11 +1878,24 @@ function initChatDetail() {
             }
             // 记录刷新前是否在底部附近（用户在看最新消息），用于智能滚动
             var wasNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 80;
+            // 管理员只读取证视图：他不是会话双方任何一人，isSelf 恒为 false，
+            // 于是每条消息都靠左、气泡长得一模一样，谁说的完全看不出来——
+            // 而仲裁恰恰要判断"这话是谁说的"。给每条挂上发言人名字。
+            // senderName 后端本就随 MessageDTO 返回（实测线上 text/image/payment
+            // 共 101 条无一为空），所以这里不用改后端。
+            function senderTag(m) {
+                if (!adminView) return '';
+                return '<div class="chat-sender">' + escapeHtml(m.senderName || ('用户 ' + m.senderId)) + '</div>';
+            }
+
             messageList.innerHTML = messages.map(function(m) {
                 // String()：真后端 id 是数字、mock 是字符串，统一转字符串比较
                 var isSelf = !!currentUser && String(m.senderId) === String(currentUser.id);
                 if (m.withdrawn) {
-                    var withdrawText = isSelf ? '你撤回了一条消息' : '对方撤回了一条消息';
+                    // 管理员视角没有"你/对方"可言，直接报名字
+                    var withdrawText = adminView
+                        ? (escapeHtml(m.senderName || ('用户 ' + m.senderId)) + ' 撤回了一条消息')
+                        : (isSelf ? '你撤回了一条消息' : '对方撤回了一条消息');
                     return '<div class="chat-message withdrawn" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
                         withdrawText +
                     '</div>';
@@ -1876,18 +1904,21 @@ function initChatDetail() {
                     return paymentCardHTML(m, currentUser, isSelf, myBalance);
                 }
                 // mock 用 senderId='system' 标记系统消息，真后端用 type='system'——两种都识别
+                // 系统消息本就居中、且发言人就是"系统"，不必再挂名字
                 if (m.senderId === 'system' || m.type === 'system') {
                     return '<div class="chat-message system">' + m.content + '</div>';
                 }
                 if (m.type === 'image') {
                     var icls = isSelf ? 'chat-right' : 'chat-left';
                     return '<div class="chat-message ' + icls + '" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
+                        senderTag(m) +
                         '<img src="' + m.content + '" onclick="openImageOverlay(this.src)" style="max-width:180px;max-height:180px;border-radius:8px;cursor:pointer;display:block;" onerror="this.style.display=\'none\'">' +
                         '<div class="chat-time">' + formatDateTime(m.time) + '</div>' +
                     '</div>';
                 }
                 var cls = isSelf ? 'chat-right' : 'chat-left';
                 return '<div class="chat-message ' + cls + '" data-msg-id="' + m.id + '" data-sender="' + m.senderId + '">' +
+                    senderTag(m) +
                     '<div class="chat-text">' + m.content + '</div>' +
                     '<div class="chat-time">' + formatDateTime(m.time) + '</div>' +
                 '</div>';
