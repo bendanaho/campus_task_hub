@@ -664,10 +664,11 @@ textarea.form-control {
 .task-publisher-credit { color: var(--ink-soft, #6b7280); font-size: 13px; }
 
 /* 报酬 / 价格：卡片里最该被看见的一条信息，原先和分类、时间挤在同一条 meta 流水行里，
-   同字号同灰色，等于没有。margin-left:auto 把它顶到发布者行右侧那片空白——
-   既不多占一行、又跑不掉。窄屏时 .task-publisher 的 flex-wrap 会让它自己换行并靠右。 */
+   同字号同灰色，等于没有。现在跟在发布者/信用之后，与左侧信息连成一串。
+   刻意不用 margin-left:auto 顶到行尾：卡片其余内容全部左对齐，宽屏下金额会被甩出
+   800 多像素，看着像另一张卡的东西。留一点额外间距把它和"信用"分开即可。 */
 .task-price {
-    margin-left: auto;
+    margin-left: 6px;
     display: inline-flex;
     align-items: baseline;
     gap: 6px;
