@@ -465,6 +465,22 @@ textarea.form-control {
     margin-top: 16px;
 }
 
+/* 次级文字链（登录页的「忘记密码？」）。
+   刻意不做成第三个按钮：它是少数人偶尔用一次的出口，和「登录」「去注册」等分量
+   会抢走主操作的视线。margin-left:auto 把它推到行尾，与按钮拉开。 */
+.link-quiet {
+    margin-left: auto;
+    align-self: center;
+    color: var(--ink-mute);
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.link-quiet:hover {
+    color: var(--coral);
+    text-decoration: underline;
+}
+
 /* 发布页：出钱/收钱二选一 */
 .side-options {
     display: flex;
@@ -1750,6 +1766,39 @@ textarea.form-control {
 }
 .frozen-notice b { font-weight: 700; }
 .frozen-notice-icon { flex: 0 0 auto; }
+
+/* 未绑定邮箱提醒条：沿用 frozen-notice 的视觉语言，但用琥珀色而非珊瑚色——
+   它是「建议你去做」，不是「你的钱正被冻着」，两者分量不同，不该长得一样。 */
+.bind-email-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--sun-soft);
+    border-radius: 10px;
+    background: var(--sun-soft);
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.bind-email-notice a {
+    color: var(--coral-deep);
+    font-weight: 700;
+    text-decoration: underline;
+}
+.bind-email-notice .bind-email-close {
+    margin-left: auto;
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    color: var(--ink-mute);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.bind-email-notice .bind-email-close:hover { color: var(--ink); }
 
 /* 页码分页条：上一页 | 1 2 … N | 下一页 + 第 X / Y 页 */
 .pager {

@@ -135,3 +135,16 @@ function debounce(fn, delay) {
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 }
+
+// 用户可控的文本（用户名、标题等）拼进 innerHTML 前先过一遍。
+// 这些字段是用户注册/发帖时随便填的，直接拼进 HTML 会被当标签解析，
+// 例如用户名取成 <img src=x onerror=...> 就能在别人（尤其管理员）的页面上执行脚本。
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

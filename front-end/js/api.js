@@ -84,6 +84,33 @@ async function register(data) {
     return _handleRes(res);
 }
 
+// 找回密码第一步：校验「账号 + 绑定邮箱」，通过则把验证码发到该邮箱。
+// 免登录接口，故不带 Authorization。
+async function sendResetCode(account, email) {
+    if (USE_MOCK) {
+        return mockSendResetCode(account, email);
+    }
+    var res = await fetch(API_BASE + '/password/reset/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account: account, email: email })
+    });
+    return _handleRes(res);
+}
+
+// 找回密码第二步：验证码 + 新密码一并提交。成功后该账号的旧登录态全部失效。
+async function resetPassword(data) {
+    if (USE_MOCK) {
+        return mockResetPassword(data);
+    }
+    var res = await fetch(API_BASE + '/password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    return _handleRes(res);
+}
+
 async function logout() {
     if (USE_MOCK) {
         removeToken();
@@ -142,7 +169,9 @@ async function updatePhone(phone) {
     return _handleRes(res);
 }
 
-async function updateEmail(email) {
+// 绑定/更换邮箱：必须带当前密码。邮箱是找回密码的凭据，只凭登录态就能改的话，
+// 拿到会话的人可以换成自己的邮箱再走「忘记密码」接管账号。
+async function updateEmail(email, currentPassword) {
     if (USE_MOCK) {
         return mockUpdateEmail(email);
     }
@@ -152,7 +181,7 @@ async function updateEmail(email) {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + getToken()
         },
-        body: JSON.stringify({ email: email })
+        body: JSON.stringify({ email: email, currentPassword: currentPassword })
     });
     return _handleRes(res);
 }
@@ -447,6 +476,31 @@ async function adminDismissReports(postId, reason) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
         body: JSON.stringify({ reason: reason || '' })
+    });
+    return _handleRes(res);
+}
+
+// 管理员：用户列表（脱敏，不含余额/实名信息）
+async function adminListUsers() {
+    if (USE_MOCK) {
+        return mockAdminListUsers();
+    }
+    var res = await fetch(API_BASE + '/admin/users', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    return _handleRes(res);
+}
+
+// 管理员：人工重置密码，给没绑邮箱、走不了自助找回的用户兜底。
+// 返回的临时密码只出现这一次，前端不做任何持久化。
+async function adminResetUserPassword(userId) {
+    if (USE_MOCK) {
+        return mockAdminResetUserPassword(userId);
+    }
+    var res = await fetch(API_BASE + '/admin/users/' + userId + '/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() }
     });
     return _handleRes(res);
 }
@@ -812,6 +866,57 @@ function mockLogin(account, password) {
             };
             setCurrentUser(safeUser);
             resolve({ user: safeUser, token: token });
+        }, 200);
+    });
+}
+
+// 本地 mock 不真发邮件：验证码固定 123456，直接 alert 出来，方便离线调试。
+// 真实后端会把 6 位随机码发到邮箱。
+var _MOCK_RESET_CODE = '123456';
+
+function mockSendResetCode(account, email) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var user = _mockGetUserByUsername(account) || _mockGetUserByPhone(account) || _mockGetUserByEmail(account);
+            if (!user || !user.email || user.email.toLowerCase() !== String(email || '').trim().toLowerCase()) {
+                reject(new Error('账号与邮箱不匹配，或该账号未绑定邮箱'));
+                return;
+            }
+            alert('【mock】验证码为 ' + _MOCK_RESET_CODE + '（真实环境会发到邮箱）');
+            resolve(null);
+        }, 200);
+    });
+}
+
+function mockResetPassword(data) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var user = _mockGetUserByUsername(data.account) || _mockGetUserByPhone(data.account) || _mockGetUserByEmail(data.account);
+            if (!user || !user.email || user.email.toLowerCase() !== String(data.email || '').trim().toLowerCase()) {
+                reject(new Error('账号与邮箱不匹配，或该账号未绑定邮箱'));
+                return;
+            }
+            if (data.code !== _MOCK_RESET_CODE) {
+                reject(new Error('验证码错误或已过期'));
+                return;
+            }
+            if (data.newPassword !== data.confirmPassword) {
+                reject(new Error('两次输入的密码不一致'));
+                return;
+            }
+            if (!data.newPassword || data.newPassword.length < 6) {
+                reject(new Error('密码长度不能少于 6 位'));
+                return;
+            }
+            var db = _mockGetDB();
+            for (var i = 0; i < db.users.length; i++) {
+                if (db.users[i].id === user.id) {
+                    db.users[i].password = data.newPassword;
+                    break;
+                }
+            }
+            _mockSaveDB(db);
+            resolve(null);
         }, 200);
     });
 }
@@ -1796,6 +1901,50 @@ function mockAdminClosePost(postId, reason) {
                 (reasonTxt ? '原因：' + reasonTxt : '如有疑问请联系平台。'));
             _mockSaveDB(db);
             resolve({ success: true, post: post });
+        }, 200);
+    });
+}
+
+// 管理员：用户列表（脱敏）
+function mockAdminListUsers() {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            resolve((db.users || []).filter(function(u) { return !u.deletedAt; }).map(function(u) {
+                return {
+                    id: u.id,
+                    username: u.username,
+                    phone: u.phone ? u.phone.substring(0, 3) + '****' + u.phone.slice(-4) : u.phone,
+                    hasEmail: !!(u.email && String(u.email).trim()),
+                    authStatus: u.authStatus,
+                    role: u.role || 0,
+                    createdAt: u.createdAt || null
+                };
+            }));
+        }, 200);
+    });
+}
+
+// 管理员：人工重置密码，返回一次性临时密码
+function mockAdminResetUserPassword(userId) {
+    return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+            var currentUser = getCurrentUser();
+            var db = _mockGetDB();
+            if (!currentUser || !_isAdminUser(db, currentUser.id)) { reject(new Error('无管理员权限')); return; }
+            var target = null;
+            for (var i = 0; i < db.users.length; i++) {
+                if (db.users[i].id === userId && !db.users[i].deletedAt) { target = db.users[i]; break; }
+            }
+            if (!target) { reject(new Error('用户不存在')); return; }
+            var chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            var temp = '';
+            for (var j = 0; j < 10; j++) temp += chars.charAt(Math.floor(Math.random() * chars.length));
+            target.password = temp;
+            _mockSaveDB(db);
+            resolve({ userId: target.id, username: target.username, tempPassword: temp });
         }, 200);
     });
 }

@@ -80,6 +80,44 @@ function updateNavUnread() {
     });
 }
 
+// 未绑定邮箱提醒条。
+// 背景：邮箱以前是选填的，24 个存量账号里 16 个没绑，这些人忘了密码只能找管理员。
+// 提醒他们主动绑一个，问题会随时间自己消化掉；只靠注册页改必填的话，存量用户永远覆盖不到。
+// 关闭状态存 sessionStorage：本次浏览不再打扰，下次打开还会提醒——毕竟没绑就是没绑。
+function renderBindEmailNotice() {
+    if (!isLoggedIn()) return;
+    var user = getCurrentUser();
+    if (!user) return;
+    // 管理员是纯管理角色，不走自助找回，不必打扰
+    if (user.role === 1) return;
+    if (user.email && String(user.email).trim()) return;
+    if (sessionStorage.getItem('bindEmailNoticeDismissed') === '1') return;
+
+    var page = window.location.pathname.split('/').pop();
+    // 个人中心本身就有绑定入口，再挂个横幅指回同一页很多余
+    if (page === 'profile.html' || page === 'login.html' || page === 'register.html'
+        || page === 'forgot-password.html') return;
+
+    var container = document.querySelector('.page .container');
+    if (!container) return;
+
+    var el = document.createElement('div');
+    el.className = 'bind-email-notice';
+    el.innerHTML = '<span>✉️</span>' +
+        '<span>你还没有绑定邮箱。绑定后忘记密码可以自助找回，' +
+        '否则只能联系管理员人工重置。<a href="profile.html">去绑定</a></span>' +
+        '<button type="button" class="bind-email-close" aria-label="关闭">×</button>';
+    container.insertBefore(el, container.firstChild);
+
+    var closeBtn = el.querySelector('.bind-email-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            sessionStorage.setItem('bindEmailNoticeDismissed', '1');
+            el.remove();
+        });
+    }
+}
+
 // ==================== 页面保护 ====================
 
 function protectPage(pages) {
@@ -282,13 +320,14 @@ function handleRegisterForm() {
         var password = document.getElementById('registerPassword').value.trim();
         var confirmPassword = document.getElementById('registerConfirmPassword').value.trim();
 
-        if (!username || !phone || !password || !confirmPassword) {
+        // 邮箱由选填改为必填：它是找回密码的唯一凭据，不填的话以后只能找管理员人工重置
+        if (!username || !phone || !email || !password || !confirmPassword) {
             alert('请完整填写必填信息。'); return;
         }
         if (!/^1\d{10}$/.test(phone)) {
             alert('请输入正确的 11 位手机号。'); return;
         }
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             alert('请输入正确的邮箱地址。'); return;
         }
         if (password.length < 6) {
@@ -345,6 +384,135 @@ function handleLoginForm() {
                 alert(err.message || '登录失败');
             });
     });
+}
+
+// ==================== 找回密码 ====================
+
+function handleForgotPasswordForm() {
+    var step1 = document.getElementById('resetStep1');
+    var step2 = document.getElementById('resetStep2');
+    if (!step1 || !step2) return;
+
+    var sendBtn = document.getElementById('sendCodeBtn');
+    var resendBtn = document.getElementById('resendCodeBtn');
+    var backBtn = document.getElementById('backToStep1Btn');
+    var form = document.getElementById('resetForm');
+    var emailEcho = document.getElementById('resetEmailEcho');
+
+    // 后端冷却是 60 秒，前端按同样的数字倒计时。前端只是省掉一次注定失败的请求，
+    // 真正的限流在后端——按钮可以被绕过，后端不行。
+    var COOLDOWN_SECONDS = 60;
+    var cooldownTimer = null;
+
+    function readInputs() {
+        return {
+            account: document.getElementById('resetAccount').value.trim(),
+            email: document.getElementById('resetEmail').value.trim()
+        };
+    }
+
+    function startCooldown(btn, label) {
+        var left = COOLDOWN_SECONDS;
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        btn.disabled = true;
+        btn.textContent = left + ' 秒后可重发';
+        cooldownTimer = setInterval(function() {
+            left--;
+            if (left <= 0) {
+                clearInterval(cooldownTimer);
+                cooldownTimer = null;
+                btn.disabled = false;
+                btn.textContent = label;
+                return;
+            }
+            btn.textContent = left + ' 秒后可重发';
+        }, 1000);
+    }
+
+    function doSend(btn, label) {
+        var v = readInputs();
+        if (!v.account || !v.email) {
+            alert('请填写账号和绑定的邮箱。'); return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) {
+            alert('请输入正确的邮箱地址。'); return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '发送中…';
+        sendResetCode(v.account, v.email)
+            .then(function() {
+                if (emailEcho) emailEcho.textContent = v.email;
+                step1.style.display = 'none';
+                step2.style.display = '';
+                startCooldown(resendBtn, '重新发送');
+                btn.textContent = label;
+                var codeInput = document.getElementById('resetCode');
+                if (codeInput) codeInput.focus();
+            })
+            .catch(function(err) {
+                alert(err.message || '验证码发送失败');
+                btn.disabled = false;
+                btn.textContent = label;
+            });
+    }
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', function() { doSend(sendBtn, '发送验证码'); });
+    }
+
+    if (resendBtn) {
+        resendBtn.addEventListener('click', function() { doSend(resendBtn, '重新发送'); });
+    }
+
+    if (backBtn) {
+        backBtn.addEventListener('click', function() {
+            step2.style.display = 'none';
+            step1.style.display = '';
+            if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '发送验证码'; }
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var v = readInputs();
+            var code = document.getElementById('resetCode').value.trim();
+            var newPassword = document.getElementById('resetNewPassword').value.trim();
+            var confirmPassword = document.getElementById('resetConfirmPassword').value.trim();
+
+            if (!code || !newPassword || !confirmPassword) {
+                alert('请完整填写验证码和新密码。'); return;
+            }
+            // 与注册页同一套规则，不另立一份
+            if (newPassword.length < 6) {
+                alert('密码长度不能少于 6 位。'); return;
+            }
+            if (newPassword !== confirmPassword) {
+                alert('两次输入的密码不一致。'); return;
+            }
+
+            var submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '提交中…'; }
+
+            resetPassword({
+                account: v.account,
+                email: v.email,
+                code: code,
+                newPassword: newPassword,
+                confirmPassword: confirmPassword
+            })
+                .then(function() {
+                    if (cooldownTimer) clearInterval(cooldownTimer);
+                    alert('密码重置成功，请用新密码登录。');
+                    window.location.href = 'login.html';
+                })
+                .catch(function(err) {
+                    alert(err.message || '重置失败');
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '重置密码'; }
+                });
+        });
+    }
 }
 
 function handleLogout() {
@@ -589,18 +757,31 @@ function initProfilePage() {
                     });
                 }
 
-                // 绑定修改邮箱
+                // 绑定修改邮箱。邮箱是找回密码的唯一凭据，所以要再验一次当前密码——
+                // 光凭登录态就能改的话，拿到会话的人可以换成自己的邮箱再走「忘记密码」接管账号。
+                // 已知粗糙之处：这里沿用页面既有的 prompt 风格，密码会明文显示在弹窗里。
+                // 本项目暂无弹窗组件，改成不回显的输入框需要单独做，留待后续。
                 var editEmail = document.getElementById('editEmail');
                 if (editEmail) {
                     editEmail.addEventListener('click', function() {
-                        var newEmail = prompt('请输入新的邮箱：', user.email || '');
+                        var hasEmail = !!(user.email && String(user.email).trim());
+                        var newEmail = prompt(hasEmail ? '请输入新的邮箱：' : '请输入要绑定的邮箱：', user.email || '');
                         if (!newEmail || newEmail.trim() === user.email) return;
                         newEmail = newEmail.trim();
                         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
                             alert('请输入正确的邮箱地址。'); return;
                         }
-                        updateEmail(newEmail).then(function() {
-                            alert('邮箱修改成功！');
+                        var currentPassword = prompt('为确认是本人操作，请输入当前登录密码：');
+                        if (!currentPassword) return;
+                        updateEmail(newEmail, currentPassword).then(function() {
+                            // 同步本地缓存的登录用户：它是登录时写进 localStorage 的快照，
+                            // 不更新的话「未绑定邮箱」的提醒条会一直挂着，直到用户重新登录。
+                            var cached = getCurrentUser();
+                            if (cached) {
+                                cached.email = newEmail;
+                                setCurrentUser(cached);
+                            }
+                            alert(hasEmail ? '邮箱修改成功！' : '邮箱绑定成功！以后忘记密码可以用它自助找回。');
                             window.location.reload();
                         }).catch(function(err) {
                             alert(err.message || '修改失败');
@@ -2821,6 +3002,9 @@ function initDevAccountSwitcher() {
 
 // ==================== 管理后台 ====================
 
+// 用户管理列表的 id → 用户名映射，供重置密码的确认框显示人名（见 renderUsers 的说明）
+var __adminUserNames = {};
+
 function initAdminPage() {
     if (!window.location.pathname.includes('admin.html')) return;
     if (!requireAdmin()) return;
@@ -2829,7 +3013,7 @@ function initAdminPage() {
     var tabs = document.querySelectorAll('.admin-tab');
     if (!content) return;
     // tab 状态写 URL hash:从详情返回(history.back)时能回到原 tab,而非默认跳"待处理申诉"
-    var validTabs = ['disputes', 'reports', 'orders', 'posts'];
+    var validTabs = ['disputes', 'reports', 'orders', 'posts', 'users'];
     var hashTab = (location.hash || '').replace('#', '');
     var currentTab = validTabs.indexOf(hashTab) >= 0 ? hashTab : 'disputes';
     tabs.forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === currentTab); });
@@ -2860,6 +3044,8 @@ function initAdminPage() {
                 renderReports(await getAdminReports());
             } else if (currentTab === 'orders') {
                 renderOrders(await getAdminOrders());
+            } else if (currentTab === 'users') {
+                renderUsers(await adminListUsers());
             } else {
                 renderPosts(await getAdminPosts());
             }
@@ -2977,6 +3163,68 @@ function initAdminPage() {
         }).join('');
     }
 
+    // 用户管理：只服务于「人工重置密码」这一件事，所以列表刻意不显示余额和实名信息——
+    // 管理员核实身份靠线下，不靠在这里翻用户隐私。
+    function renderUsers(list) {
+        if (!list || list.length === 0) {
+            content.innerHTML = '<div class="card empty-state"><p>暂无用户</p></div>';
+            return;
+        }
+        var noEmail = list.filter(function(u) { return !u.hasEmail; }).length;
+        var header = '<div class="card">' +
+            '<p class="meta">共 <b>' + list.length + '</b> 个账号，其中 <b>' + noEmail + '</b> 个未绑定邮箱。' +
+            '未绑定邮箱的用户无法自助找回密码，只能由管理员在此重置。</p>' +
+            '<p class="meta">重置前请务必线下核实对方身份——重置后临时密码只显示一次，' +
+            '且该用户在所有设备上的登录状态会立即失效。</p>' +
+        '</div>';
+
+        // 用户名只经 id 查表，不拼进 onclick 字符串：用户名是用户自己起的，
+        // 往「HTML 属性里的 JS 字符串」里塞用户输入，转义规则叠两层，很容易出错。
+        // 传纯数字 id 最省事，也最不容易写错。
+        __adminUserNames = {};
+        list.forEach(function(u) { __adminUserNames[u.id] = u.username; });
+
+        content.innerHTML = header + list.map(function(u) {
+            var emailBadge = u.hasEmail
+                ? '<span class="status-badge status-completed">已绑邮箱</span>'
+                : '<span class="status-badge status-action">未绑邮箱</span>';
+            var authBadge = u.authStatus === 1
+                ? '<span class="status-badge status-completed">已实名</span>'
+                : '<span class="status-badge status-cancelled">未实名</span>';
+            var roleBadge = u.role === 1 ? ' <span class="status-badge status-in_progress">管理员</span>' : '';
+            return '<div class="card">' +
+                '<div class="msg-header"><h3>' + escapeHtml(u.username) + ' ' + emailBadge + ' ' + authBadge + roleBadge + '</h3>' +
+                    '<span class="msg-time">' + escapeHtml(u.createdAt || '') + '</span></div>' +
+                '<p class="meta">ID：' + u.id + ' ｜ 手机号：' + escapeHtml(u.phone || '--') + '</p>' +
+                '<div class="actions">' +
+                    '<button type="button" class="btn btn-small btn-danger" ' +
+                        'onclick="handleAdminResetUserPassword(' + u.id + ')">重置密码</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // 人工重置密码。临时密码只在这一次响应里出现，不做任何存储——
+    // 管理员必须当场记下并线下转告本人。
+    window.handleAdminResetUserPassword = function(userId) {
+        var username = __adminUserNames[userId] || ('用户 ' + userId);
+        if (!confirm('确认重置「' + username + '」的密码？\n\n' +
+                     '· 请先线下核实对方确实是本人\n' +
+                     '· 临时密码只显示一次，关掉就没了\n' +
+                     '· 该用户在所有设备上的登录状态会立即失效')) {
+            return;
+        }
+        adminResetUserPassword(userId).then(function(res) {
+            window.prompt(
+                '「' + res.username + '」的临时密码如下（只显示这一次，请复制后线下转告本人，\n' +
+                '并提醒对方登录后立即修改）：',
+                res.tempPassword
+            );
+        }).catch(function(err) {
+            alert(err.message || '重置失败');
+        });
+    };
+
     // 裁决：读卡片上的处理说明；partial 再询问结算金额
     window.handleAdminResolve = function(orderId, decision) {
         var noteEl = document.getElementById('note-' + orderId);
@@ -3027,8 +3275,10 @@ function initAdminPage() {
 document.addEventListener('DOMContentLoaded', function() {
     renderNav();
     updateNavUnread();
+    renderBindEmailNotice();
     handleRegisterForm();
     handleLoginForm();
+    handleForgotPasswordForm();
     handleLogout();
     initProfilePage();
     initAuthForm();
