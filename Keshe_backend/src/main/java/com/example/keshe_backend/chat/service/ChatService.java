@@ -747,6 +747,39 @@ public class ChatService {
         }
     }
 
+    /**
+     * 统计该会话中仍处于托管(escrowed)的转账总额。
+     * 争议仲裁要分的钱 = 订单金额 + 这部分转账；只看 order.amount 会漏掉它。
+     */
+    public BigDecimal sumEscrowedTransfers(String chatId) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (Message m : messageRepository.findByChatIdOrderByTimeAsc(chatId)) {
+            if (!"payment".equals(m.getType())) continue;
+            Map<String, Object> p = parseJson(m.getPayment());
+            if (p == null || !"escrowed".equals(p.get("status"))) continue;
+            sum = sum.add(new BigDecimal(String.valueOf(p.get("amount"))));
+        }
+        return sum;
+    }
+
+    /**
+     * 把该会话托管中的转账标记为"已并入仲裁处理"——【只改状态，不动钱】。
+     *
+     * 仲裁时钱由 resolveDispute 按「订单金额 + 托管转账」的总额一次性分配，
+     * 这里若再调 release/refund 就会把同一笔钱扣两次。
+     */
+    @Transactional
+    public void markEscrowedTransfersArbitrated(String chatId) {
+        for (Message m : messageRepository.findByChatIdOrderByTimeAsc(chatId)) {
+            if (!"payment".equals(m.getType())) continue;
+            Map<String, Object> p = parseJson(m.getPayment());
+            if (p == null || !"escrowed".equals(p.get("status"))) continue;
+            p.put("status", "arbitrated");
+            m.setPayment(toJson(p));
+            messageRepository.save(m);
+        }
+    }
+
     // ===== 辅助 =====
 
     private User requireVerified(Long userId) {

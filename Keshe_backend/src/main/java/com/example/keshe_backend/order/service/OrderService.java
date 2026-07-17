@@ -416,12 +416,19 @@ public class OrderService {
 
     private AdminOrderItemResponse toAdminItem(Order o) {
         String title = taskRepository.findById(o.getPostId()).map(Task::getTitle).orElse("");
+        BigDecimal amount = o.getAmount() != null ? o.getAmount() : BigDecimal.ZERO;
+        // 只有争议单需要知道托管转账明细，其余订单不必为此多查一次会话消息
+        BigDecimal escrowed = "disputed".equals(o.getStatus())
+                ? chatService.sumEscrowedTransfers(o.getChatId())
+                : BigDecimal.ZERO;
         return AdminOrderItemResponse.builder()
                 .order(OrderDTO.from(o))
                 .postTitle(title)
                 .payerName(nameOf(o.getPayerId()))
                 .earnerName(nameOf(o.getEarnerId()))
                 .disputedByName(o.getDisputedBy() != null ? nameOf(o.getDisputedBy()) : "")
+                .escrowedTransferTotal(escrowed)
+                .disputeTotal(amount.add(escrowed))
                 .build();
     }
 
@@ -454,27 +461,38 @@ public class OrderService {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "请填写处理说明");
         }
 
+        // 争议标的 = 订单金额 + 该会话仍在托管中的私信转账。
+        // 此前只按 order.amount 分配，托管转账则"全有或全无"地跟着 decision 走：
+        //   - 全额退款/结算：净额碰巧对（20+5 都给同一方），看不出问题
+        //   - 部分结算：管理员以为在分 20，那 5 元转账却被全额悄悄划给收款方，
+        //     而且面板压根没告诉他这 5 元存在（上限也被卡在 20，退不了 25）
+        // 现在按总额统一分配：钱包的 frozen 不区分是哪一笔冻的，一次性分完即可。
         BigDecimal amount = order.getAmount() != null ? order.getAmount() : BigDecimal.ZERO;
+        BigDecimal escrowedTransfers = chatService.sumEscrowedTransfers(order.getChatId());
+        BigDecimal total = amount.add(escrowedTransfers);
+
         BigDecimal earnerGets;
         if ("refund".equals(decision)) {
             earnerGets = BigDecimal.ZERO;
         } else if ("settle".equals(decision)) {
-            earnerGets = amount;
+            earnerGets = total;
         } else if ("partial".equals(decision)) {
             if (amountToEarner == null || amountToEarner.compareTo(BigDecimal.ZERO) <= 0
-                    || amountToEarner.compareTo(amount) >= 0) {
+                    || amountToEarner.compareTo(total) >= 0) {
                 throw new BusinessException(ErrorCode.PARAM_ERROR,
-                        "部分结算金额需大于 0 且小于订单金额 " + fmt(amount) + " 元");
+                        "部分结算金额需大于 0 且小于争议总额 " + fmt(total) + " 元"
+                                + (escrowedTransfers.compareTo(BigDecimal.ZERO) > 0
+                                    ? "（订单 " + fmt(amount) + " + 托管转账 " + fmt(escrowedTransfers) + "）" : ""));
             }
             earnerGets = amountToEarner;
         } else {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "无效的处理方式");
         }
-        BigDecimal payerGets = amount.subtract(earnerGets);
+        BigDecimal payerGets = total.subtract(earnerGets);
 
         String title = taskRepository.findById(order.getPostId()).map(Task::getTitle).orElse("");
 
-        // 报酬从付款方冻结中分配：退回付款方 payerGets、结算给收款方 earnerGets
+        // 从付款方冻结中分配：退回付款方 payerGets、结算给收款方 earnerGets
         if (payerGets.compareTo(BigDecimal.ZERO) > 0) {
             walletService.refund(order.getPayerId(), payerGets, "escrow_refund",
                     relOrder(order.getId()), "仲裁退款：" + title);
@@ -483,12 +501,8 @@ public class OrderService {
             walletService.release(order.getPayerId(), order.getEarnerId(), earnerGets, "order",
                     relOrder(order.getId()), "订单收入（仲裁）：" + title);
         }
-        // 托管中的私信转账：全额退款 → 退回发送者；结算/部分 → 释放给接收方
-        if ("refund".equals(decision)) {
-            chatService.refundEscrowedTransfers(order.getChatId());
-        } else {
-            chatService.releaseEscrowedTransfers(order.getChatId());
-        }
+        // 托管转账的钱已包含在上面的总额里分完了，这里只标记状态，不能再动钱（否则重复扣款）
+        chatService.markEscrowedTransfersArbitrated(order.getChatId());
 
         order.setStatus("closed");
         order.setResolution(decision);
