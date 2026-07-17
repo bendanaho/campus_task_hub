@@ -124,13 +124,14 @@
 
                     <div class="single-filter">
                         <select id="sortSelect" class="form-control placeholder-select">
-                            <option value="" selected>默认排序</option>
-                            <option value="time_asc">发布时间：从早到晚</option>
-                            <option value="time_desc">发布时间：从晚到早</option>
-                            <option value="reward_asc">报酬金额：从低到高</option>
-                            <option value="reward_desc">报酬金额：从高到低</option>
-                            <option value="credit_asc">信用分数：从低到高</option>
-                            <option value="credit_desc">信用分数：从高到低</option>
+                            <!-- 「默认」送空 sort，后端 buildSort 把空值兜成 time_desc，
+                                 即最新发布在前。原先另有一项「发布时间：从晚到早」，
+                                 和「默认」是同一个排序，已删。 -->
+                            <option value="" selected>默认（最新发布）</option>
+                            <option value="time_asc">最早发布</option>
+                            <option value="reward_asc">报酬金额递增</option>
+                            <option value="reward_desc">报酬金额递减</option>
+                            <option value="credit_desc">信用分数递减</option>
                         </select>
                     </div>
                     <button type="button" class="btn" id="searchBtn">搜索</button>
