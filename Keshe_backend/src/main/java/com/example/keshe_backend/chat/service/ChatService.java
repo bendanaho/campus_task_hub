@@ -151,6 +151,28 @@ public class ChatService {
         return result;
     }
 
+    /**
+     * 判断"待我操作"：待我接受(pending 且我是发布者) 或 待我确认(in_progress 且对方已确认、我未确认)。
+     * 与前端 describeOrderStatus 的 action:true 分支保持一致，用于未读口径把待操作计入总数。
+     */
+    private boolean userNeedsAction(Order order, Long userId, Long taskPublisherId) {
+        if (order == null) return false;
+        String st = order.getStatus();
+        boolean isPublisher = taskPublisherId != null && taskPublisherId.equals(userId);
+        if ("pending".equals(st)) {
+            return isPublisher; // 待我接受
+        }
+        if ("in_progress".equals(st)) {
+            boolean isPayer = userId.equals(order.getPayerId());
+            boolean myConfirmed = isPayer ? Boolean.TRUE.equals(order.getPayerConfirmed())
+                                          : Boolean.TRUE.equals(order.getEarnerConfirmed());
+            boolean otherConfirmed = isPayer ? Boolean.TRUE.equals(order.getEarnerConfirmed())
+                                             : Boolean.TRUE.equals(order.getPayerConfirmed());
+            return otherConfirmed && !myConfirmed; // 待我确认
+        }
+        return false;
+    }
+
     private ConversationDTO toConversationDTO(Conversation c, Long currentUserId) {
         // 系统通知会话：对方固定为「系统通知」，不去查真实用户
         if (c.getId() != null && c.getId().startsWith("sys-notify-")) {
@@ -307,13 +329,7 @@ public class ChatService {
 
         Message msg = new Message();
         msg.setChatId(chatId);
-        // 哨兵 0（与 addSystemNotify 一致）：非 null 才会被未读 SQL 计入，0 不对应真实用户。
-        // 此前这里是 null → 未读 SQL 的 "senderId IS NOT NULL" 把它排除掉了：
-        // 「有人申请接单」只留下这么一条系统消息，角标却是 0，用户会漏掉——
-        // 于是当时给 getUnreadCounts 打了个 actionCount 补丁去单独统计"待我操作"的会话数，
-        // 结果角标变成「未读条数 + 待办会话数」，和消息中心的「未读」卡片(会话数)对不上。
-        // 让系统消息本身就算未读，这个补丁就不需要了，两边口径自然统一。
-        msg.setSenderId(0L);
+        msg.setSenderId(null);
         msg.setSenderName("系统");
         msg.setReceiverId(null);
         msg.setContent(content);
@@ -632,9 +648,8 @@ public class ChatService {
 
     /**
      * 导航栏未读红点：每个页面加载都会调用，是全站最高频的接口之一。
-     * 口径 = 未读【消息条数】，与消息中心「未读」卡片一致。
-     *
-     * 撤掉 actionCount 后，这里不再需要查订单和任务，查询数从 3 次降到 1 次。
+     * 因此这里必须批量取数——原先是"每个会话查未读COUNT + 查订单 + 查任务"的 1+3N，
+     * 一个有 20 个会话的用户每打开一个页面就要 61 次查询。现固定为 3 次。
      */
     public UnreadCountResponse getUnreadCounts() {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -646,30 +661,48 @@ public class ChatService {
 
         List<String> chatIds = conversations.stream().map(Conversation::getId).collect(Collectors.toList());
 
-        // 一次 GROUP BY 算完所有会话的未读数
+        // 查询①：一次 GROUP BY 算完所有会话的未读数
         Map<String, Long> unreadByChat = new HashMap<>();
         for (Object[] row : messageRepository.countUnreadGroupedByChatId(chatIds, userId)) {
             unreadByChat.put((String) row[0], ((Number) row[1]).longValue());
         }
 
+        // 查询②：一次取回这些会话的全部订单，内存里保留每个会话最新的一条
+        Map<String, Order> latestOrderByChat = new HashMap<>();
+        for (Order o : orderRepository.findByChatIdInOrderByCreatedAtAsc(chatIds)) {
+            latestOrderByChat.put(o.getChatId(), o);   // 升序遍历，后写入的即最新
+        }
+
+        // 查询③：一次取回相关任务，用于判断"我是不是发布者"
+        Set<Long> taskIds = conversations.stream()
+                .map(Conversation::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Task> taskById = new HashMap<>();
+        if (!taskIds.isEmpty()) {
+            for (Task t : taskRepository.findAllById(taskIds)) taskById.put(t.getId(), t);
+        }
+
         Map<String, Long> byChat = new LinkedHashMap<>();
         long total = 0;
+        long actionCount = 0;
         for (Conversation c : conversations) {
             long count = unreadByChat.getOrDefault(c.getId(), 0L);
             if (count > 0) {
                 byChat.put(c.getId(), count);
                 total += count;
             }
+            // #4：待操作(待我接受/待我确认)也计入未读总数——即便该会话没有未读消息
+            if (c.getTaskId() != null && (c.getId() == null || !c.getId().startsWith("sys-notify-"))) {
+                Order order = latestOrderByChat.get(c.getId());
+                if (order != null) {
+                    Task task = taskById.get(c.getTaskId());
+                    Long pubId = task != null ? task.getPublisherId() : null;
+                    if (userNeedsAction(order, userId, pubId)) {
+                        actionCount++;
+                    }
+                }
+            }
         }
-        // 口径：total 就是未读【消息条数】，与消息中心「未读」卡片完全一致。
-        //
-        // 此前这里还会把"待我接受/待我确认"的【会话数】加进 total（因为订单系统消息
-        // senderId=null 不算未读，角标会漏报待办）。那个补丁有三个后遗症：
-        //   1) 角标(条数+会话数)和消息中心「未读」卡片(会话数) 单位与口径都对不上；
-        //   2) 后端 userNeedsAction 不含"待我评价"，而前端 needsAction 含，两边永远差一截；
-        //   3) "待我评价"还带前端本地的"暂不评价"(localStorage)，后端根本无从对齐。
-        // 现在订单系统消息改用哨兵 senderId=0 → 本身就算未读，待办场景
-        // (申请接单/对方已确认/订单完成待评价) 都会自然点亮角标，补丁即可撤除。
+        total += actionCount;
         return UnreadCountResponse.builder().total(total).byChat(byChat).build();
     }
 
