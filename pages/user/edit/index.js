@@ -79,6 +79,7 @@ Page({
     emailMasked: '',
     phone: '',
     email: '',
+    emailPwd: '',
     verified: false,
     submitting: false,
     username: '',
@@ -253,6 +254,12 @@ Page({
       wx.showToast({ title: '邮箱格式不正确', icon: 'none' })
       return
     }
+    // 换邮箱后端强制验当前密码（邮箱是找回密码的凭据）
+    const emailPwd = this.data.emailPwd || ''
+    if (email && !emailPwd) {
+      wx.showToast({ title: '修改邮箱需输入当前密码', icon: 'none' })
+      return
+    }
     this.setData({ submitting: true })
     const self = this
     // 每个子步骤独立成败：成功者就地更新掩码/清空对应输入框，失败者不影响另一个
@@ -273,10 +280,10 @@ Page({
     }
     if (email) {
       chain = chain.then(function () {
-        return userService.updateEmail(email).then(function (profile) {
+        return userService.updateEmail(email, emailPwd).then(function (profile) {
           auth.updateUser(profile)
           const user = auth.getUser() || {}
-          self.setData({ email: '', emailMasked: maskEmail(user.email) })
+          self.setData({ email: '', emailPwd: '', emailMasked: maskEmail(user.email) })
           result.emailOk = true
         }).catch(function () {
         })

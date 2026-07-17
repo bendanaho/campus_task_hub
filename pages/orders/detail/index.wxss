@@ -147,3 +147,13 @@
   color: var(--faint);
   font-size: 24rpx;
 }
+
+/* 待接受阶段的状态提示（替代无意义的完成确认两行） */
+.pending-hint {
+  margin-top: 14rpx;
+  padding: 14rpx 20rpx;
+  border-radius: 12rpx;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 25rpx;
+}

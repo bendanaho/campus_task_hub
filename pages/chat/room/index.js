@@ -1,6 +1,7 @@
 const auth = require('../../../utils/auth')
 const chatService = require('../../../services/chat')
 const orderService = require('../../../services/orders')
+const postService = require('../../../services/posts')
 const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
 const confirm = require('../../../utils/confirm').confirm
@@ -17,6 +18,19 @@ const TIME_GROUP_GAP = 5 * 60 * 1000
 
 // 会话草稿（含未发送输入 / 发送失败文案）本地存储键前缀
 const DRAFT_PREFIX = 'chat-draft-'
+
+// 支付卡片状态全集（与后端 ChatService 对齐）：
+// escrowed=托管冻结中；released=订单完成托管款已转给对方；refunded=订单未成退回；
+// arbitrated=按仲裁结果分配。未知状态兜底"已处理"，绝不能误显示成"已取消"
+const PAYMENT_STATUS_TEXT = {
+  pending: '待处理',
+  paid: '已支付',
+  escrowed: '托管中 · 订单完成后到账',
+  released: '已到账（订单完成自动转账）',
+  refunded: '已退回（订单未完成）',
+  arbitrated: '已按仲裁结果分配',
+  cancelled: '已取消'
+}
 
 const QUICK_PHRASES = ['在吗？', '多少钱？', '好的', '已到楼下', '麻烦快一点', '谢谢！']
 
@@ -85,7 +99,8 @@ Page({
     atBottom: true,
     showPay: false,
     showMore: false,
-    inputFocused: false
+    inputFocused: false,
+    kbHeight: 0
   },
 
   onLoad(options) {
@@ -120,13 +135,24 @@ Page({
     // WS 已负责实时刷新，此处仅作兜底轮询，故间隔从 4s 拉长到 15s，降低长会话下
     // 每次全量 GET + 全量 setData 的开销。真正的增量拉取（since/afterId 游标、
     // 只 append 新消息）需后端消息接口支持游标参数，前端暂无法实现。
-    this.pollTimer = setInterval(() => this.loadMessages(true), 15000)
+    this.pollTimer = setInterval(() => {
+      this.loadMessages(true)
+      // WS 断线时的兜底：订单按钮也跟着轮询刷新，不会一直停在旧状态
+      this.refreshOrderSilently()
+    }, 15000)
     // WS 即时刷新（轮询保留作兜底）
     this.stopRealtime()
     this.unsubChat = socket.on('CHAT_UPDATE', (msg) => {
       if (msg && msg.chatId === this.data.chatId) {
         this.loadMessages(true)
+        // 订单状态变化（接受/确认/申诉/结案）也会触发 CHAT_UPDATE：一并静默重拉
+        // 订单上下文，让对方的按钮（确认下单/确认完成/去评价）即时出现，无需退出重进
+        this.refreshOrderSilently()
       }
+    })
+    // 对方接受/确认订单时后端会给我推 PERSONAL_NOTICE：同样即时刷新订单按钮
+    this.unsubNotice = socket.on('PERSONAL_NOTICE', () => {
+      this.refreshOrderSilently()
     })
     // 返回会话时恢复上次离开留下的未发送/发送失败草稿（每个页面实例只恢复一次）
     if (!this.draftRestored) {
@@ -217,6 +243,14 @@ Page({
       this.unsubChat()
       this.unsubChat = null
     }
+    if (this.unsubNotice) {
+      this.unsubNotice()
+      this.unsubNotice = null
+    }
+    if (this.orderRefreshTimer) {
+      clearTimeout(this.orderRefreshTimer)
+      this.orderRefreshTimer = null
+    }
   },
 
   stopPolling() {
@@ -228,21 +262,42 @@ Page({
 
   loadContext() {
     Promise.all([
-      chatService.conversations(),
+      // 聚合会话接口带 taskPublisherId：判断"我能否就地接受订单"要用；老后端回退普通接口
+      chatService.enrichedConversations().then(function (list) {
+        return (list || []).map(function (it) {
+          const c = (it && it.conversation) || {}
+          return {
+            id: c.id,
+            partnerId: c.partnerId,
+            partnerName: c.partnerName,
+            taskId: c.taskId,
+            taskTitle: c.taskTitle,
+            taskPublisherId: it && it.taskPublisherId,
+            taskPublisherSide: it && it.taskPublisherSide,
+            taskStatus: it && it.taskStatus,
+            taskDeleted: !!(it && it.taskDeleted)
+          }
+        })
+      }).catch(function () {
+        return chatService.conversations().catch(function () { return [] })
+      }),
       orderService.byChat(this.data.chatId).catch(function () { return null })
     ]).then((res) => {
       const conversations = res[0] || []
       const found = conversations.find((item) => item.id === this.data.chatId)
       const activeOrder = res[1] || null
+      const user = auth.getUser()
+      const uid = user ? String(user.id) : ''
+      const publisherId = found && found.taskPublisherId != null ? String(found.taskPublisherId) : ''
+      // 会话信息存实例属性：WS 静默刷新时无需再拉会话列表，即可复算「订单按钮 + 购买入口」
+      this._conv = found || null
+      this._publisherId = publisherId
       this.setData({
         partnerId: found ? found.partnerId : '',
         partnerName: found ? found.partnerName : '',
-        taskTitle: found ? found.taskTitle : '',
-        activeOrder: activeOrder ? Object.assign({}, activeOrder, {
-          statusText: format.orderStatusLabel(activeOrder.status),
-          amountText: format.formatMoney(activeOrder.amount)
-        }) : null
+        taskTitle: found ? found.taskTitle : ''
       })
+      this.applyActiveOrder(activeOrder)
       this.refreshOrderExtras(activeOrder)
       this.loadMessages()
     }).catch(() => {
@@ -250,15 +305,191 @@ Page({
     })
   },
 
+  // 会话内就地下单：拉一次帖子详情核实在售并取金额，确认后创建订单
+  // （款项由后端在下单/发布时冻结托管，双方确认完成即自动转给收款方）
+  buyNow() {
+    if (!auth.requireVerified()) {
+      return
+    }
+    const taskId = this._buyTaskId
+    if (!taskId || this.buying) {
+      return
+    }
+    this.buying = true
+    const self = this
+    postService.detail(taskId).then(function (data) {
+      const task = (data && data.task) || {}
+      const side = task.publisherSide
+      const money = Number(task.rewardValue) > 0 ? '¥' + format.formatMoney(task.rewardValue) : ''
+      let title, content
+      if (side === 'payer') {
+        title = '确认接单'
+        content = '将创建订单，等待发布者接受。' + (money ? '赏金 ' + money + ' 已由平台冻结托管，完成后打给你。' : '')
+      } else if (side === 'none') {
+        title = '确认参加'
+        content = '将向发起者申请参加，不涉及任何费用。'
+      } else {
+        title = '确认购买'
+        content = money
+          ? ('将创建订单并立即从你的余额冻结 ' + money + '（对方未接受或取消会自动退回），双方确认完成后自动转给对方。')
+          : '将创建订单，费用面议，可先在会话中沟通。'
+      }
+      return confirm({ title: title, content: content }).then(function (ok) {
+        if (!ok) {
+          return
+        }
+        return orderService.create({ postId: taskId, chatId: self.data.chatId }).then(function () {
+          wx.showToast({ title: side === 'none' ? '已申请参加' : '已下单，等待对方确认', icon: 'none' })
+          self.loadContext()
+        })
+      })
+    }).catch(function () {
+    }).then(function () {
+      self.buying = false
+    })
+  },
+
+  // 把订单算成头部按钮需要的展示态。loadContext 与 WS 静默刷新共用同一份逻辑，
+  // 避免两处判断分叉导致"一边有按钮一边没有"
+  decorateOrder(order, uid, publisherId) {
+    if (!order) {
+      return null
+    }
+    const isPayer = order.payerId != null && String(order.payerId) === uid
+    const myConfirmed = isPayer ? !!order.payerConfirmed : !!order.earnerConfirmed
+    const otherConfirmed = isPayer ? !!order.earnerConfirmed : !!order.payerConfirmed
+    return Object.assign({}, order, {
+      statusText: format.orderStatusLabel(order.status),
+      amountText: format.formatMoney(order.amount),
+      // 就地操作：待接受且我是发布者 → 接受；进行中且我未确认 → 确认完成；
+      // 双方确认后后端自动结算转钱、订单直接完成
+      canAcceptHere: order.status === 'pending' && !!publisherId && publisherId === uid,
+      canConfirmHere: order.status === 'in_progress' && !myConfirmed,
+      // 我是最后一个确认的（对方已确认，我一点即完成结算）→ 只写"确认"；否则"确认完成"
+      confirmLabel: otherConfirmed ? '确认' : '确认完成',
+      waitingOther: order.status === 'in_progress' && myConfirmed && !otherConfirmed,
+      waitingAccept: order.status === 'pending' && (!publisherId || publisherId !== uid),
+      // 进行中随时可申诉给管理员定夺：资金保持冻结，等待仲裁（退款/结算/部分结算）
+      canDisputeHere: order.status === 'in_progress',
+      isDisputed: order.status === 'disputed'
+    })
+  },
+
+  // 依据「当前订单 + 会话信息」一次算出头部的订单按钮与购买入口。
+  // loadContext 与 WS 静默刷新共用：对方接受/确认/取消订单时，两者都会即时跟着变。
+  applyActiveOrder(order) {
+    const user = auth.getUser()
+    const uid = user ? String(user.id) : ''
+    const publisherId = this._publisherId || ''
+    const found = this._conv
+    const decorated = this.decorateOrder(order, uid, publisherId)
+    // 会话内直接购买：对方的帖子、帖子在售、且当前没有活跃订单（上一单已取消/结案则可再买）
+    const orderBlocking = decorated && ['cancelled', 'closed'].indexOf(decorated.status) === -1
+    const taskOpen = found && !found.taskDeleted && (!found.taskStatus || found.taskStatus === 'open')
+    const canBuy = !!(found && found.taskId && publisherId && publisherId !== uid && taskOpen && !orderBlocking)
+    const side = found && found.taskPublisherSide
+    this._buyTaskId = canBuy ? found.taskId : null
+    this.setData({
+      buyLabel: canBuy ? (side === 'payer' ? '接单' : (side === 'none' ? '参加' : '购买')) : '',
+      activeOrder: decorated
+    })
+  },
+
+  // 只重拉订单状态并刷新头部按钮，不碰消息列表（不打断输入/滚动）。
+  // 300ms 节流：一次订单操作会连带触发系统消息+通知等多条推送，避免重复请求。
+  refreshOrderSilently() {
+    if (this.data.isSystemChat || this.orderRefreshTimer) {
+      return
+    }
+    const self = this
+    this.orderRefreshTimer = setTimeout(function () {
+      self.orderRefreshTimer = null
+      orderService.byChat(self.data.chatId).then(function (order) {
+        self.applyActiveOrder(order || null)
+        self.refreshOrderExtras(order || null)
+      }).catch(function () {})
+    }, 300)
+  },
+
+  // 就地接受订单（发布者）：接受后进入进行中
+  acceptActiveOrder() {
+    const order = this.data.activeOrder
+    if (!order || !order.canAcceptHere) {
+      return
+    }
+    confirm({
+      title: '确认下单',
+      content: '接受后订单进入进行中，双方确认完成即自动结算给收款方。确认接受？',
+      confirmText: '接受'
+    }).then((ok) => {
+      if (!ok) return
+      orderService.accept(order.id).then(() => {
+        wx.showToast({ title: '已接受，订单进行中', icon: 'none' })
+        this.loadContext()
+      }).catch(function () {})
+    })
+  },
+
+  // 任务进行到一半出问题：就地申诉给管理员定夺。资金保持冻结，
+  // 管理员仲裁（全额退款 / 全额结算 / 部分结算）后订单结案
+  disputeActiveOrder() {
+    const order = this.data.activeOrder
+    if (!order || !order.canDisputeHere) {
+      return
+    }
+    wx.showModal({
+      title: '订单申诉',
+      editable: true,
+      placeholderText: '请填写申诉理由（必填）',
+      confirmText: '提交申诉',
+      success: (res) => {
+        if (!res.confirm) return
+        const reason = (res.content || '').trim()
+        if (!reason) {
+          wx.showToast({ title: '请填写申诉理由', icon: 'none' })
+          return
+        }
+        orderService.dispute(order.id, reason).then(() => {
+          wx.showToast({ title: '已提交申诉，资金冻结，等待管理员裁决', icon: 'none' })
+          this.loadContext()
+        }).catch(function () {
+        })
+      }
+    })
+  },
+
+  // 就地确认完成：双方都确认后，后端自动把托管款项转给收款方并完成订单
+  confirmActiveOrder() {
+    const order = this.data.activeOrder
+    if (!order || !order.canConfirmHere) {
+      return
+    }
+    confirm({
+      title: '确认完成',
+      content: '双方都确认后，托管款项将自动转给收款方并完成订单。确认？'
+    }).then((ok) => {
+      if (!ok) return
+      orderService.confirm(order.id).then((data) => {
+        wx.showToast({
+          title: data && data.status === 'completed' ? '已完成，款项已结算' : '已确认，等待对方确认',
+          icon: 'none'
+        })
+        this.loadContext()
+      }).catch(function () {})
+    })
+  },
+
   // 订单完成后的附加状态：交易成功标记、是否可评价、对方是否已评价我
   refreshOrderExtras(order) {
     if (!order || order.status !== 'completed') {
-      this.setData({ tradeDone: false, canReview: false, hasNewReview: false })
+      this.setData({ tradeDone: false, canReview: false, reviewedDone: false, hasNewReview: false })
       return
     }
     this.setData({ tradeDone: true })
+    // 已评价 → 收起"去评价对方"、改显"已评价"；每次 onShow 都重查，评完返回即刷新
     reviewService.hasReviewed(order.id).then((data) => {
-      this.setData({ canReview: !(data && data.hasReviewed) })
+      const reviewed = !!(data && data.hasReviewed)
+      this.setData({ canReview: !reviewed, reviewedDone: reviewed })
     }).catch(function () {
     })
     const me = auth.getUser()
@@ -342,6 +573,28 @@ Page({
     this.setData({ inputFocused: true, showEmoji: false, showMore: false }, this.remeasureLater())
   },
 
+  // 键盘不再整页上推（adjust-position=false），改为手动把底部区抬高键盘高度：
+  // 顶部会话头与历史消息保持原位，"发的第一条消息"不会被顶出屏幕
+  onKbHeightChange(e) {
+    const h = (e.detail && e.detail.height) || 0
+    if (h === this.data.kbHeight) {
+      return
+    }
+    const self = this
+    const wasAtBottom = this.data.atBottom
+    this.setData({ kbHeight: h }, function () {
+      // 消息可视区高度变了，重新量一次供贴底判断；原本贴底的保持看到最新一条
+      self.measureMessagesHeight()
+      if (h > 0 && wasAtBottom) {
+        const msgs = self.data.messages || []
+        const last = msgs.length ? msgs[msgs.length - 1] : null
+        if (last) {
+          self.setData({ intoView: 'msg-' + last.id })
+        }
+      }
+    })
+  },
+
   onInputBlur() {
     // 延迟收起，保证点击快捷短语能先于失焦触发
     const self = this
@@ -374,12 +627,7 @@ Page({
           bubbleClass: isMine ? 'mine' : 'other',
           paymentInfo: payment,
           paymentTitle: payment && payment.kind === 'request' ? '收款请求' : '转账',
-          paymentStatusText: payment ? (
-            payment.status === 'pending' ? '待处理'
-              : payment.status === 'paid' ? '已支付'
-                : payment.status === 'escrowed' ? '托管中 · 订单完成后到账'
-                  : '已取消'
-          ) : '',
+          paymentStatusText: payment ? (PAYMENT_STATUS_TEXT[payment.status] || '已处理') : '',
           paymentAmountText: payment ? format.formatMoney(payment.amount) : '',
           paymentNote: payment && payment.note ? String(payment.note) : '',
           canPay: payment && payment.status === 'pending' && String(payment.payerId) === uid,

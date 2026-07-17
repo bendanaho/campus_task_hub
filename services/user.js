@@ -29,11 +29,12 @@ function updatePhone(phone) {
   })
 }
 
-function updateEmail(email) {
+// 换邮箱一律验当前密码（邮箱是找回密码的凭据，后端强制要求）
+function updateEmail(email, currentPassword) {
   return request({
     url: '/api/user/email',
     method: 'PUT',
-    data: { email: email },
+    data: { email: email, currentPassword: currentPassword },
     showLoading: true
   })
 }

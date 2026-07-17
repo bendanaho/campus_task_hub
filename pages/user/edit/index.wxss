@@ -190,3 +190,12 @@
   font-size: 24rpx;
   font-weight: 600;
 }
+
+.email-pwd {
+  margin-top: 14rpx;
+}
+
+.email-pwd-tip {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}

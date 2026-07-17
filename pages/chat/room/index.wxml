@@ -1,4 +1,4 @@
-<view class="page room {{themeCls}}">
+<view class="page room {{themeCls}}" style="{{kbHeight ? 'padding-bottom:' + kbHeight + 'px' : ''}}">
   <view class="card section chat-head">
     <view class="head-row">
       <view class="strong">{{partnerName || '会话'}}</view>
@@ -6,12 +6,24 @@
       <view wx:if="{{hasNewReview}}" class="review-link" hover-class="btn-hover" bindtap="goMyReviews" aria-role="button" aria-label="查看我的新评价">有新评价 ›</view>
     </view>
     <view wx:if="{{!isSystemChat}}" class="muted">{{taskTitle || '未关联帖子'}}</view>
-    <view wx:if="{{activeOrder}}" class="order-line">
-      订单：{{activeOrder.statusText}} / ¥{{activeOrder.amountText}}
+    <!-- 无活跃订单时的就地下单入口：下单即托管冻结，双方确认完成自动转账，完成后此处变成"去评价" -->
+    <view wx:if="{{buyLabel}}" class="order-line buy-line">
+      <text class="order-wait">下单后款项托管，确认完成自动转给对方</text>
+      <button class="btn small order-act buy-btn" bindtap="buyNow">{{buyLabel}}</button>
     </view>
-    <view wx:if="{{!isSystemChat}}" class="head-actions">
-      <view class="order-entry" bindtap="openOrderDetail">{{activeOrder ? '订单详情 ›' : '历史订单 ›'}}</view>
+    <!-- 订单动作就地完成：待接受→确认下单；进行中→确认完成；双方确认后自动结算转钱、直接完成 -->
+    <view wx:if="{{activeOrder}}" class="order-line">
+      <text>订单：{{activeOrder.statusText}} / ¥{{activeOrder.amountText}}</text>
+      <button wx:if="{{activeOrder.canAcceptHere}}" class="btn small order-act" bindtap="acceptActiveOrder">确认下单</button>
+      <button wx:if="{{activeOrder.canConfirmHere}}" class="btn small order-act" bindtap="confirmActiveOrder">{{activeOrder.confirmLabel || '确认完成'}}</button>
+      <text wx:if="{{activeOrder.waitingAccept}}" class="order-wait">等待对方确认下单</text>
+      <text wx:if="{{activeOrder.waitingOther}}" class="order-wait">你已确认，等对方确认后自动结算</text>
+      <text wx:if="{{activeOrder.canDisputeHere}}" class="order-dispute" bindtap="disputeActiveOrder" aria-role="button" aria-label="向管理员申诉">有问题？申诉</text>
+      <text wx:if="{{activeOrder.isDisputed}}" class="order-wait">申诉已提交，资金冻结中，等待管理员裁决</text>
+    </view>
+    <view wx:if="{{!isSystemChat && (canReview || reviewedDone)}}" class="head-actions">
       <view wx:if="{{canReview}}" class="review-btn" hover-class="btn-hover" bindtap="goReview">去评价对方</view>
+      <text wx:elif="{{reviewedDone}}" class="mini-tag reviewed-tag">已评价</text>
     </view>
   </view>
 
@@ -108,7 +120,7 @@
   </view>
 
   <view wx:if="{{!isSystemChat}}" class="input-bar">
-    <input class="message-input" placeholder="输入消息，回车发送" value="{{input}}" bindinput="onInput" bindfocus="onInputFocus" bindblur="onInputBlur" confirm-type="send" confirm-hold="{{true}}" bindconfirm="sendText" />
+    <input class="message-input" placeholder="输入消息，回车发送" value="{{input}}" adjust-position="{{false}}" bindkeyboardheightchange="onKbHeightChange" bindinput="onInput" bindfocus="onInputFocus" bindblur="onInputBlur" confirm-type="send" confirm-hold="{{true}}" bindconfirm="sendText" />
     <view class="io-btn" hover-class="btn-hover" bindtap="toggleEmoji" aria-role="button" aria-label="表情">😊</view>
     <view class="io-btn io-plus {{showMore ? 'active' : ''}}" hover-class="btn-hover" bindtap="toggleMore" aria-role="button" aria-label="更多，转账或图片">＋</view>
   </view>

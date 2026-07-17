@@ -27,13 +27,13 @@ const SUB_TABS = {
   ],
   sold: [
     { label: '全部', value: 'all' },
-    { label: '待付款', value: 'pending' },
+    { label: '待接受', value: 'pending' },
     { label: '待评价', value: 'toreview' },
     { label: '退款中', value: 'refunding' }
   ],
   bought: [
     { label: '全部', value: 'all' },
-    { label: '待付款', value: 'pending' },
+    { label: '待接受', value: 'pending' },
     { label: '待评价', value: 'toreview' },
     { label: '退款中', value: 'refunding' }
   ]
@@ -120,7 +120,7 @@ function buildEmpty(main, sub, showHidden) {
   if (showHidden) {
     return { emoji: '🗂️', title: '没有已隐藏的订单', sub: '被你移除的订单会出现在这里', btn: '' }
   }
-  if (sub === 'pending') return { emoji: '💰', title: '没有待付款的订单', sub: '', btn: '' }
+  if (sub === 'pending') return { emoji: '💰', title: '没有待接受的订单', sub: '', btn: '' }
   if (sub === 'toreview') return { emoji: '⭐', title: '没有待评价的订单', sub: '', btn: '' }
   if (sub === 'refunding') return { emoji: '🛡️', title: '没有退款中的订单', sub: '', btn: '' }
   return { emoji: '📋', title: main === 'sold' ? '还没有卖出的订单' : '还没有买到的订单', sub: '去大厅逛逛，接单或发布需求', btn: '去大厅' }
@@ -255,7 +255,8 @@ Page({
           canCancel: order.status === 'pending',
           canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
           canReview: order.status === 'completed',
-          reviewed: false,
+          // 新版后端 /orders/mine 随行返回 reviewed（批量算好），直接采用
+          reviewed: item.reviewed === true,
           canDelete: true,
           isHidden: isHidden,
           isFinished: FINISHED.indexOf(order.status) > -1,
@@ -275,7 +276,12 @@ Page({
       // 全量存实例属性，角色分桶/二级筛选/搜索/排序在前端做（该接口无对应参数）
       this.allOrders = orders
       this.render()
-      this.loadReviewFlags(orders)
+      // 旧后端不返回 reviewed 字段时才退回逐单查询（新后端已随行返回，省 N 次请求）
+      const missingReviewed = (list || []).length > 0
+        && !Object.prototype.hasOwnProperty.call(list[0] || {}, 'reviewed')
+      if (missingReviewed) {
+        this.loadReviewFlags(orders)
+      }
     }).catch(function () {
     }).finally(() => {
       this.setData({ loading: false })

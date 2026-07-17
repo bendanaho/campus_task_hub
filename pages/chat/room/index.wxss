@@ -457,3 +457,53 @@
 .msg-image {
   min-height: 200rpx;
 }
+
+/* 会话内就地订单操作 */
+.order-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.order-line .order-act {
+  margin: 0;
+  min-height: 52rpx;
+  line-height: 52rpx;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+}
+
+.order-wait {
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+/* 会话内申诉入口：弱化为文字链，不与主操作(确认完成)抢视觉 */
+.order-dispute {
+  font-size: 22rpx;
+  color: var(--reward);
+  text-decoration: underline;
+  padding: 6rpx 4rpx;
+}
+
+/* 购买按钮靠最右：说明文字占左侧，按钮 margin-left:auto 推到最右 */
+.buy-line {
+  flex-wrap: nowrap;
+}
+
+.buy-line .order-wait {
+  flex: 1;
+  min-width: 0;
+}
+
+.buy-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+/* 已评价标记：与"交易成功"绿标区分，用中性灰 */
+.reviewed-tag {
+  background: var(--field);
+  color: var(--muted);
+}

@@ -76,6 +76,16 @@
         data-key="email"
         bindinput="onInput"
       />
+      <input
+        wx:if="{{email}}"
+        class="input email-pwd"
+        password
+        placeholder="当前登录密码（修改邮箱必填）"
+        value="{{emailPwd}}"
+        data-key="emailPwd"
+        bindinput="onInput"
+      />
+      <view wx:if="{{email}}" class="muted email-pwd-tip">邮箱用于找回密码，修改需验证当前密码</view>
     </view>
     <button class="btn" disabled="{{submitting}}" loading="{{submitting}}" bindtap="save">更新联系方式</button>
   </view>

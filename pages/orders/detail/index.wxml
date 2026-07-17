@@ -12,13 +12,18 @@
       <view class="tag {{active.statusClass}}">{{active.statusText}}</view>
       <view class="amount"><text class="amount-yuan">¥</text>{{active.amountText}}</view>
 
-      <view class="confirm-rows">
+      <!-- 「付款方/收款方确认」是完成确认，只在进行中及之后才有意义；
+           待接受阶段显示会让人误以为"接单方该已确认"，改为一句状态提示 -->
+      <view wx:if="{{active.status === 'pending'}}" class="pending-hint">
+        {{active.canAccept ? '对方已下单，等待你接受订单' : '已下单，等待发布者接受'}}
+      </view>
+      <view wx:else class="confirm-rows">
         <view class="confirm-row">
-          <text class="confirm-role">付款方</text>
+          <text class="confirm-role">付款方（完成确认）</text>
           <text class="confirm-state {{active.payerConfirmed ? 'ok' : ''}}">{{active.payerText}}</text>
         </view>
         <view class="confirm-row">
-          <text class="confirm-role">收款方</text>
+          <text class="confirm-role">收款方（完成确认）</text>
           <text class="confirm-state {{active.earnerConfirmed ? 'ok' : ''}}">{{active.earnerText}}</text>
         </view>
       </view>
@@ -36,6 +41,7 @@
 
       <view class="actions">
         <button class="btn ghost" hover-class="btn-hover" bindtap="goChat">进入会话</button>
+        <button wx:if="{{active.canAccept}}" class="btn" hover-class="btn-hover" bindtap="acceptOrder">接受订单</button>
         <button wx:if="{{active.canCancel}}" class="btn warn" hover-class="btn-hover" bindtap="cancelOrder">取消订单</button>
         <button wx:if="{{active.canConfirm}}" class="btn" hover-class="btn-hover" bindtap="confirmOrder">确认完成</button>
         <button wx:if="{{active.canReview}}" class="btn secondary" hover-class="btn-hover" bindtap="goReview">评价</button>

@@ -1,5 +1,6 @@
 const auth = require('../../../utils/auth')
 const orderService = require('../../../services/orders')
+const postService = require('../../../services/posts')
 const chatService = require('../../../services/chat')
 const reviewService = require('../../../services/reviews')
 const format = require('../../../utils/format')
@@ -78,14 +79,23 @@ Page({
     return Promise.all([
       orderService.byChat(chatId).catch(function () { return null }),
       orderService.history(chatId).catch(function () { return [] }),
-      // 对方昵称订单接口未返回，沿用聊天室做法：从会话列表按 chatId 取
-      chatService.conversations().catch(function () { return [] })
+      // 聚合会话接口：一次拿对方昵称 + 任务发布者 id（判断"我能否接受订单"要用），
+      // 老后端无该接口时回退普通会话列表（届时无 taskPublisherId，接受入口仍在订单中心）
+      chatService.enrichedConversations().then(function (list) {
+        return (list || []).map(function (it) {
+          const c = (it && it.conversation) || {}
+          return { id: c.id, partnerName: c.partnerName, taskPublisherId: it && it.taskPublisherId }
+        })
+      }).catch(function () {
+        return chatService.conversations().catch(function () { return [] })
+      })
     ]).then((results) => {
       const user = auth.getUser()
       const uid = user ? String(user.id) : ''
       const conv = (results[2] || []).find(function (c) { return c.id === chatId })
       const partnerName = conv && conv.partnerName ? conv.partnerName : '对方'
-      const active = this.decorateActive(results[0], uid, partnerName)
+      const publisherId = conv && conv.taskPublisherId != null ? String(conv.taskPublisherId) : ''
+      const active = this.decorateActive(results[0], uid, partnerName, publisherId)
       const history = (results[1] || []).slice().reverse().map(function (order) {
         return {
           id: order.id,
@@ -97,6 +107,19 @@ Page({
         }
       })
       this.setData({ active: active, history: history })
+      // 兜底：聚合接口没给 taskPublisherId 时（老后端/会话未命中），按帖子详情
+      // 再确认一次"我是否发布者"，是则补出「接受订单」按钮
+      if (active && active.status === 'pending' && !active.canAccept && results[0] && results[0].postId) {
+        const self = this
+        postService.detail(results[0].postId).then(function (data) {
+          const t = (data && data.task) || {}
+          const stillPending = self.data.active && self.data.active.id === active.id
+            && self.data.active.status === 'pending'
+          if (stillPending && t.publisherId != null && String(t.publisherId) === uid) {
+            self.setData({ 'active.canAccept': true })
+          }
+        }).catch(function () {})
+      }
       return this.refreshReviewFlag(active)
     }).catch(function () {
     }).finally(() => {
@@ -118,12 +141,14 @@ Page({
     })
   },
 
-  decorateActive(order, uid, partnerName) {
+  decorateActive(order, uid, partnerName, publisherId) {
     if (!order || !order.id) {
       return null
     }
     const isPayer = order.payerId != null && String(order.payerId) === uid
     const isEarner = order.earnerId != null && String(order.earnerId) === uid
+    // 只有帖子发布者能接受待接受订单（接单/下单方无此权限，后端同规则）
+    const canAccept = order.status === 'pending' && !!publisherId && publisherId === uid
     const partnerId = isPayer
       ? (order.earnerId != null ? String(order.earnerId) : '')
       : (isEarner ? (order.payerId != null ? String(order.payerId) : '') : '')
@@ -151,6 +176,7 @@ Page({
       autoText: order.autoConfirmAt && order.status === 'in_progress'
         ? '若对方未确认，将于 ' + format.formatTime(order.autoConfirmAt) + ' 自动结算'
         : '',
+      canAccept: canAccept,
       canCancel: order.status === 'pending' && (isPayer || isEarner),
       canConfirm: order.status === 'in_progress' && ((isPayer && !order.payerConfirmed) || (isEarner && !order.earnerConfirmed)),
       canDispute: order.status === 'in_progress' && (isPayer || isEarner),
@@ -162,6 +188,23 @@ Page({
         ? '申诉理由：' + order.disputeReason
         : (order.status === 'closed' ? resolutionLabel(order) : '')
     }
+  },
+
+  // 发布者接受待接受订单（→ 进行中）。悬赏报酬已在发布时冻结；服务/组队单对方下单时已冻结
+  acceptOrder() {
+    const active = this.data.active
+    if (!active) return
+    confirmUtil.confirm({
+      title: '接受订单',
+      content: '接受后订单进入进行中，完成后双方确认结算。确认接受？'
+    }).then((ok) => {
+      if (!ok) return
+      orderService.accept(active.id).then(() => {
+        wx.showToast({ title: '已接受，订单进行中', icon: 'none' })
+        this.loadData()
+      }).catch(function () {
+      })
+    })
   },
 
   cancelOrder() {

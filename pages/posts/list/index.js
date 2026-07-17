@@ -76,6 +76,8 @@ Page({
       }
     }
     socket.on('NEW_TASK', markStale)
+    // 帖子被下架/撤回/删除时同样提示刷新（后端 85114d7 起广播 TASK_CLOSED）
+    socket.on('TASK_CLOSED', markStale)
     socket.on('TASK_TAKEN', markStale)
     this.loadPosts()
   },
@@ -244,7 +246,10 @@ Page({
       let thumb = ''
       if (thumbSrc) {
         if (thumbSrc.indexOf('data:') !== 0) {
-          thumb = thumbSrc
+          // 新版后端图片为 /uploads/xxx 相对路径：补全域名（否则被当作包内路径加载失败），
+          // 已预取过本地文件的直接用本地路径（真机 http/IP 直载受限）
+          const full = upload.fullUrl(thumbSrc)
+          thumb = upload.getCachedLocal(full) || full
         } else if (thumbSrc.length <= 150 * 1024 && thumbBudget >= thumbSrc.length) {
           thumb = thumbSrc
           thumbBudget -= thumbSrc.length
@@ -292,24 +297,26 @@ Page({
     })
   },
 
-  // 把仍指向 http 远程地址的发布者头像转成本地文件后原位替换（真机可显示）。
+  // 把仍指向 http 远程地址的发布者头像/卡片缩略图转成本地文件后原位替换（真机可显示）。
   // toLocalFile 有完成缓存 + 去重，翻页/刷新反复调用无害。
   prefetchAvatars(startIndex) {
     const self = this
     const list = this.data.posts || []
-    for (let i = startIndex; i < list.length; i++) {
-      ;(function (idx, item) {
-        const url = item && item.avatarUrl
-        if (!url || String(url).indexOf('http') !== 0) {
-          return
+    function fetchField(idx, item, field) {
+      const url = item && item[field]
+      if (!url || String(url).indexOf('http') !== 0) {
+        return
+      }
+      upload.toLocalFile(url).then(function (path) {
+        const cur = (self.data.posts || [])[idx]
+        if (cur && cur.id === item.id) {
+          self.setData({ ['posts[' + idx + '].' + field]: path })
         }
-        upload.toLocalFile(url).then(function (path) {
-          const cur = (self.data.posts || [])[idx]
-          if (cur && cur.id === item.id) {
-            self.setData({ ['posts[' + idx + '].avatarUrl']: path })
-          }
-        }).catch(function () {})
-      })(i, list[i])
+      }).catch(function () {})
+    }
+    for (let i = startIndex; i < list.length; i++) {
+      fetchField(i, list[i], 'avatarUrl')
+      fetchField(i, list[i], 'thumb')
     }
   },
 

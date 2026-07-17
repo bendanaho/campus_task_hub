@@ -1,7 +1,26 @@
-// 包装全局 Page：每个页面 onShow 自动应用外观主题（themeCls / 导航栏 / tabBar）
+// 包装全局 Page：每个页面 onLoad/onShow 自动应用外观主题（themeCls / 导航栏 / tabBar）
 const themeUtil = require('./utils/theme')
 const originalPage = Page
 Page = function (config) {
+  const originOnLoad = config.onLoad
+  // 深色模式下切页闪白的根因：themeCls 原来只在 onShow 里 setData，
+  // 新页面第一帧先按浅色渲染、下一拍才变深。onLoad 在首帧渲染前执行，
+  // 在这里就把主题类注入 data，首帧即深色（applyPage 幂等，onShow 再调无害）
+  config.onLoad = function () {
+    themeUtil.applyPage(this)
+    if (originOnLoad) {
+      originOnLoad.apply(this, arguments)
+    }
+  }
+  // 原生导航栏/窗口背景是异步原生调用，个别平台在 onLoad 时机会被吞掉，
+  // onReady（首帧已渲染）再断言一次，确保深色下导航栏不残留白色
+  const originOnReady = config.onReady
+  config.onReady = function () {
+    themeUtil.applyPage(this)
+    if (originOnReady) {
+      originOnReady.apply(this, arguments)
+    }
+  }
   const originOnShow = config.onShow
   config.onShow = function () {
     themeUtil.applyPage(this)
@@ -87,6 +106,8 @@ function reportError(tag, detail) {
 
 App({
   onLaunch() {
+    // 构建标记：vConsole 里看到这行即确认跑的是当前版本（排查"改了没生效"）
+    console.log('[campus-build] v0717-2 darkfix+payment-status')
     const token = wx.getStorageSync('campus_token') || ''
     const user = wx.getStorageSync('campus_user') || null
     this.globalData.token = token

@@ -81,14 +81,35 @@ Page({
       // 网格渲染 thumb；点击放大时再按需拉原图（/posts/{id}/images），此处先重置缓存。
       const rawImages = Array.isArray(task.images) ? task.images : []
       this.originalImages = null
+      // 新版后端图片为 /uploads/xxx 相对路径：补全域名，已预取过的用本地文件
       task.images = rawImages.map(function (img) {
-        return typeof img === 'string' ? img : (img.thumb || img.full || '')
+        const src = typeof img === 'string' ? img : (img.thumb || img.full || '')
+        if (!src || src.indexOf('data:') === 0) {
+          return src
+        }
+        const full = upload.fullUrl(src)
+        return upload.getCachedLocal(full) || full
       }).filter(Boolean)
       publisher.avatarText = publisher.username ? publisher.username.slice(0, 1) : '同'
       // 头像可能是 /uploads/xxx 相对路径：ua-avatar 只把 http/data 视作图片，
       // 故先补全为完整 URL；'color:' 模板与空值原样传入，交由组件走首字色块兜底
       const rawAvatar = publisher.avatar || ''
       publisher.avatar = (rawAvatar && rawAvatar.indexOf('color:') !== 0) ? upload.fullUrl(rawAvatar) : rawAvatar
+      const self = this
+      // 详情缩略图若是 http 远程地址，预取为本地文件后原位替换（真机直载受限）
+      setTimeout(function () {
+        ;(self.data.task && self.data.task.images || []).forEach(function (src, idx) {
+          if (!src || String(src).indexOf('http') !== 0) {
+            return
+          }
+          upload.toLocalFile(src).then(function (path) {
+            const cur = self.data.task && self.data.task.images
+            if (cur && cur[idx] === src) {
+              self.setData({ ['task.images[' + idx + ']']: path })
+            }
+          }).catch(function () {})
+        })
+      }, 0)
       this.setData({
         respondText: respondText,
         task: task,
@@ -133,14 +154,25 @@ Page({
       imageUtil.preview(thumbs, index)
       return
     }
-    // 详情只下发缩略图，点击放大时按需拉原图
+    // 详情只下发缩略图，点击放大时按需拉原图；
+    // 原图是 /uploads 相对路径 → 补全域名；真机直载受限 → 逐张转本地文件（失败退回远程地址）
     postService.images(taskId).then(function (list) {
       const fulls = (list || []).map(function (img) {
-        if (typeof img === 'string') return img
-        return (img && (img.full || img.thumb)) || ''
+        const src = typeof img === 'string' ? img : ((img && (img.full || img.thumb)) || '')
+        return (src && src.indexOf('data:') !== 0) ? upload.fullUrl(src) : src
       }).filter(Boolean)
-      self.originalImages = fulls.length ? fulls : thumbs
-      imageUtil.preview(self.originalImages, index)
+      if (!fulls.length) {
+        imageUtil.preview(thumbs, index)
+        return
+      }
+      return Promise.all(fulls.map(function (u) {
+        return String(u).indexOf('http') === 0
+          ? upload.toLocalFile(u).catch(function () { return u })
+          : Promise.resolve(u)
+      })).then(function (locals) {
+        self.originalImages = locals
+        imageUtil.preview(locals, index)
+      })
     }).catch(function () {
       // 拉原图失败退回用缩略图预览，至少能看
       imageUtil.preview(thumbs, index)
@@ -265,8 +297,10 @@ Page({
       partnerName: task.publisherName,
       taskId: task.id,
       taskTitle: task.title
-    }).then(function () {
-      return chatId
+    }).then(function (res) {
+      // 会话身份已收归后端：同一「任务+双方」后端会复用既有会话并返回规范 chatId
+      // （根治网页端/小程序端 id 格式不同导致的重复会话）；旧后端无返回则用本地生成的
+      return (res && res.chatId) || chatId
     })
   },
 
@@ -308,11 +342,12 @@ Page({
     if (side === 'payer') {
       title = '确认接单'
       content = '将创建订单，等待发布者接受。'
-        + (money ? '对方接受时赏金 ' + money + ' 由平台冻结托管，你完成任务、双方确认后打给你。' : '')
+        + (money ? '赏金 ' + money + ' 已在发布时由平台冻结托管，你完成任务、双方确认后打给你。' : '')
     } else if (side === 'earner') {
       title = '确认下单'
-      content = '将创建订单，等待对方接受。'
-        + (money ? '对方接受时服务费 ' + money + ' 将从你的余额冻结托管，服务完成、双方确认后支付给对方。' : '费用面议，可先在会话中沟通。')
+      content = money
+        ? ('将创建订单并立即从你的余额冻结服务费 ' + money + '（对方未接受或取消会自动退回），服务完成、双方确认后支付给对方。')
+        : '将创建订单，等待对方接受。费用面议，可先在会话中沟通。'
     } else {
       title = '确认参加'
       content = '将向发起者申请参加并建立会话，不涉及任何费用。'
