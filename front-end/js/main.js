@@ -838,8 +838,43 @@ function initHomePage() {
     var taskList = document.querySelector('.task-list');
     if (!taskList) return;
 
-    getTasks({ page: 0, size: 4 }).then(function(res) {
-        var tasks = (res && res.list) ? res.list : [];
+    var RECOMMEND_COUNT = 4;
+
+    // 随机取 N 条上架帖子。原先是 getTasks({page:0, size:4})，也就是「最新 4 条」，
+    // 每次进首页看到的永远是同一批，越靠后发布的帖子越没人看得见。
+    //
+    // 后端没有随机排序，也不该为此加一个（ORDER BY RAND() 在大表上是灾难）。纯前端做法：
+    //   1) 先要一个越界页拿 total —— 只回 {list:[], total:N}，117 字节，不带任何帖子
+    //   2) 在 [0, total) 里随机挑 N 个不重复的下标
+    //   3) 用 size=1&page=下标 并行取这 N 条
+    // 流量与原来的「一次取 4 条」基本相同（都是 4 条帖子的量），而不是把全部帖子
+    // 拉回来再洗牌——那样要 320KB，首页是落地页，不该背这个。
+    // 默认排序是 publishTime DESC、稳定，所以下标是有意义的；两步之间万一有人发了新帖，
+    // 最坏也就是某条重复或漏掉一条，无伤大雅。
+    function pickRandomIndexes(total, want) {
+        var pool = [];
+        for (var i = 0; i < total; i++) pool.push(i);
+        // Fisher-Yates 洗前 want 个就够，不必洗完整个数组
+        for (var j = 0; j < want && j < pool.length; j++) {
+            var k = j + Math.floor(Math.random() * (pool.length - j));
+            var t = pool[j]; pool[j] = pool[k]; pool[k] = t;
+        }
+        return pool.slice(0, want);
+    }
+
+    // 越界页：只为拿 total，不取帖子
+    getTasks({ page: 999999, size: 1 }).then(function(meta) {
+        var total = (meta && meta.total) || 0;
+        if (total === 0) return [];
+        var idxs = pickRandomIndexes(total, Math.min(RECOMMEND_COUNT, total));
+        return Promise.all(idxs.map(function(i) {
+            // 单条失败不连累整批（Promise.all 遇 reject 会全盘皆输）
+            return getTasks({ page: i, size: 1 })
+                .then(function(r) { return (r && r.list && r.list[0]) || null; })
+                .catch(function() { return null; });
+        }));
+    }).then(function(list) {
+        var tasks = (list || []).filter(Boolean);
         if (tasks.length === 0) {
             taskList.innerHTML = '<p>暂无推荐任务</p>';
             return;
@@ -866,6 +901,9 @@ function initHomePage() {
                 '</div>' +
             '</div>';
         }).join('');
+    }).catch(function() {
+        // 原来只有一个 then、没有 catch，请求挂了首页就一直空着不给交代
+        taskList.innerHTML = '<p>推荐任务加载失败，请刷新重试。</p>';
     });
 }
 
